@@ -383,6 +383,8 @@ static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 static void hide_enemy_slot(u16 slot);
 static void hide_enemies(void);
 static void map_cell(int mx, int my, u16 pal, u16 tile);
+static void draw_minimap_cell(int mx, int my);
+static void redraw_minimap_thing_cell(int thing_index);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
@@ -731,6 +733,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         enemy_awake[thing_index] = 0;
         enemy_attack_cooldown[thing_index] = 0;
         explode_barrel_at(thing_index, thing_x_q8[thing_index], thing_y_q8[thing_index]);
+        redraw_minimap_thing_cell(thing_index);
         return 1;
     }
     {
@@ -766,6 +769,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                     enemy_hit_flash[i] = 0;
                     enemy_awake[i] = 0;
                     enemy_attack_cooldown[i] = 0;
+                    redraw_minimap_thing_cell(i);
                     if (!score_awarded && player_score <= 999) {
                         u16 value = monster_score_value(source_type);
                         player_score = (u16)(player_score + value > 999 ? 999 : player_score + value);
@@ -984,6 +988,7 @@ static void update_enemy_hit_flash(void) {
             if (!explosion_timer[i]) {
                 enemy_dead[i] = 1;
                 thing_type_override[i] = 0;
+                redraw_minimap_thing_cell(i);
             }
         }
         if (death_drop_timer[i]) {
@@ -991,6 +996,7 @@ static void update_enemy_hit_flash(void) {
             if (!death_drop_timer[i]) {
                 thing_type_override[i] = death_drop_type[i];
                 death_drop_type[i] = 0;
+                redraw_minimap_thing_cell(i);
                 hide_enemies();
             }
         }
@@ -1348,6 +1354,7 @@ static void collect_nearby_pickups(void) {
             if (apply_pickup(runtime_thing_type(i))) {
                 if (player_items < 999) player_items++;
                 enemy_dead[i] = 1;
+                redraw_minimap_thing_cell(i);
                 hide_enemies();
             }
         }
@@ -1607,7 +1614,7 @@ static void open_door_index(u16 door_index) {
         if (!in_group[i]) continue;
         if (!g_runtime_door_open[i]) opened = 1;
         g_runtime_door_open[i] = 1;
-        if (map_on) map_cell(g_runtime_doors[i].x, g_runtime_doors[i].y, 0, FIX_BLANK);
+        if (map_on) draw_minimap_cell(g_runtime_doors[i].x, g_runtime_doors[i].y);
     }
     if (opened) {
         door_message_timer = 35;
@@ -1770,7 +1777,7 @@ static u8 minimap_has_pickup(int mx, int my) {
 static u8 minimap_has_threat(int mx, int my) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u16 type = runtime_thing_type(i);
-        if (enemy_dead[i] || (!thing_is_monster(type) && !thing_is_barrel(type))) continue;
+        if (enemy_dead[i] || (!thing_is_monster(type) && !thing_is_barrel(type) && !thing_is_explosion(type))) continue;
         if ((thing_x_q8[i] >> 8) == mx && (thing_y_q8[i] >> 8) == my) return 1;
     }
     return 0;
@@ -1790,6 +1797,12 @@ static void draw_minimap_cell(int mx, int my) {
     } else {
         map_cell(mx, my, 0, FIX_BLANK);
     }
+}
+
+static void redraw_minimap_thing_cell(int thing_index) {
+    if (!map_on || thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
+    draw_minimap_cell(thing_x_q8[thing_index] >> 8, thing_y_q8[thing_index] >> 8);
+    prev_px = -1;
 }
 
 static void draw_minimap(void) {
