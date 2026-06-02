@@ -626,6 +626,10 @@ def emit_header(
         if doors:
             f.write("    if (cell >= 2) return g_runtime_door_open[cell - 2] ? 0 : 1;\n")
         f.write("    return 1;\n")
+        f.write("}\n\n")
+        f.write("static inline unsigned char map_cell_value(int x, int y) {\n")
+        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
+        f.write("    return g_map[y][x];\n")
         f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
 
 

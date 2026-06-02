@@ -54,8 +54,11 @@ static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
 static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
+static u8  kindbuf[NUM_COLS];    /* 0 = wall atlas, 1 = door atlas          */
+static u8  curkind[NUM_COLS];
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
+static u16 door_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 
@@ -79,6 +82,7 @@ void rc_init(void) {
         for (int row = 0; row < WALL_WIN; row++) {
             int ty = (row * TILE_WALL_ATLAS_ROWS) / WALL_WIN;
             wall_tiles[tx][row] = (u16)(TILE_WALL_ATLAS_BASE + ty * TILE_WALL_ATLAS_COLS + tx);
+            door_tiles[tx][row] = (u16)(TILE_DOOR_ATLAS_BASE + ty * TILE_WALL_ATLAS_COLS + tx);
         }
     }
     for (int c = 0; c < NUM_COLS; c++) {
@@ -94,6 +98,7 @@ void rc_init(void) {
     for (int c = 0; c < NUM_COLS; c++) {
         curpal[c] = 0xFF; /* force first write */
         curtex[c] = 0xFF;
+        curkind[c] = 0xFF;
         curscb2[c] = 0xFFFF;
         curscb3[c] = 0xFFFF;
     }
@@ -197,11 +202,16 @@ void rc_render(void) {
         else          { stepY =  1; sideY = fmul(((mapY + 1) << FBITS) - posY, ddY); }
 
         int side = 0;                       /* 0 = hit on X grid line (N/S)  */
+        unsigned char hit_cell = 1;
         for (;;) {
             if (sideX < sideY) { sideX += ddX; mapX += stepX; side = 0; }
             else               { sideY += ddY; mapY += stepY; side = 1; }
-            if (map_at(mapX, mapY)) break;
+            if (map_at(mapX, mapY)) {
+                hit_cell = map_cell_value(mapX, mapY);
+                break;
+            }
         }
+        kindbuf[x] = (hit_cell >= 2) ? 1 : 0;
 
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
         if (perp < FMIN) perp = FMIN;
@@ -233,7 +243,7 @@ void rc_render(void) {
         int band = ((MAX_H - h) * DEPTH_BANDS) / MAX_H;
         if (band < 0) band = 0;
         if (band >= DEPTH_BANDS) band = DEPTH_BANDS - 1;
-        palbuf[x] = (u8)(PAL_DEPTH_BASE + (side ? DEPTH_BANDS : 0) + band);
+        palbuf[x] = (u8)((kindbuf[x] ? PAL_DOOR_DEPTH_BASE : PAL_DEPTH_BASE) + (side ? DEPTH_BANDS : 0) + band);
     }
     view_dirty = 0;
     wall_upload_dirty = 1;
@@ -281,9 +291,9 @@ void rc_blit(void) {
 
     /* directional shading */
     for (int c = 0; c < NUM_COLS; c++) {
-        if (texbuf[c] != curtex[c]) {
+        if (texbuf[c] != curtex[c] || kindbuf[c] != curkind[c]) {
             u16 spr = WALL_BASE + c;
-            u16 *tiles = wall_tiles[texbuf[c]];
+            u16 *tiles = kindbuf[c] ? door_tiles[texbuf[c]] : wall_tiles[texbuf[c]];
             if (palbuf[c] != curpal[c]) {
                 u16 attr = (u16)(palbuf[c] << 8);
                 vram_addr(VRAM_SCB1 + spr * 64);
@@ -299,6 +309,7 @@ void rc_blit(void) {
                 for (int t = 0; t < WALL_WIN; t++) vram_w(tiles[t]);
             }
             curtex[c] = texbuf[c];
+            curkind[c] = kindbuf[c];
             continue;
         }
         if (palbuf[c] == curpal[c]) continue;

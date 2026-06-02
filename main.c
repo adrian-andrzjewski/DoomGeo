@@ -12,6 +12,34 @@ static u8 hurt_flash = 0;
 static u8 hurt_flash_on = 0;
 
 /* ---- palette setup --------------------------------------------------- */
+static u8 shade_channel(u8 value, u16 scale) {
+    u16 shaded = (u16)value * scale / 128;
+    return shaded > 31 ? 31 : (u8)shaded;
+}
+
+static void set_flat_palette(u16 pal, const u8 rgb[3], u16 scale) {
+    u8 r = shade_channel(rgb[0], scale);
+    u8 g = shade_channel(rgb[1], scale);
+    u8 b = shade_channel(rgb[2], scale);
+    for (int i = 1; i < 16; i++) pal_set(pal, (u16)i, RGB(r, g, b));
+}
+
+static void restore_flat_palettes(void) {
+    for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
+        pal_set(PAL_CEILING, (u16)(i + 1), RGB(g_ceiling_palette_rgb[i][0], g_ceiling_palette_rgb[i][1], g_ceiling_palette_rgb[i][2]));
+    }
+    for (int i = 0; i < FLOOR_PALETTE_COLORS; i++) {
+        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(g_floor_palette_rgb[i][0], g_floor_palette_rgb[i][1], g_floor_palette_rgb[i][2]));
+    }
+
+    for (u16 row = 0; row < BG_SPLIT; row++) {
+        u16 ceiling_scale = (u16)(72 + row * 18);
+        u16 floor_scale = (u16)(96 + row * 18);
+        set_flat_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb[0], ceiling_scale);
+        set_flat_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb[0], floor_scale);
+    }
+}
+
 static void init_palettes(void) {
     /* index 0 of every palette is transparent for sprites; we keep walls
      * opaque by only using indices 1..3. */
@@ -39,20 +67,22 @@ static void init_palettes(void) {
                 }
             }
         }
+        for (int b = 0; b < DEPTH_BANDS; b++) {
+            int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);
+            for (int s = 0; s < 2; s++) {
+                int sf = s ? 140 : 256;
+                u16 pal = PAL_DOOR_DEPTH_BASE + s * DEPTH_BANDS + b;
+                for (int i = 0; i < DOOR_PALETTE_COLORS; i++) {
+                    int r = g_door_palette_rgb[i][0] * fn / 256 * sf / 256;
+                    int g = g_door_palette_rgb[i][1] * fn / 256 * sf / 256;
+                    int bl = g_door_palette_rgb[i][2] * fn / 256 * sf / 256;
+                    pal_set(pal, (u16)(i + 1), RGB((u8)r, (u8)g, (u8)bl));
+                }
+            }
+        }
     }
 
-    for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
-        u8 r = g_ceiling_palette_rgb[i][0];
-        u8 g = g_ceiling_palette_rgb[i][1];
-        u8 b = g_ceiling_palette_rgb[i][2];
-        pal_set(PAL_CEILING, (u16)(i + 1), RGB(r, g, b));
-    }
-    for (int i = 0; i < FLOOR_PALETTE_COLORS; i++) {
-        u8 r = g_floor_palette_rgb[i][0];
-        u8 g = g_floor_palette_rgb[i][1];
-        u8 b = g_floor_palette_rgb[i][2];
-        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(r, g, b));
-    }
+    restore_flat_palettes();
 
     /* minimap */
     pal_set(PAL_MAP_WALL,   15, RGB(20, 20, 22)); /* walls */
@@ -75,12 +105,7 @@ static void init_palettes(void) {
 }
 
 static void restore_play_palettes(void) {
-    for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
-        pal_set(PAL_CEILING, (u16)(i + 1), RGB(g_ceiling_palette_rgb[i][0], g_ceiling_palette_rgb[i][1], g_ceiling_palette_rgb[i][2]));
-    }
-    for (int i = 0; i < FLOOR_PALETTE_COLORS; i++) {
-        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(g_floor_palette_rgb[i][0], g_floor_palette_rgb[i][1], g_floor_palette_rgb[i][2]));
-    }
+    restore_flat_palettes();
     for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
         pal_set(PAL_HUD, (u16)(i + 1), RGB(g_hud_palette_rgb[i][0], g_hud_palette_rgb[i][1], g_hud_palette_rgb[i][2]));
     }
@@ -100,6 +125,19 @@ static void restore_play_palettes(void) {
             }
         }
     }
+    for (int b = 0; b < DEPTH_BANDS; b++) {
+        int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);
+        for (int s = 0; s < 2; s++) {
+            int sf = s ? 140 : 256;
+            u16 pal = PAL_DOOR_DEPTH_BASE + s * DEPTH_BANDS + b;
+            for (int i = 0; i < DOOR_PALETTE_COLORS; i++) {
+                int r = g_door_palette_rgb[i][0] * fn / 256 * sf / 256;
+                int g = g_door_palette_rgb[i][1] * fn / 256 * sf / 256;
+                int bl = g_door_palette_rgb[i][2] * fn / 256 * sf / 256;
+                pal_set(pal, (u16)(i + 1), RGB((u8)r, (u8)g, (u8)bl));
+            }
+        }
+    }
 }
 
 static void set_hurt_palettes(void) {
@@ -109,8 +147,15 @@ static void set_hurt_palettes(void) {
         pal_set(PAL_HUD, (u16)i, RGB(31, 4, 4));
         pal_set(PAL_WEAPON, (u16)i, RGB(31, 5, 4));
     }
+    for (u16 row = 0; row < BG_SPLIT; row++) {
+        for (int i = 1; i < 16; i++) {
+            pal_set((u16)(PAL_CEILING_GRAD_BASE + row), (u16)i, RGB(31, 2, 2));
+            pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)i, RGB(28, 2, 1));
+        }
+    }
     for (int p = 0; p < DEPTH_BANDS * 2; p++) {
         for (int i = 1; i < 16; i++) pal_set((u16)(PAL_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
+        for (int i = 1; i < 16; i++) pal_set((u16)(PAL_DOOR_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
     }
 }
 
@@ -1111,7 +1156,9 @@ static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
         for (u16 t = 0; t < BG_WIN; t++) {
-            u16 pal = (t < BG_SPLIT) ? PAL_CEILING : PAL_FLOOR;
+            u16 pal = (t < BG_SPLIT)
+                ? (u16)(PAL_CEILING_GRAD_BASE + t)
+                : (u16)(PAL_FLOOR_GRAD_BASE + (t - BG_SPLIT));
             scb1_tile(spr, t, TILE_SOLID, pal);
         }
         scb2(spr, 0x0F, 0xFF);        /* full size, no shrink (16-tile ref)  */

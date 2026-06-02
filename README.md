@@ -6,7 +6,7 @@ in C.
 This was made purely for research purposes to understand the complexities of rendering realtime "3D"
 on the Neo Geo. The code is unoptimized and could be built to run much faster. 
 
-<img width="960" height="672" alt="Current Neo Geo Doom prototype with textured walls, stable floor and ceiling, pistol HUD, pickups, and live counters" src="docs/screenshots/doom-neogeo-current.png" />
+<img width="960" height="672" alt="Current Neo Geo Doom prototype with Doom wall and door textures, shaded floor and ceiling, pistol HUD, pickups, and live counters" src="docs/screenshots/doom-neogeo-current.png" />
 
 ## How it works
 
@@ -20,16 +20,18 @@ Every frame, for each of 64 screen columns:
 The video chip then scales each precomposed Doom wall-texture column to the
 computed height. Floor and ceiling now follow the original branch's steadier
 split-plane strategy: the converter still reads the player-start Doom flats,
-but uses them to derive solid backdrop colours instead of trying to animate a
-screen-space flat texture sheet. This keeps the 3D read anchored on the wall
+but uses them to derive row-shaded backdrop colours instead of trying to animate
+a screen-space flat texture sheet. This keeps the 3D read anchored on the wall
 perspective and avoids the noisy floor/ceiling motion that fought the raycaster
-on Neo Geo's sprite hardware. Doom pistol frames and the `STFST00` status face
-are baked with Doom patch offsets so the weapon sits at the same screen anchor
-as the original psprite path while the bottom 32-pixel `STBAR` remains a
-separate HUD surface. The pistol animates when B is pressed; walking and
-strafing nudge the strips with a small hardware-position bob so movement feels
-less static without adding any sprite slots. The converter emits a compact
-grid-space runtime list from WAD `THINGS`;
+on Neo Geo's sprite hardware. The wall path now packs a second Doom texture
+atlas for converted closed-door cells, so normal walls keep the `STARTAN3`
+columns while closed doors use `BIGDOOR2` with their own distance-shaded
+palette range. Doom pistol frames and the `STFST00` status face are baked with
+Doom patch offsets so the weapon sits at the same screen anchor as the original
+psprite path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
+The pistol animates when B is pressed; walking and strafing nudge the strips
+with a small hardware-position bob so movement feels less static without adding
+any sprite slots. The converter emits a compact grid-space runtime list from WAD `THINGS`;
 the renderer projects up to two visible monster candidates with the same camera
 math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Visible monsters are selected
