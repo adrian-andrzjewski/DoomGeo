@@ -116,8 +116,8 @@ $(CROM2): rom/c2.bin
 rom/c1.bin rom/c2.bin rom/s1.bin rom/m1.bin rom/v1.bin: $(GFX_STAMP)
 	@test -f $@
 
-$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(FREEDOOM_ZIP) | $(BUILDDIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER)
+$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(DOOM_MAP_HEADER) $(FREEDOOM_ZIP) | $(BUILDDIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER)
 	touch $@
 
 $(GFX_HEADER): $(GFX_STAMP)

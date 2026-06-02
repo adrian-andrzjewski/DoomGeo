@@ -37,9 +37,18 @@ static void init_palettes(void) {
         }
     }
 
-    /* backdrop bands */
-    pal_set(PAL_CEILING, 1, RGB( 6,  7, 12));    /* night sky / ceiling     */
-    pal_set(PAL_FLOOR,   1, RGB(12, 10,  7));    /* dusty floor             */
+    for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
+        u8 r = g_ceiling_palette_rgb[i][0];
+        u8 g = g_ceiling_palette_rgb[i][1];
+        u8 b = g_ceiling_palette_rgb[i][2];
+        pal_set(PAL_CEILING, (u16)(i + 1), RGB(r, g, b));
+    }
+    for (int i = 0; i < FLOOR_PALETTE_COLORS; i++) {
+        u8 r = g_floor_palette_rgb[i][0];
+        u8 g = g_floor_palette_rgb[i][1];
+        u8 b = g_floor_palette_rgb[i][2];
+        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(r, g, b));
+    }
 
     /* minimap */
     pal_set(PAL_MAP_WALL,   15, RGB(20, 20, 22)); /* walls */
@@ -114,8 +123,12 @@ static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
         for (u16 t = 0; t < BG_WIN; t++) {
-            u16 pal = (t < BG_SPLIT) ? PAL_CEILING : PAL_FLOOR;
-            scb1_tile(spr, t, TILE_SOLID, pal);
+            if (t < BG_SPLIT) {
+                scb1_tile(spr, t, (u16)(TILE_CEILING_BASE + t * BG_COUNT + i), PAL_CEILING);
+            } else {
+                u16 row = (u16)(t - BG_SPLIT);
+                scb1_tile(spr, t, (u16)(TILE_FLOOR_BASE + row * BG_COUNT + i), PAL_FLOOR);
+            }
         }
         scb2(spr, 0x0F, 0xFF);        /* full size, no shrink (16-tile ref)  */
         scb3(spr, 0, 0, BG_WIN);      /* top of screen                       */
