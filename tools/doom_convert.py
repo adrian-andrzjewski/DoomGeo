@@ -280,6 +280,11 @@ def grid_point(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int
 
 
 def raster_line(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> None:
+    for x, y in line_cells(grid, x0, y0, x1, y1):
+        grid[y][x] = 1
+
+
+def line_cells(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
     width = len(grid[0])
     height = len(grid)
     dx = abs(x1 - x0)
@@ -288,9 +293,10 @@ def raster_line(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> No
     sy = 1 if y0 < y1 else -1
     err = dx + dy
     x, y = x0, y0
+    cells: list[tuple[int, int]] = []
     while True:
         if 0 <= x < width and 0 <= y < height:
-            grid[y][x] = 1
+            cells.append((x, y))
         if x == x1 and y == y1:
             break
         e2 = 2 * err
@@ -300,6 +306,7 @@ def raster_line(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> No
         if e2 <= dx:
             err += dx
             y += sy
+    return cells
 
 
 def nearest_open(grid: list[list[int]], sx: int, sy: int) -> tuple[int, int]:
@@ -425,6 +432,7 @@ PICKUP_TYPES = {
 
 RUNTIME_THING_TYPES = MONSTER_TYPES | PICKUP_TYPES
 EXIT_SPECIALS = {11, 51, 52, 124, 197, 198, 243, 244}
+DOOR_SPECIALS = {1, 26, 27, 28, 31, 32, 33, 34, 46, 61, 63, 76, 86, 90, 103, 117, 118}
 
 def line_of_sight_grid(grid: list[list[int]], ax: float, ay: float, bx: float, by: float) -> bool:
     steps = max(1, int(math.hypot(bx - ax, by - ay) * 8))
@@ -501,6 +509,35 @@ def runtime_exits(
     return exits
 
 
+def runtime_doors(
+    linedefs: list[LineDef],
+    vertices: list[Vertex],
+    grid: list[list[int]],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> list[tuple[int, int, int]]:
+    doors: list[tuple[int, int, int]] = []
+    seen: set[tuple[int, int]] = set()
+    for line in linedefs:
+        if line.special not in DOOR_SPECIALS:
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        x0, y0 = grid_point(a.x, a.y, min_x, max_y, scale, margin)
+        x1, y1 = grid_point(b.x, b.y, min_x, max_y, scale, margin)
+        for cell_x, cell_y in line_cells(grid, x0, y0, x1, y1):
+            if not grid[cell_y][cell_x]:
+                continue
+            key = (cell_x, cell_y)
+            if key in seen:
+                continue
+            seen.add(key)
+            doors.append((cell_x, cell_y, line.special))
+    return doors
+
+
 def emit_header(
     out_path: str,
     grid: list[list[int]],
@@ -512,6 +549,7 @@ def emit_header(
     stats: dict[str, int],
     things: list[tuple[int, int, int, int]],
     exits: list[tuple[int, int, int]],
+    doors: list[tuple[int, int, int]],
 ) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     angle_rad = math.radians(angle)
@@ -544,10 +582,15 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_BLOCKMAP_WORDS {stats['blockmap_words']}\n")
         f.write(f"#define DOOM_CONVERTED_THINGS {stats['things']}\n")
         f.write(f"#define DOOM_CONVERTED_EXITS {len(exits)}\n")
+        f.write(f"#define DOOM_CONVERTED_DOORS {len(doors)}\n")
         f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
         f.write(f"#define NG_RUNTIME_EXIT_COUNT {len(exits)}\n\n")
+        f.write(f"#define NG_RUNTIME_DOOR_COUNT {len(doors)}\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
         f.write("typedef struct NgRuntimeExit { short x_q8; short y_q8; unsigned short special; } NgRuntimeExit;\n\n")
+        f.write("typedef struct NgRuntimeDoor { unsigned char x; unsigned char y; unsigned short special; } NgRuntimeDoor;\n\n")
+        if doors:
+            f.write("extern unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT];\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for row in grid:
             f.write("    {")
@@ -562,9 +605,18 @@ def emit_header(
         for x_q8, y_q8, special in exits:
             f.write(f"    {{{x_q8},{y_q8},{special}}},\n")
         f.write("};\n\n")
+        f.write("static const NgRuntimeDoor g_runtime_doors[NG_RUNTIME_DOOR_COUNT] = {\n")
+        for x, y, special in doors:
+            f.write(f"    {{{x},{y},{special}}},\n")
+        f.write("};\n\n")
         f.write("static inline int map_at(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
-        f.write("    return g_map[y][x];\n")
+        f.write("    if (!g_map[y][x]) return 0;\n")
+        if doors:
+            f.write("    for (int i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {\n")
+            f.write("        if (g_runtime_door_open[i] && g_runtime_doors[i].x == x && g_runtime_doors[i].y == y) return 0;\n")
+            f.write("    }\n")
+        f.write("    return 1;\n")
         f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
 
 
@@ -775,6 +827,7 @@ def convert(args: argparse.Namespace) -> None:
     sx, sy = choose_start_pose(grid, sx, sy, player.angle)
     converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle)
     converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin)
+    converted_doors = runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin)
 
     emit_header(
         args.out,
@@ -800,6 +853,7 @@ def convert(args: argparse.Namespace) -> None:
         },
         converted_things,
         converted_exits,
+        converted_doors,
     )
     if args.assets_header and args.assets_source:
         emit_assets(

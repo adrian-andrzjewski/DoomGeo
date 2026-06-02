@@ -47,6 +47,7 @@ pixel work is offloaded to the scaler hardware.
 | Hold A + Left/Right | Strafe            |
 | B                   | Fire pistol       |
 | C                   | Toggle minimap    |
+| D                   | Open nearby door  |
 
 Turning is tuned deliberately slower than the original raycaster demo so the
 projected Doom targets can be lined up with keyboard or arcade-stick input.
@@ -69,10 +70,12 @@ the player while still using the compact converted WAD data for type, flags, and
 initial placement. When health reaches zero, movement and firing stop and the
 fix layer shows a compact `DEAD` message.
 
-The converter also preserves Doom exit linedefs as a compact runtime trigger
-list. Reaching the converted E1M1 exit cell now raises a fix-layer `EXIT`
-message, which is the first pass toward level completion behavior without
-keeping generic WAD directory/lump metadata in the cartridge.
+The converter also preserves Doom door and exit linedefs as compact runtime
+trigger lists. Pressing D opens nearby converted door cells, affecting both
+movement and raycasting through the shared `map_at()` path. Reaching the
+converted E1M1 exit cell now raises a fix-layer `EXIT` message. This keeps
+level progression behavior in the ROM without keeping generic WAD
+directory/lump metadata in the cartridge.
 
 ## Building
 

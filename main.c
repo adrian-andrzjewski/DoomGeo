@@ -7,6 +7,8 @@
 #include "raycast.h"
 #include "map.h"
 
+unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
+
 /* ---- palette setup --------------------------------------------------- */
 static void init_palettes(void) {
     /* index 0 of every palette is transparent for sprites; we keep walls
@@ -112,6 +114,7 @@ static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 
 static void hide_enemy_slot(u16 slot);
 static void hide_enemies(void);
+static void map_cell(int mx, int my, u16 pal, u16 tile);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
@@ -402,6 +405,21 @@ static void check_exit_reached(void) {
             level_complete = 1;
             draw_exit_message();
             return;
+        }
+    }
+}
+
+static void open_nearby_door(void) {
+    int px, py;
+    rc_player_q8(&px, &py);
+    for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
+        const NgRuntimeDoor *door = &g_runtime_doors[i];
+        int dx = px - ((int)door->x * 256 + 128);
+        int dy = py - ((int)door->y * 256 + 128);
+        if (g_runtime_door_open[i]) continue;
+        if (iabs16(dx) <= 384 && iabs16(dy) <= 384) {
+            g_runtime_door_open[i] = 1;
+            if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
         }
     }
 }
@@ -731,10 +749,15 @@ int main(void) {
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;    
         if (player_health) {
+            enum { D = 0x80 };
+            static u8 d_prev = 0;
+            u8 d_now = pressed & D;
             rc_input(pressed);
             update_monster_ai();
             collect_nearby_pickups();
             check_exit_reached();
+            if (d_now && !d_prev) open_nearby_door();
+            d_prev = d_now;
         } else {
             pressed = 0;
         }
