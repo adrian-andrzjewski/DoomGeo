@@ -1142,14 +1142,46 @@ static int closed_door_at_cell(int cell_x, int cell_y) {
 static void open_door_index(u16 door_index) {
     const NgRuntimeDoor *door = &g_runtime_doors[door_index];
     u8 required_key = key_bit_for_door(door->special);
+    u8 in_group[NG_RUNTIME_DOOR_COUNT];
+    u8 opened = 0;
     if (required_key && (player_keys & required_key) == 0) {
         key_message_timer = 60;
         return;
     }
-    g_runtime_door_open[door_index] = 1;
-    door_message_timer = 35;
-    rc_invalidate_view();
-    if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
+
+    for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) in_group[i] = 0;
+    in_group[door_index] = 1;
+    for (;;) {
+        u8 changed = 0;
+        for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
+            if (in_group[i]) continue;
+            if (g_runtime_doors[i].special != door->special) continue;
+            for (u16 j = 0; j < NG_RUNTIME_DOOR_COUNT; j++) {
+                int dx;
+                int dy;
+                if (!in_group[j]) continue;
+                dx = (int)g_runtime_doors[i].x - (int)g_runtime_doors[j].x;
+                dy = (int)g_runtime_doors[i].y - (int)g_runtime_doors[j].y;
+                if (iabs16(dx) + iabs16(dy) == 1) {
+                    in_group[i] = 1;
+                    changed = 1;
+                    break;
+                }
+            }
+        }
+        if (!changed) break;
+    }
+
+    for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
+        if (!in_group[i]) continue;
+        if (!g_runtime_door_open[i]) opened = 1;
+        g_runtime_door_open[i] = 1;
+        if (map_on) map_cell(g_runtime_doors[i].x, g_runtime_doors[i].y, 0, FIX_BLANK);
+    }
+    if (opened) {
+        door_message_timer = 35;
+        rc_invalidate_view();
+    }
 }
 
 static void open_nearby_door(void) {
