@@ -60,6 +60,7 @@ PLANE_PERSPECTIVE_TILES = (
     * PLANE_PERSPECTIVE_ROWS
     * PLANE_PERSPECTIVE_COLS
 )
+PLANE_TEXEL_Q8_DIV = 2
 CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
 FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
 HUD_BASE = FLOOR_FLAT_BASE + FLAT_TILES
@@ -563,8 +564,8 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
                                 else:
                                     world_x = origin_x + ray_x * dist_q8
                                     world_y = origin_y + ray_y * dist_q8
-                                sx = int(world_x / 4) & 63
-                                sy = int(world_y / 4) & 63
+                                sx = int(world_x / PLANE_TEXEL_Q8_DIV) & 63
+                                sy = int(world_y / PLANE_TEXEL_Q8_DIV) & 63
                                 tile[y][x] = quantize_color(flat[sy][sx], playpal, palette)
                         tiles.append(tile)
     return tiles

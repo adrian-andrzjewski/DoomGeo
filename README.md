@@ -24,8 +24,9 @@ bakes each plane into 16 view-direction buckets, 2x2 movement phases, and 6x20
 screen-tile perspective caches. Runtime only chooses the current bucket from
 the raycaster's direction and half-cell player phase, so each 16x16 backdrop
 tile already contains perspective-sampled flat pixels instead of a raw flat
-block. This keeps the planes tied to the wall perspective and gives the near
-floor stronger 3D texture movement without adding more per-scanline sprites.
+block. The baked sampler uses a denser Doom-flat texel scale, keeping the
+planes tied to the wall perspective while making the near floor read as a
+receding textured surface without adding more per-scanline sprites.
 The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
 `BROWNGRN`, `BROWN1`, and `SUPPORT2` E1M1 linedefs can select their own
