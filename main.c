@@ -175,6 +175,10 @@ static int iabs16(int value) {
     return value < 0 ? -value : value;
 }
 
+static u8 game_active(void) {
+    return player_health != 0 && !level_complete;
+}
+
 static void init_runtime_things(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         thing_x_q8[i] = g_runtime_things[i].x_q8;
@@ -338,7 +342,7 @@ static void update_monster_damage(void) {
         hurt_timer--;
         return;
     }
-    if (player_health == 0) return;
+    if (!game_active()) return;
 
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
@@ -479,6 +483,7 @@ static void check_exit_reached(void) {
         const NgRuntimeExit *exit = &g_runtime_exits[i];
         if (iabs16(px - exit->x_q8) <= 128 && iabs16(py - exit->y_q8) <= 128) {
             level_complete = 1;
+            hide_enemies();
             draw_exit_message();
             return;
         }
@@ -824,7 +829,7 @@ int main(void) {
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;    
-        if (player_health) {
+        if (game_active()) {
             enum { D = 0x80 };
             static u8 d_prev = 0;
             u8 d_now = pressed & D;
@@ -843,7 +848,8 @@ int main(void) {
         update_hurt_flash();
         rc_blit();                      /* push to VRAM during vblank         */
         update_background_phase(rc_bg_phase());
-        update_enemy();
+        if (level_complete) hide_enemies();
+        else update_enemy();
         update_monster_damage();
         update_weapon(pressed);
         update_status_numbers();
