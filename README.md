@@ -24,12 +24,13 @@ player-start sector and packed into preprojected sprite-strip phase banks; the
 a framebuffer span renderer. Doom pistol frames are rendered as a centered
 sprite-strip overlay above the bottom 32-pixel `STBAR` status bar and animate
 when B is pressed. The converter emits a compact grid-space runtime list from
-WAD `THINGS`; the renderer projects the first visible monster candidate with
-the same camera math as the wall renderer. Common E1M1 monster thing types map
-to their own pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`, `SARG`) and live
-palette, and the pistol clears overlapping thing variants at that coordinate as
-the initial combat proof of concept. The optional minimap is drawn on the fix
-(text) layer, which always composites over sprites.
+WAD `THINGS`; the renderer projects up to two visible monster candidates with
+the same camera math as the wall renderer while staying at the Neo Geo's
+96-sprites-per-scanline ceiling in the worst case. Common E1M1 monster thing
+types map to their own pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`,
+`SARG`) and live palette, and the pistol clears the currently rendered target
+set as the initial combat proof of concept. The optional minimap is drawn on
+the fix (text) layer, which always composites over sprites.
 
 All arithmetic is 16.16 . Rotation uses constant cos/sin multiplies. The whole
 renderer writes only a few control words per column per frame; the expensive

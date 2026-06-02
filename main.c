@@ -82,12 +82,21 @@ static u8  bg_phase = 0xFF;
 static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
-static int enemy_active = -1;
-static int enemy_sprite_def = -1;
-static int enemy_screen_x = SCRW / 2;
-static int enemy_screen_w = 0;
+static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
 
-static void hide_enemy(void);
+typedef struct EnemyDraw {
+    int thing_index;
+    int sprite_def;
+    int screen_x;
+    int screen_w;
+    int screen_h;
+    int dist_q8;
+} EnemyDraw;
+
+static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
+
+static void hide_enemy_slot(u16 slot);
+static void hide_enemies(void);
 
 static int enemy_sprite_def_for_type(u16 thing_type) {
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
@@ -96,29 +105,38 @@ static int enemy_sprite_def_for_type(u16 thing_type) {
     return 0;
 }
 
-static void load_enemy_palette(int def) {
-    if (def == enemy_sprite_def) return;
+static void load_enemy_palette(u16 slot, int def) {
+    if (def == enemy_palette_def[slot]) return;
     for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
         u8 r = g_enemy_palette_rgb[def][i][0];
         u8 g = g_enemy_palette_rgb[def][i][1];
         u8 b = g_enemy_palette_rgb[def][i][2];
-        pal_set(PAL_ENEMY, (u16)(i + 1), RGB(r, g, b));
+        pal_set((u16)(PAL_ENEMY_BASE + slot), (u16)(i + 1), RGB(r, g, b));
     }
-    enemy_sprite_def = def;
+    enemy_palette_def[slot] = def;
 }
 
-static void kill_active_enemy(void) {
-    if (enemy_active < 0 || enemy_active >= NG_RUNTIME_THING_COUNT) return;
+static void kill_enemy_at(int thing_index) {
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
     {
-        short x = g_runtime_things[enemy_active].x_q8;
-        short y = g_runtime_things[enemy_active].y_q8;
+        short x = g_runtime_things[thing_index].x_q8;
+        short y = g_runtime_things[thing_index].y_q8;
         for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
             if (g_runtime_things[i].x_q8 == x && g_runtime_things[i].y_q8 == y) {
                 enemy_dead[i] = 1;
             }
         }
     }
-    hide_enemy();
+}
+
+static void kill_visible_enemies(void) {
+    u8 killed = 0;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        if (enemies[slot].thing_index < 0) continue;
+        kill_enemy_at(enemies[slot].thing_index);
+        killed = 1;
+    }
+    if (killed) hide_enemies();
 }
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
@@ -246,7 +264,7 @@ static void update_weapon(u8 pressed) {
     u8 b_now = pressed & B;
     if (b_now && !b_prev && fire_timer == 0) {
         fire_timer = 12;
-        kill_active_enemy();
+        kill_visible_enemies();
     }
     b_prev = b_now;
 
@@ -272,26 +290,32 @@ static void init_weapon(void) {
     set_weapon_frame(0);
 }
 
-static void hide_enemy(void) {
-    for (u16 i = 0; i < ENEMY_COUNT; i++) {
-        u16 spr = ENEMY_BASE + i;
+static void hide_enemy_slot(u16 slot) {
+    for (u16 i = 0; i < ENEMY_STRIPS; i++) {
+        u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + i;
         scb2(spr, 0x0F, 0x00);
         scb3(spr, SCRH + 32, 0, 1);
         scb4(spr, 0);
     }
-    enemy_screen_w = 0;
-    enemy_active = -1;
+    enemies[slot].thing_index = -1;
+    enemies[slot].screen_w = 0;
+    enemies[slot].screen_h = 0;
 }
 
-static void set_enemy_tiles(const DoomSpriteScale *meta) {
-    for (u16 i = 0; i < ENEMY_COUNT; i++) {
-        u16 spr = ENEMY_BASE + i;
+static void hide_enemies(void) {
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
+}
+
+static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
+    u16 pal = (u16)(PAL_ENEMY_BASE + slot);
+    for (u16 i = 0; i < ENEMY_STRIPS; i++) {
+        u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + i;
         vram_addr(VRAM_SCB1 + spr * 64);
         vram_mod(1);
         for (u16 row = 0; row < ENEMY_WIN; row++) {
             if (i < meta->strips && row < meta->rows) {
                 vram_w((u16)(meta->tile_base + row * meta->strips + i));
-                vram_w((u16)(PAL_ENEMY << 8));
+                vram_w((u16)(pal << 8));
             } else {
                 vram_w(TILE_BLANK);
                 vram_w(0);
@@ -300,59 +324,71 @@ static void set_enemy_tiles(const DoomSpriteScale *meta) {
     }
 }
 
+static u8 enemy_coord_selected(int count, short x, short y) {
+    for (int slot = 0; slot < count; slot++) {
+        int thing = enemies[slot].thing_index;
+        if (thing >= 0 && g_runtime_things[thing].x_q8 == x && g_runtime_things[thing].y_q8 == y) return 1;
+    }
+    return 0;
+}
+
 static void update_enemy(void) {
-    int sx, h, dist_q8;
-    int idx;
-    int best = -1;
-    int def_idx;
-    const DoomEnemySpriteDef *def;
-    const DoomSpriteScale *meta;
+    int found = 0;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
+
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         const NgRuntimeThing *thing = &g_runtime_things[i];
+        int sx, h, dist_q8;
         if (enemy_dead[i]) continue;
+        if (enemy_coord_selected(found, thing->x_q8, thing->y_q8)) continue;
         if (rc_project_point(thing->x_q8, thing->y_q8, &sx, &h, &dist_q8)) {
-            best = i;
-            break;
-        }
-    }
-    if (best < 0) {
-        hide_enemy();
-        return;
-    }
-    enemy_active = best;
-    def_idx = enemy_sprite_def_for_type(g_runtime_things[best].type);
-    def = &g_enemy_sprite_defs[def_idx];
-    load_enemy_palette(def_idx);
+            int idx;
+            int def_idx = enemy_sprite_def_for_type(thing->type);
+            const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
+            const DoomSpriteScale *meta;
+            u16 slot = (u16)found;
 
-    if (h > 110) idx = 0;
-    else if (h > 76) idx = 1;
-    else if (h > 48) idx = 2;
-    else if (h > 30) idx = 3;
-    else idx = 4;
-    if (idx >= def->scale_count) idx = def->scale_count - 1;
-    meta = &g_enemy_scales[def->first_scale + idx];
+            enemies[slot].thing_index = i;
+            enemies[slot].sprite_def = def_idx;
+            enemies[slot].dist_q8 = dist_q8;
+            enemies[slot].screen_h = h;
+            load_enemy_palette(slot, def_idx);
 
-    set_enemy_tiles(meta);
-    enemy_screen_x = sx - meta->width / 2;
-    enemy_screen_w = meta->width;
-    {
-        int bottom = (GAME_H + h) / 2;
-        if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
-        int top = bottom - meta->height;
-        if (top < 0) top = 0;
-        for (u16 i = 0; i < ENEMY_COUNT; i++) {
-            u16 spr = ENEMY_BASE + i;
-            if (i < meta->strips) {
-                scb2(spr, 0x0F, 0xFF);
-                scb3(spr, top, 0, meta->rows);
-                scb4(spr, (u16)(enemy_screen_x + i * 16));
-            } else {
-                scb2(spr, 0x0F, 0x00);
-                scb3(spr, SCRH + 32, 0, 1);
-                scb4(spr, 0);
+            if (h > 110) idx = 0;
+            else if (h > 76) idx = 1;
+            else if (h > 48) idx = 2;
+            else if (h > 30) idx = 3;
+            else idx = 4;
+            if (idx >= def->scale_count) idx = def->scale_count - 1;
+            meta = &g_enemy_scales[def->first_scale + idx];
+
+            set_enemy_tiles(slot, meta);
+            enemies[slot].screen_x = sx - meta->width / 2;
+            enemies[slot].screen_w = meta->width;
+            {
+                int bottom = (GAME_H + h) / 2;
+                if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
+                int top = bottom - meta->height;
+                if (top < 0) top = 0;
+                for (u16 j = 0; j < ENEMY_STRIPS; j++) {
+                    u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
+                    if (j < meta->strips) {
+                        scb2(spr, 0x0F, 0xFF);
+                        scb3(spr, top, 0, meta->rows);
+                        scb4(spr, (u16)(enemies[slot].screen_x + j * 16));
+                    } else {
+                        scb2(spr, 0x0F, 0x00);
+                        scb3(spr, SCRH + 32, 0, 1);
+                        scb4(spr, 0);
+                    }
+                }
             }
+
+            found++;
+            if (found >= ENEMY_VISIBLE_COUNT) break;
         }
     }
+    for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }
 
 int main(void) {
@@ -364,7 +400,7 @@ int main(void) {
     init_walls();
     init_hud();
     init_weapon();
-    hide_enemy();
+    hide_enemies();
     rc_init();
 
     for (;;) {
