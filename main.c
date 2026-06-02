@@ -45,6 +45,13 @@ static void init_palettes(void) {
     pal_set(PAL_MAP_WALL,   15, RGB(20, 20, 22)); /* walls */
     pal_set(PAL_MAP_PLAYER, 15, RGB( 4, 31,  8)); /* player */
 
+    for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
+        u8 r = g_hud_palette_rgb[i][0];
+        u8 g = g_hud_palette_rgb[i][1];
+        u8 b = g_hud_palette_rgb[i][2];
+        pal_set(PAL_HUD, (u16)(i + 1), RGB(r, g, b));
+    }
+
     REG_BACKDROP = RGB(0, 0, 0);
 }
 
@@ -56,7 +63,7 @@ static void clear_fix(void) {
 }
 
 static int prev_px = -1, prev_py = -1;
-static u8  map_on = 1;              /* minimap visible?                       */
+static u8  map_on = 0;              /* minimap visible?                       */
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
     fix_poke((u16)(MAP_FIX_COL + mx), (u16)(MAP_FIX_ROW + my), pal, tile);
@@ -128,6 +135,19 @@ static void init_walls(void) {
     }
 }
 
+static void init_hud(void) {
+    for (u16 i = 0; i < HUD_COUNT; i++) {
+        u16 spr = HUD_BASE + i;
+        for (u16 row = 0; row < HUD_WIN; row++) {
+            u16 tile = (u16)(TILE_HUD_BASE + row * HUD_COUNT + i);
+            scb1_tile(spr, row, tile, PAL_HUD);
+        }
+        scb2(spr, 0x0F, 0xFF);
+        scb3(spr, GAME_H, 0, HUD_WIN);
+        scb4(spr, i * 16);
+    }
+}
+
 int main(void) {
     watchdog_kick();
     clear_fix();
@@ -135,8 +155,8 @@ int main(void) {
     disable_sprites();
     init_background();
     init_walls();
+    init_hud();
     rc_init();
-    draw_minimap();                     /* static walls, drawn once           */
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;    

@@ -6,21 +6,23 @@ in C.
 This was made purely for research purposes to understand the complexities of rendering realtime "3D"
 on the Neo Geo. The code is unoptimized and could be built to run much faster. 
 
-<img width="1280" height="729" alt="image" src="https://github.com/user-attachments/assets/b7616e2a-4fb5-4afa-b1b9-46d4edaf23b0" />
+<img width="960" height="672" alt="Current Neo Geo Doom prototype with Doom wall texture and status bar HUD" src="docs/screenshots/doom-neogeo-current.png" />
 
 ## How it works
 
-Every frame, for each of 80 screen columns:
+Every frame, for each of 64 screen columns:
 
 1. Cast a ray through a 2D grid map until it hits a wall.
 2. Measure the perpendicular distance and turn it into a slice height
 3. Write a vertical-shrink value, a Y position, and a palette into the sprite
    control block for that column's sprite.
 
-The video chip then scales each column's brick-texture sprite to the computed
-height. Floor and ceiling are a static backdrop of full-width sprites sitting
-behind the walls (lower sprite indices draw first = further back). A HUD
-minimap is drawn on the fix (text) layer, which always composites over sprites.
+The video chip then scales each precomposed Doom wall-texture column to the
+computed height. Floor and ceiling are a static backdrop of full-width sprites
+sitting behind the walls (lower sprite indices draw first = further back). The
+bottom 32 pixels are reserved for a Doom `STBAR` status bar converted into Neo
+Geo sprite strips. The optional minimap is drawn on the fix (text) layer, which
+always composites over sprites.
 
 All arithmetic is 16.16 . Rotation uses constant cos/sin multiplies. The whole
 renderer writes only a few control words per column per frame; the expensive
