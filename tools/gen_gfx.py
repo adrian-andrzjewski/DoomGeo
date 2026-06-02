@@ -72,10 +72,13 @@ HUD_FACE_COL = 9
 HUD_FACE_COLS = 2
 HUD_FACE_ROWS = 2
 HUD_FACE_TILES = HUD_FACE_COLS * HUD_FACE_ROWS
-HUD_FACE_FRAMES = (
-    "STFST00", "STFST10", "STFST20", "STFST30", "STFST40",
-    "STFOUCH0", "STFOUCH1", "STFOUCH2", "STFOUCH3", "STFOUCH4",
-    "STFDEAD0",
+HUD_FACE_FRAMES = tuple(
+    [f"STFST{pain}{variant}" for pain in range(5) for variant in range(3)]
+    + [f"STFTR{pain}0" for pain in range(5)]
+    + [f"STFTL{pain}0" for pain in range(5)]
+    + [f"STFOUCH{pain}" for pain in range(5)]
+    + [f"STFEVL{pain}" for pain in range(5)]
+    + ["STFDEAD0"]
 )
 WEAPON_BASE = HUD_FACE_BASE + len(HUD_FACE_FRAMES) * HUD_FACE_TILES
 WEAPON_STRIPS = 7

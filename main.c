@@ -12,6 +12,11 @@ static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
 static u8 palette_effect = 0;
 static u8 face_pain_timer = 0;
+static u8 face_evil_timer = 0;
+static u8 face_turn_timer = 0;
+static u8 face_turn_frame = 0;
+static u8 face_idle_tick = 0;
+static u8 face_idle_variant = 0;
 
 /* ---- palette setup --------------------------------------------------- */
 static u8 shade_channel(u8 value, u16 scale) {
@@ -1192,6 +1197,7 @@ static u8 apply_pickup(u16 thing_type) {
         shown_ammo = 0xFFFF;
         pickup_message_weapon = 2;
         pickup_message_type = 2;
+        face_evil_timer = 70;
         break;
     case 2002: /* chaingun */
         if (player_has_chaingun && player_ammo >= player_max_bullets) return 0;
@@ -1202,6 +1208,7 @@ static u8 apply_pickup(u16 thing_type) {
         shown_ammo = 0xFFFF;
         pickup_message_weapon = 3;
         pickup_message_type = 2;
+        face_evil_timer = 70;
         break;
     case 2003: /* rocket launcher */
         if (player_has_rocket_launcher && player_rockets >= player_max_rockets) return 0;
@@ -1212,6 +1219,7 @@ static u8 apply_pickup(u16 thing_type) {
         shown_ammo = 0xFFFF;
         pickup_message_weapon = 4;
         pickup_message_type = 2;
+        face_evil_timer = 70;
         break;
     case 2007: /* clip */
         if (!add_capped_u16(&player_ammo, 10, player_max_bullets)) return 0;
@@ -1615,7 +1623,7 @@ static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
 
 static u8 face_frame_for_health(void);
 static void set_hud_face_frame(u8 frame);
-static void update_hud_face(void);
+static void update_hud_face(u8 pressed);
 
 static u16 weapon_ammo(void) {
     if (current_weapon == 1 && player_has_shotgun) return player_shells;
@@ -1623,7 +1631,7 @@ static u16 weapon_ammo(void) {
     return player_ammo;
 }
 
-static void update_status_numbers(void) {
+static void update_status_numbers(u8 pressed) {
     u16 health = player_health;
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
@@ -1631,7 +1639,7 @@ static void update_status_numbers(void) {
         draw_number3(11, 24, health, PAL_HUD);
         shown_health = health;
     }
-    update_hud_face();
+    update_hud_face(pressed);
     if (ammo != shown_ammo) {
         draw_number3(5, 24, ammo, PAL_HUD);
         shown_ammo = ammo;
@@ -1658,7 +1666,7 @@ static void force_fix_hud_redraw(void) {
     shown_armor = 0xFFFF;
     shown_keys = 0xFF;
     hud_face_frame = 0xFF;
-    update_status_numbers();
+    update_status_numbers(0);
     draw_crosshair();
     update_center_message();
 }
@@ -1815,10 +1823,22 @@ static u8 face_health_band(void) {
     return 4;
 }
 
+enum {
+    FACE_STRAIGHT_BASE = 0,
+    FACE_TURN_RIGHT_BASE = 15,
+    FACE_TURN_LEFT_BASE = 20,
+    FACE_OUCH_BASE = 25,
+    FACE_EVIL_BASE = 30,
+    FACE_DEAD_FRAME = 35
+};
+
 static u8 face_frame_for_health(void) {
-    if (player_health == 0) return 10;
-    if (face_pain_timer) return (u8)(5 + face_health_band());
-    return face_health_band();
+    u8 band = face_health_band();
+    if (player_health == 0) return FACE_DEAD_FRAME;
+    if (face_pain_timer) return (u8)(FACE_OUCH_BASE + band);
+    if (face_evil_timer) return (u8)(FACE_EVIL_BASE + band);
+    if (face_turn_timer) return (u8)(face_turn_frame + band);
+    return (u8)(FACE_STRAIGHT_BASE + band * 3 + face_idle_variant);
 }
 
 static void set_hud_face_frame(u8 frame) {
@@ -1835,9 +1855,24 @@ static void set_hud_face_frame(u8 frame) {
     hud_face_frame = frame;
 }
 
-static void update_hud_face(void) {
+static void update_hud_face(u8 pressed) {
+    enum { LEFT = 0x04, RIGHT = 0x08 };
+    if (player_health && !face_pain_timer && !face_evil_timer) {
+        if (pressed & LEFT) {
+            face_turn_frame = FACE_TURN_LEFT_BASE;
+            face_turn_timer = 18;
+        } else if (pressed & RIGHT) {
+            face_turn_frame = FACE_TURN_RIGHT_BASE;
+            face_turn_timer = 18;
+        } else if (face_idle_tick++ >= 18) {
+            face_idle_tick = 0;
+            face_idle_variant = (u8)((face_idle_variant + 1) % 3);
+        }
+    }
     set_hud_face_frame(face_frame_for_health());
     if (face_pain_timer) face_pain_timer--;
+    if (face_evil_timer) face_evil_timer--;
+    if (face_turn_timer) face_turn_timer--;
 }
 
 static void init_hud(void) {
@@ -2228,6 +2263,11 @@ static void restart_level(void) {
     muzzle_flash = 0;
     palette_effect = 0;
     face_pain_timer = 0;
+    face_evil_timer = 0;
+    face_turn_timer = 0;
+    face_turn_frame = FACE_STRAIGHT_BASE;
+    face_idle_tick = 0;
+    face_idle_variant = 0;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
     for (u16 i = 0; i < MAP_SECRET_BYTES; i++) secret_found_bits[i] = 0;
@@ -2311,7 +2351,7 @@ int main(void) {
         update_monster_damage();
         update_weapon(pressed);
         update_enemy_hit_flash();
-        update_status_numbers();
+        update_status_numbers(pressed);
         update_center_message();
 
         /* button C toggles the minimap  */

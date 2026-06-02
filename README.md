@@ -34,9 +34,9 @@ precomposed atlases, and converted closed-door cells use `BIGDOOR2`; each atlas
 has its own distance-shaded palette range. The converter also emits a compact
 per-cell texture phase from Doom sidedef offsets and distance along each solid
 linedef, so wall columns no longer all restart at the same coarse grid-cell
-edge. Doom pistol frames and the `STFST00` status face are baked with
-Doom patch offsets so the weapon sits at the same screen anchor as the original
-psprite path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
+edge. Doom pistol frames and the status-face set are baked with Doom patch
+offsets so the weapon sits at the same screen anchor as the original psprite
+path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
 The weapon bake lifts the cropped psprite window inside the Neo Geo strip chain,
 keeping the pistol hand and barrel visible above the status bar instead of
 letting the lower rows disappear into the HUD edge.
@@ -98,14 +98,16 @@ share the three projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar using large Doom `STTNUM` digit art
 quantized into the `STBAR` palette instead of debug-green minimap colors.
-The center face is now generated as Doom health-band `STFST`, matching
-`STFOUCH`, and death face windows in C-ROM. It swaps by health band and briefly
-shows the matching pain face when damage lands, while weapon frames start after
-that dedicated face block and both runtime frame setters clamp to their own
-generated banks, so the gun cannot accidentally read HUD face tiles or vice
-versa. The base `STBAR` rows and the dedicated face crop are corrected for the
-Neo Geo sprite-chain row order, keeping the Doom labels and face readable while
-leaving the already-aligned weapon strip path alone.
+The center face is now generated from Doom's straight, left/right turn,
+`STFOUCH`, `STFEVL`, and death face windows in C-ROM. It swaps by health band,
+cycles the straight face variants, glances while turning, briefly shows the
+matching pain face when damage lands, and uses the evil grin when a weapon is
+picked up. Weapon frames start after that dedicated face block and both runtime
+frame setters clamp to their own generated banks, so the gun cannot accidentally
+read HUD face tiles or vice versa. The base `STBAR` rows and the dedicated face
+crop are corrected for the Neo Geo sprite-chain row order, keeping the Doom
+labels and face readable while leaving the already-aligned weapon strip path
+alone.
 The pistol crop keeps the original Doom patch offsets inside an eight-row Neo
 Geo strip window aligned to the playfield bottom, preserving the lower hand
 pixels before the status bar masks the final edge.
