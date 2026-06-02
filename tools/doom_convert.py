@@ -325,6 +325,42 @@ def solid_line_texture(line: LineDef, sidedefs: list[SideDef]) -> str:
     return ""
 
 
+def solid_line_texture_x(line: LineDef, sidedefs: list[SideDef]) -> int:
+    if line.side_front == 0xFFFF:
+        return 0
+    return sidedefs[line.side_front].texture_x
+
+
+def parse_texture_widths(wad: Wad) -> dict[str, int]:
+    widths: dict[str, int] = {}
+    for lump_name in ("TEXTURE1", "TEXTURE2"):
+        for lump_id in wad.by_name.get(lump_name, []):
+            data = wad.lump_data(lump_id)
+            if len(data) < 4:
+                continue
+            count = struct.unpack_from("<i", data, 0)[0]
+            for i in range(max(0, count)):
+                off_pos = 4 + i * 4
+                if off_pos + 4 > len(data):
+                    break
+                tex_off = struct.unpack_from("<i", data, off_pos)[0]
+                if tex_off < 0 or tex_off + 22 > len(data):
+                    continue
+                name_raw, _masked, width, _height = struct.unpack_from("<8sihh", data, tex_off)
+                name = decode_lump_name(name_raw)
+                if name:
+                    widths[name] = max(1, width)
+    return widths
+
+
+def texture_phase_for_cell(texture_x: int, texture_width: int, step: int, cell_count: int) -> int:
+    if cell_count <= 1:
+        distance = 0
+    else:
+        distance = (step * texture_width) // cell_count
+    return int((((texture_x + distance) % texture_width) * 16) // texture_width) & 0x0F
+
+
 def wall_texture_class(name: str) -> int:
     classes = {
         "BROWNGRN": 1,
@@ -583,6 +619,7 @@ def emit_header(
     out_path: str,
     grid: list[list[int]],
     texture_grid: list[list[int]],
+    texture_phase_grid: list[list[int]],
     start_x: float,
     start_y: float,
     angle: int,
@@ -646,6 +683,12 @@ def emit_header(
             f.write(",".join(str(cell) for cell in row))
             f.write("},\n")
         f.write("};\n\n")
+        f.write("static const unsigned char g_map_tex_phase[MAP_H][MAP_W] = {\n")
+        for row in texture_phase_grid:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
         f.write("static const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {\n")
         for x_q8, y_q8, typ, flags in things:
             f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
@@ -673,6 +716,10 @@ def emit_header(
         f.write("static inline unsigned char map_cell_texture(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
         f.write("    return g_map_tex[y][x];\n")
+        f.write("}\n\n")
+        f.write("static inline unsigned char map_cell_texture_phase(int x, int y) {\n")
+        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+        f.write("    return g_map_tex_phase[y][x];\n")
         f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
 
 
@@ -853,6 +900,7 @@ def convert(args: argparse.Namespace) -> None:
 
     grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
     texture_grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
+    texture_phase_grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
     for x in range(args.width):
         grid[0][x] = 1
         grid[-1][x] = 1
@@ -863,6 +911,8 @@ def convert(args: argparse.Namespace) -> None:
     solid_count = 0
     culled_count = 0
     min_solid_len = scale * args.detail_cull
+    texture_widths = parse_texture_widths(wad)
+    default_texture_width = texture_widths.get("STARTAN3", 64)
     for line in linedefs:
         if not is_solid_linedef(line, sidedefs, sectors):
             continue
@@ -874,8 +924,17 @@ def convert(args: argparse.Namespace) -> None:
         solid_count += 1
         x0, y0 = grid_point(a.x, a.y, min_x, max_y, scale, margin)
         x1, y1 = grid_point(b.x, b.y, min_x, max_y, scale, margin)
-        raster_line(grid, x0, y0, x1, y1)
-        raster_line_value(texture_grid, x0, y0, x1, y1, wall_texture_class(solid_line_texture(line, sidedefs)))
+        texture_name = solid_line_texture(line, sidedefs)
+        texture_class = wall_texture_class(texture_name)
+        texture_width = texture_widths.get(texture_name, default_texture_width)
+        texture_x = solid_line_texture_x(line, sidedefs)
+        cells = line_cells(grid, x0, y0, x1, y1)
+        cell_count = max(1, len(cells))
+        for step, (cell_x, cell_y) in enumerate(cells):
+            grid[cell_y][cell_x] = 1
+            if texture_class or texture_grid[cell_y][cell_x] == 0:
+                texture_grid[cell_y][cell_x] = texture_class
+                texture_phase_grid[cell_y][cell_x] = texture_phase_for_cell(texture_x, texture_width, step, cell_count)
 
     player = next((thing for thing in things if thing.type == 1), None)
     if player is None:
@@ -891,6 +950,7 @@ def convert(args: argparse.Namespace) -> None:
         args.out,
         grid,
         texture_grid,
+        texture_phase_grid,
         sx,
         sy,
         player.angle,

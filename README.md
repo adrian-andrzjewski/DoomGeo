@@ -31,8 +31,10 @@ The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
 `BROWNGRN`, `BROWN1`, and `SUPPORT2` E1M1 linedefs can select their own
 precomposed atlases, and converted closed-door cells use `BIGDOOR2`; each atlas
-has its own distance-shaded palette range. Doom pistol frames and the `STFST00`
-status face are baked with
+has its own distance-shaded palette range. The converter also emits a compact
+per-cell texture phase from Doom sidedef offsets and distance along each solid
+linedef, so wall columns no longer all restart at the same coarse grid-cell
+edge. Doom pistol frames and the `STFST00` status face are baked with
 Doom patch offsets so the weapon sits at the same screen anchor as the original
 psprite path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
 The pistol animates when B is pressed; walking and strafing nudge the strips

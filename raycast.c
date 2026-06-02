@@ -245,6 +245,7 @@ void rc_render(void) {
             int tex_x = (int)(((wall & (FONE - 1)) * TILE_WALL_ATLAS_COLS) >> FBITS);
             if (tex_x < 0) tex_x = 0;
             if (tex_x >= TILE_WALL_ATLAS_COLS) tex_x = TILE_WALL_ATLAS_COLS - 1;
+            tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
             texbuf[x] = (u8)tex_x;
         }
 
