@@ -90,6 +90,7 @@ WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
 WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
 DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
+WEAPON_BAKE_Y_ADJUST = -32
 
 
 def encode_tile(px):
@@ -715,7 +716,7 @@ def weapon_tiles(iwad, zip_member, patch_names):
         screen_x = DOOM_PSPR_SX - left
         screen_y = DOOM_PSPR_SY - top
         x0 = screen_x - WEAPON_SCREEN_LEFT
-        y0 = screen_y - WEAPON_SCREEN_TOP
+        y0 = screen_y - WEAPON_SCREEN_TOP + WEAPON_BAKE_Y_ADJUST
         canvas = [[-1] * dst_w for _ in range(dst_h)]
 
         for y, row in enumerate(patch):

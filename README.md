@@ -36,6 +36,9 @@ linedef, so wall columns no longer all restart at the same coarse grid-cell
 edge. Doom pistol frames and the `STFST00` status face are baked with
 Doom patch offsets so the weapon sits at the same screen anchor as the original
 psprite path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
+The weapon bake lifts the cropped psprite window inside the Neo Geo strip chain,
+keeping the pistol hand and barrel visible above the status bar instead of
+letting the lower rows disappear into the HUD edge.
 The pistol animates when B is pressed; walking and strafing nudge the strips
 with a small hardware-position bob so movement feels less static without adding
 any sprite slots. Real shots also pulse the weapon palette for a few frames,
