@@ -76,6 +76,8 @@
 #define FIX_DEAD_A 18
 #define FIX_KEY_BASE 19             /* 19..21 = B/R/Y key HUD glyphs         */
 #define FIX_KEY_MSG_K 22            /* K for compact locked-door KEY message */
+#define FIX_AMMO_M 23               /* M,O for compact empty-ammo AMMO msg   */
+#define FIX_AMMO_O 24
 
  
 #define MAP_FIX_COL 1             

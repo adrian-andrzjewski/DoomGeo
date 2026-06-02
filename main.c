@@ -145,6 +145,7 @@ static u8  fire_timer = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
 static u8  key_message_timer = 0;
+static u8  ammo_message_timer = 0;
 static u8  key_message_visible = 0;
 static u8  monster_ai_tick = 0;
 static u8  player_keys = 0;
@@ -562,6 +563,15 @@ static void draw_key_message(void) {
     fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, (u16)(FIX_KEY_BASE + 2));
 }
 
+static void draw_ammo_message(void) {
+    const u16 col = (SCRW / 16) - 2;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_DEAD_A);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_AMMO_M);
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, FIX_AMMO_M);
+    fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_AMMO_O);
+}
+
 static void clear_center_message(void) {
     const u16 col = (SCRW / 16) - 2;
     const u16 row = (GAME_H / 16) - 2;
@@ -576,6 +586,10 @@ static void update_center_message(void) {
     } else if (key_message_timer) {
         draw_key_message();
         key_message_timer--;
+        key_message_visible = 1;
+    } else if (ammo_message_timer) {
+        draw_ammo_message();
+        ammo_message_timer--;
         key_message_visible = 1;
     } else if (key_message_visible) {
         clear_center_message();
@@ -819,6 +833,8 @@ static void update_weapon(u8 pressed) {
             player_ammo--;
             fire_timer = 12;
             damage_best_visible_enemy();
+        } else {
+            ammo_message_timer = 45;
         }
     }
     b_prev = b_now;
