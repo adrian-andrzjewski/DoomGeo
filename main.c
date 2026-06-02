@@ -68,6 +68,24 @@ static void restore_wall_depth_palettes(void) {
     set_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS);
 }
 
+static void restore_weapon_palette(void) {
+    for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
+        pal_set(PAL_WEAPON, (u16)(i + 1), RGB(g_weapon_palette_rgb[i][0], g_weapon_palette_rgb[i][1], g_weapon_palette_rgb[i][2]));
+    }
+}
+
+static void set_weapon_flash_palette(void) {
+    for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
+        u8 r = g_weapon_palette_rgb[i][0];
+        u8 g = g_weapon_palette_rgb[i][1];
+        u8 b = g_weapon_palette_rgb[i][2];
+        r = (u8)(r + ((31 - r) * 3) / 4);
+        g = (u8)(g + ((28 - g) * 2) / 3);
+        b = (u8)(b + ((12 - b) / 3));
+        pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
+    }
+}
+
 static void init_palettes(void) {
     /* index 0 of every palette is transparent for sprites; we keep walls
      * opaque by only using indices 1..3. */
@@ -95,12 +113,7 @@ static void init_palettes(void) {
         u8 b = g_hud_palette_rgb[i][2];
         pal_set(PAL_HUD, (u16)(i + 1), RGB(r, g, b));
     }
-    for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
-        u8 r = g_weapon_palette_rgb[i][0];
-        u8 g = g_weapon_palette_rgb[i][1];
-        u8 b = g_weapon_palette_rgb[i][2];
-        pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
-    }
+    restore_weapon_palette();
     REG_BACKDROP = RGB(0, 0, 0);
 }
 
@@ -109,9 +122,7 @@ static void restore_play_palettes(void) {
     for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
         pal_set(PAL_HUD, (u16)(i + 1), RGB(g_hud_palette_rgb[i][0], g_hud_palette_rgb[i][1], g_hud_palette_rgb[i][2]));
     }
-    for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
-        pal_set(PAL_WEAPON, (u16)(i + 1), RGB(g_weapon_palette_rgb[i][0], g_weapon_palette_rgb[i][1], g_weapon_palette_rgb[i][2]));
-    }
+    restore_weapon_palette();
     restore_wall_depth_palettes();
 }
 
@@ -165,6 +176,8 @@ static u8  hud_face_frame = 0xFF;
 static u8  weapon_bob_phase = 0;
 static signed char weapon_bob_x = 0;
 static signed char weapon_bob_y = 0;
+static u8  weapon_flash_timer = 0;
+static u8  weapon_flash_on = 0;
 static u8  fire_timer = 0;
 static u8  fire_prev = 0;
 static u8  door_prev = 0;
@@ -238,6 +251,24 @@ typedef struct EnemyDraw {
     int screen_h;
     int dist_q8;
 } EnemyDraw;
+
+static void trigger_weapon_flash(void) {
+    weapon_flash_timer = 5;
+}
+
+static void update_weapon_flash(void) {
+    if (hurt_flash_on) return;
+    if (weapon_flash_timer) {
+        if (!weapon_flash_on) {
+            set_weapon_flash_palette();
+            weapon_flash_on = 1;
+        }
+        weapon_flash_timer--;
+    } else if (weapon_flash_on) {
+        restore_weapon_palette();
+        weapon_flash_on = 0;
+    }
+}
 
 static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 
@@ -1690,6 +1721,7 @@ static void update_weapon(u8 pressed) {
                 player_ammo--;
                 fire_timer = 4;
                 chaingun_flash ^= 1;
+                trigger_weapon_flash();
                 alert_monsters_by_sound();
                 damage_best_visible_enemy(1);
             } else if (!fire_prev) {
@@ -1698,17 +1730,20 @@ static void update_weapon(u8 pressed) {
         } else if (!fire_prev && current_weapon == 3 && player_has_rocket_launcher && player_rockets > 0) {
             player_rockets--;
             fire_timer = 20;
+            trigger_weapon_flash();
             alert_monsters_by_sound();
             damage_rocket_target();
         } else if (!fire_prev && current_weapon == 1 && player_has_shotgun && player_shells > 0) {
             player_shells--;
             fire_timer = 16;
+            trigger_weapon_flash();
             alert_monsters_by_sound();
             damage_shotgun_spread();
         } else if (!fire_prev && current_weapon == 0 && player_ammo > 0) {
             current_weapon = 0;
             player_ammo--;
             fire_timer = 12;
+            trigger_weapon_flash();
             alert_monsters_by_sound();
             damage_best_visible_enemy(1);
         } else if (!fire_prev) {
@@ -1937,6 +1972,8 @@ static void restart_level(void) {
     weapon_bob_phase = 0;
     weapon_bob_x = 0;
     weapon_bob_y = 0;
+    weapon_flash_timer = 0;
+    weapon_flash_on = 0;
     fire_timer = 0;
     fire_prev = 0;
     door_prev = 0;
@@ -2051,6 +2088,7 @@ int main(void) {
         wait_vblank();
         watchdog_kick();
         update_hurt_flash();
+        update_weapon_flash();
         update_background_scroll();
         rc_blit();                      /* push to VRAM during vblank         */
         update_projectile();
