@@ -1700,7 +1700,7 @@ static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, 
     return 0;
 }
 
-static int select_visible_things(int found, u8 want_monsters) {
+static int select_visible_things(int found, u8 pass) {
     ThingCandidate candidates[ENEMY_VISIBLE_COUNT];
     int count = 0;
     if (found >= ENEMY_VISIBLE_COUNT) return found;
@@ -1710,9 +1710,12 @@ static int select_visible_things(int found, u8 want_monsters) {
         int sx, h, dist_q8;
         int score;
         int insert_at;
-        u8 is_monster = thing_is_monster(runtime_thing_type(i)) || thing_is_barrel(runtime_thing_type(i)) || thing_is_explosion(runtime_thing_type(i));
+        u16 thing_type = runtime_thing_type(i);
+        u8 is_monster = thing_is_monster(thing_type) || thing_is_barrel(thing_type) || thing_is_explosion(thing_type);
         if (enemy_dead[i]) continue;
-        if (want_monsters != is_monster) continue;
+        if (pass == 1 && !is_monster) continue;
+        if (pass == 2 && !thing_is_pickup(thing_type)) continue;
+        if (pass == 3 && !thing_is_corpse(thing_type)) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
         if (enemy_obscured_by_weapon(sx, h)) continue;
@@ -1751,7 +1754,8 @@ static void update_enemy(void) {
 
     found = render_visible_projectile(found);
     found = select_visible_things(found, 1);
-    found = select_visible_things(found, 0);
+    found = select_visible_things(found, 2);
+    found = select_visible_things(found, 3);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }
 

@@ -41,7 +41,8 @@ the renderer projects up to three visible monster candidates with the same camer
 math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Active monster projectiles
 reserve the first visible world-sprite slot so incoming fire stays readable,
-then visible monsters/barrels are selected before pickups and corpses;
+then visible monsters/barrels are selected before useful pickups, and corpses
+only use slots left after those gameplay-critical objects;
 candidates are ranked by distance and screen relevance each frame, and tiny
 candidates hidden under the pistol overlay are skipped. The converter only emits monster thing
 types that currently have pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`,
