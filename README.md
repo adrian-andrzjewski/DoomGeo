@@ -93,9 +93,9 @@ The center face is now generated as Doom health-band `STFST`, matching
 `STFOUCH`, and death face windows in C-ROM. It swaps by health band and briefly
 shows the matching pain face when damage lands, while weapon frames start after
 that dedicated face block so the gun cannot accidentally read HUD face tiles.
-The pistol crop also keeps the original Doom patch offsets but raises the baked
-canvas enough to preserve the lower hand pixels before the status bar masks the
-bottom edge.
+The pistol crop keeps the original Doom patch offsets inside an eight-row Neo
+Geo strip window aligned to the playfield bottom, preserving the lower hand
+pixels before the status bar masks the final edge.
 Clips, shells, and rockets are tracked separately. Bullet, shell, and rocket
 pools now use compact Doom-like caps, and
 pickups remain in the map instead of disappearing when the matching resource is
@@ -116,9 +116,9 @@ compact ammo caps, and grant a small ammo/shell/rocket refill; thing type
 `2048` now uses the correct `AMMO` box art instead of backpack art.
 Supercharge pickups now convert from Doom thing type `2013`, use `SOUL` art,
 and raise health toward 200 through the existing status-face and health path.
-The weapon psprite bake now uses the same top position as the runtime Neo Geo
-sprite chain, so the original Doom hand/gun patches land in the intended
-screen-space window instead of being shifted upward into the play view.
+The weapon psprite bake now uses the same eight-row top position as the runtime
+Neo Geo sprite chain, so the original Doom hand/gun patches land in the intended
+screen-space window instead of being clipped into an unreadable center blob.
 Close visible monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
 green armor absorbs roughly one third of incoming damage and blue armor absorbs
 roughly half.
