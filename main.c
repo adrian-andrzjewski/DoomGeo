@@ -388,6 +388,14 @@ static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 static void hide_enemy_slot(u16 slot);
 static void hide_enemies(void);
 static void map_cell(int mx, int my, u16 pal, u16 tile);
+
+#define FACE_TUNE_ROM 1
+
+static signed char face_tune_x = 0;
+static signed char face_tune_y = 0;
+static u8 face_tune_reverse_rows = 1;
+static u8 face_tune_hide_weapon = 0;
+static u8 face_tune_prev = 0;
 static void draw_minimap_cell(int mx, int my);
 static void redraw_minimap_thing_cell(int thing_index);
 
@@ -1734,10 +1742,10 @@ static void draw_weapon_status(void) {
 }
 
 static void draw_face_debug_indices(void) {
-    fix_poke(16, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 0));
-    fix_poke(18, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 1));
-    fix_poke(20, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 2));
-    fix_poke(22, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 3));
+    fix_poke(18, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 0));
+    fix_poke(20, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 1));
+    fix_poke(18, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 2));
+    fix_poke(20, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 3));
 }
 
 static void update_status_numbers(u8 pressed) {
@@ -1975,11 +1983,20 @@ static void set_hud_face_frame(u8 frame) {
     for (u16 col = 0; col < TILE_HUD_FACE_COLS; col++) {
         u16 spr = HUD_BASE + TILE_HUD_FACE_COL + col;
         for (u16 row = 0; row < TILE_HUD_FACE_ROWS; row++) {
-            u16 tile = (u16)(frame_base + row * TILE_HUD_FACE_COLS + col);
+            u16 src_row = face_tune_reverse_rows ? (u16)(TILE_HUD_FACE_ROWS - 1 - row) : row;
+            u16 tile = (u16)(frame_base + src_row * TILE_HUD_FACE_COLS + col);
             scb1_tile(spr, row, tile, PAL_HUD);
         }
     }
     hud_face_frame = frame;
+}
+
+static void apply_hud_face_tune_position(void) {
+    for (u16 col = 0; col < TILE_HUD_FACE_COLS; col++) {
+        u16 spr = HUD_BASE + TILE_HUD_FACE_COL + col;
+        scb3(spr, GAME_H + face_tune_y, 0, HUD_WIN);
+        scb4(spr, (u16)((TILE_HUD_FACE_COL + col) * 16 + face_tune_x));
+    }
 }
 
 static void update_hud_face(u8 pressed) {
@@ -2016,6 +2033,7 @@ static void init_hud(void) {
     }
     hud_face_frame = 0xFF;
     set_hud_face_frame(face_frame_for_health());
+    apply_hud_face_tune_position();
 }
 
 static void set_weapon_frame(u8 frame) {
@@ -2143,6 +2161,55 @@ static void init_weapon(void) {
     weapon_bob_x = 0;
     weapon_bob_y = 0;
     set_weapon_frame(0);
+}
+
+static void hide_weapon_sprites(void) {
+    for (u16 i = 0; i < WEAPON_COUNT; i++) {
+        u16 spr = WEAPON_BASE + i;
+        scb2(spr, 0x0F, 0x00);
+        scb3(spr, SCRH + 32, 0, 1);
+    }
+}
+
+static void update_face_tune_controls(u8 pressed) {
+#if FACE_TUNE_ROM
+    enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08, A = 0x10, B = 0x20 };
+    u8 edge = (u8)(pressed & ~face_tune_prev);
+    u8 moved = 0;
+
+    if (pressed & LEFT) {
+        face_tune_x--;
+        moved = 1;
+    }
+    if (pressed & RIGHT) {
+        face_tune_x++;
+        moved = 1;
+    }
+    if (pressed & UP) {
+        face_tune_y--;
+        moved = 1;
+    }
+    if (pressed & DOWN) {
+        face_tune_y++;
+        moved = 1;
+    }
+    if (edge & A) {
+        face_tune_hide_weapon ^= 1;
+        if (face_tune_hide_weapon) hide_weapon_sprites();
+        else init_weapon();
+    }
+    if (edge & B) {
+        face_tune_reverse_rows ^= 1;
+        hud_face_frame = 0xFF;
+        set_hud_face_frame(face_frame_for_health());
+        moved = 1;
+    }
+    if (moved) apply_hud_face_tune_position();
+    if (face_tune_hide_weapon) hide_weapon_sprites();
+    face_tune_prev = pressed;
+#else
+    (void)pressed;
+#endif
 }
 
 static void hide_enemy_slot(u16 slot) {
@@ -2452,7 +2519,13 @@ int main(void) {
     init_runtime_things();
 
     for (;;) {
-        u8 pressed = (u8)~REG_P1CNT;    
+        u8 raw_pressed = (u8)~REG_P1CNT;
+#if FACE_TUNE_ROM
+        update_face_tune_controls(raw_pressed);
+        u8 pressed = 0;
+#else
+        u8 pressed = raw_pressed;
+#endif
         if (game_active()) {
             enum { A = 0x10, D = 0x80 };
             u8 d_now = pressed & D;
