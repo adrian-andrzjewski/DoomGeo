@@ -32,7 +32,7 @@ psprite path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
 The pistol animates when B is pressed; walking and strafing nudge the strips
 with a small hardware-position bob so movement feels less static without adding
 any sprite slots. The converter emits a compact grid-space runtime list from WAD `THINGS`;
-the renderer projects up to two visible monster candidates with the same camera
+the renderer projects up to three visible monster candidates with the same camera
 math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Visible monsters are selected
 before pickups so the limited sprite slots keep combat readable; candidates are
@@ -67,7 +67,7 @@ The wall and sprite projection heights use the raycaster's reciprocal lookup
 table instead of doing a 64-bit divide for each projected column.
 
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
-share the two projected world-sprite slots to preserve the Neo Geo scanline
+share the three projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar using large Doom `STTNUM` digit art
 quantized into the `STBAR` palette instead of debug-green minimap colors.
@@ -117,7 +117,7 @@ WAD data for type, flags, and initial placement. Monsters now keep a compact
 awake bit after seeing or being hit by the player, so they continue pursuit
 around corners instead of stopping the moment line of sight is broken. Chase
 movement also keeps a small separation radius between live monsters, which
-reduces stacked enemies and makes the two projected world-sprite slots more
+reduces stacked enemies and makes the projected world-sprite slots more
 readable. When health
 reaches zero, movement and firing stop and the fix layer shows a compact `DEAD`
 message; pressing D resets the player, doors, pickups, monsters, and HUD for

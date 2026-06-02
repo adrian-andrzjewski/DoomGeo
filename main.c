@@ -214,8 +214,8 @@ static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
-static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
-static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
+static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
+static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
 static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
@@ -605,8 +605,8 @@ static void damage_rocket_target(void) {
 }
 
 static void damage_shotgun_spread(void) {
-    int targets[ENEMY_VISIBLE_COUNT] = {-1, -1};
-    int scores[ENEMY_VISIBLE_COUNT] = {9999, 9999};
+    int targets[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
+    int scores[ENEMY_VISIBLE_COUNT] = {9999, 9999, 9999};
 
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
         int sx, h, dist_q8;
@@ -639,6 +639,7 @@ static void damage_shotgun_spread(void) {
 
     damage_visible_enemy(targets[0], 5);
     damage_visible_enemy(targets[1], 2);
+    damage_visible_enemy(targets[2], 1);
 }
 
 static void update_enemy_hit_flash(void) {
