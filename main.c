@@ -1701,7 +1701,8 @@ static void init_hud(void) {
     for (u16 i = 0; i < HUD_COUNT; i++) {
         u16 spr = HUD_BASE + i;
         for (u16 row = 0; row < HUD_WIN; row++) {
-            u16 tile = (u16)(TILE_HUD_BASE + row * HUD_COUNT + i);
+            u16 src_row = (u16)(HUD_WIN - 1 - row);
+            u16 tile = (u16)(TILE_HUD_BASE + src_row * HUD_COUNT + i);
             scb1_tile(spr, row, tile, PAL_HUD);
         }
         scb2(spr, 0x0F, 0xFF);

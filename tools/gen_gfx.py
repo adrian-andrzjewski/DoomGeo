@@ -602,7 +602,7 @@ def hud_face_tiles(iwad, zip_member, face_names, palette):
                 tile = [[0] * 16 for _ in range(16)]
                 src_col = HUD_FACE_COL + col
                 for y in range(16):
-                    sy = row * 16 + y
+                    sy = HUD_FACE_ROWS * 16 - 1 - (row * 16 + y)
                     for x in range(16):
                         sx = src_col * 16 + x
                         if 0 <= sy < len(stbar) and 0 <= sx < len(stbar[sy]):

@@ -99,7 +99,9 @@ The center face is now generated as Doom health-band `STFST`, matching
 shows the matching pain face when damage lands, while weapon frames start after
 that dedicated face block and both runtime frame setters clamp to their own
 generated banks, so the gun cannot accidentally read HUD face tiles or vice
-versa.
+versa. The base `STBAR` rows and the dedicated face crop are corrected for the
+Neo Geo sprite-chain row order, keeping the Doom labels and face readable while
+leaving the already-aligned weapon strip path alone.
 The pistol crop keeps the original Doom patch offsets inside an eight-row Neo
 Geo strip window aligned to the playfield bottom, preserving the lower hand
 pixels before the status bar masks the final edge.
