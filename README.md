@@ -39,8 +39,9 @@ psprite path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
 The pistol animates when B is pressed; walking and strafing nudge the strips
 with a small hardware-position bob so movement feels less static without adding
 any sprite slots. Real shots also pulse the weapon palette for a few frames,
-giving muzzle feedback through one cheap palette update while the project still
-uses the null sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
+and briefly brighten the wall/floor/ceiling depth palettes, giving muzzle
+feedback through cheap palette updates while the project still uses the null
+sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
 the renderer projects up to three visible monster candidates with the same camera
 math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Active monster projectiles

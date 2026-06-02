@@ -9,7 +9,8 @@
 
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 static u8 hurt_flash = 0;
-static u8 hurt_flash_on = 0;
+static u8 muzzle_flash = 0;
+static u8 palette_effect = 0;
 static u8 face_pain_timer = 0;
 
 /* ---- palette setup --------------------------------------------------- */
@@ -66,6 +67,43 @@ static void restore_wall_depth_palettes(void) {
         set_depth_palette_range(base, g_wall_alt_palette_rgb[alt], WALL_ALT_PALETTE_COLORS);
     }
     set_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS);
+}
+
+static u8 clamp31(int value) {
+    if (value < 0) return 0;
+    if (value > 31) return 31;
+    return (u8)value;
+}
+
+static void set_muzzle_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors) {
+    for (int b = 0; b < DEPTH_BANDS; b++) {
+        int fn = 390 - (b * 135) / (DEPTH_BANDS - 1);
+        for (int s = 0; s < 2; s++) {
+            int sf = s ? 260 : 390;
+            u16 pal = (u16)(base + s * DEPTH_BANDS + b);
+            for (u16 i = 0; i < colors; i++) {
+                int r = rgb[i][0] * fn / 256 * sf / 256 + 8;
+                int g = rgb[i][1] * fn / 256 * sf / 256 + 6;
+                int bl = rgb[i][2] * fn / 256 * sf / 256 + 2;
+                pal_set(pal, (u16)(i + 1), RGB(clamp31(r), clamp31(g), clamp31(bl)));
+            }
+        }
+    }
+}
+
+static void set_muzzle_palettes(void) {
+    for (u16 row = 0; row < BG_SPLIT; row++) {
+        u16 ceiling_scale = (u16)(135 + row * 20);
+        u16 floor_scale = (u16)(175 + row * 30);
+        set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
+        set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
+    }
+    set_muzzle_depth_palette_range(PAL_DEPTH_BASE, g_wall_palette_rgb, WALL_PALETTE_COLORS);
+    for (u16 alt = 0; alt < WALL_ALT_TEXTURE_COUNT; alt++) {
+        u16 base = (u16)(PAL_WALL_ALT_DEPTH_BASE + alt * PAL_WALL_ALT_DEPTH_STRIDE);
+        set_muzzle_depth_palette_range(base, g_wall_alt_palette_rgb[alt], WALL_ALT_PALETTE_COLORS);
+    }
+    set_muzzle_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS);
 }
 
 static void restore_weapon_palette(void) {
@@ -151,14 +189,20 @@ static void set_hurt_palettes(void) {
 
 static void update_hurt_flash(void) {
     if (hurt_flash) {
-        if (!hurt_flash_on) {
+        if (palette_effect != 1) {
             set_hurt_palettes();
-            hurt_flash_on = 1;
+            palette_effect = 1;
         }
         hurt_flash--;
-    } else if (hurt_flash_on) {
+    } else if (muzzle_flash) {
+        if (palette_effect != 2) {
+            set_muzzle_palettes();
+            palette_effect = 2;
+        }
+        muzzle_flash--;
+    } else if (palette_effect) {
         restore_play_palettes();
-        hurt_flash_on = 0;
+        palette_effect = 0;
     }
 }
 
@@ -258,10 +302,11 @@ typedef struct EnemyDraw {
 
 static void trigger_weapon_flash(void) {
     weapon_flash_timer = 5;
+    muzzle_flash = 8;
 }
 
 static void update_weapon_flash(void) {
-    if (hurt_flash_on) return;
+    if (palette_effect == 1) return;
     if (weapon_flash_timer) {
         if (!weapon_flash_on) {
             set_weapon_flash_palette();
@@ -2155,7 +2200,8 @@ static void restart_level(void) {
     player_max_rockets = PLAYER_MAX_ROCKETS;
     player_score = 0;
     hurt_flash = 0;
-    hurt_flash_on = 0;
+    muzzle_flash = 0;
+    palette_effect = 0;
     face_pain_timer = 0;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
