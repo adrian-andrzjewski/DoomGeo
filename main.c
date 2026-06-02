@@ -378,6 +378,20 @@ static void draw_exit_message(void) {
     fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, (u16)(FIX_EXIT_BASE + 3));
 }
 
+static void draw_dead_message(void) {
+    const u16 col = (SCRW / 16) - 2;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_DEAD_D);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, FIX_DEAD_A);
+    fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_DEAD_D);
+}
+
+static void update_center_message(void) {
+    if (player_health == 0) draw_dead_message();
+    else if (level_complete) draw_exit_message();
+}
+
 static void check_exit_reached(void) {
     int px, py;
     if (level_complete) return;
@@ -716,10 +730,14 @@ int main(void) {
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;    
-        rc_input(pressed);
-        update_monster_ai();
-        collect_nearby_pickups();
-        check_exit_reached();
+        if (player_health) {
+            rc_input(pressed);
+            update_monster_ai();
+            collect_nearby_pickups();
+            check_exit_reached();
+        } else {
+            pressed = 0;
+        }
         rc_render();                    /* DDA during active display          */
         wait_vblank();
         watchdog_kick();
@@ -729,6 +747,7 @@ int main(void) {
         update_monster_damage();
         update_weapon(pressed);
         update_status_numbers();
+        update_center_message();
 
         /* button C toggles the minimap  */
         {
