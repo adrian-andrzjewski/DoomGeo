@@ -140,12 +140,11 @@ awake bit after seeing or being hit by the player, so they continue pursuit
 around corners instead of stopping the moment line of sight is broken. Chase
 movement also keeps a small separation radius between live monsters, which
 reduces stacked enemies and makes the projected world-sprite slots more
-readable. When health
-reaches zero, movement and firing stop and the fix layer shows a compact `DEAD`
-message; pressing D resets the player, doors, pickups, monsters, and HUD for
-another run. Restart also clears the button-edge latches used by fire, doors,
-weapon toggle, minimap, and restart so stale held inputs do not leak into the
-next run.
+readable. When health reaches zero, movement, firing, and active projectiles
+stop and the fix layer shows a compact `DEAD` message; pressing D resets the
+player, doors, pickups, monsters, and HUD for another run. Restart also clears
+the button-edge latches used by fire, doors, weapon toggle, minimap, and
+restart so stale held inputs do not leak into the next run.
 
 The converter also preserves Doom door and exit linedefs as compact runtime
 trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
@@ -159,9 +158,9 @@ trying a facing keyed door without the matching key flashes `KEY`, so door
 interactions have readable feedback. Reaching the
 converted E1M1 exit cell now
 raises a fix-layer `EXIT` message and freezes player control, monster movement,
-and monster damage until D restarts the level. This keeps level progression
-behavior in the ROM without keeping generic WAD directory/lump metadata in the
-cartridge.
+monster damage, and active projectiles until D restarts the level. This keeps
+level progression behavior in the ROM without keeping generic WAD
+directory/lump metadata in the cartridge.
 
 ## Building
 

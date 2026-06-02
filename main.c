@@ -734,6 +734,10 @@ static void spawn_monster_projectile(int thing, u16 type, u8 damage) {
 static void update_projectile(void) {
     int px, py;
     if (!projectile_active) return;
+    if (!game_active()) {
+        projectile_active = 0;
+        return;
+    }
     projectile_x_q8 = (short)(projectile_x_q8 + projectile_dx_q8);
     projectile_y_q8 = (short)(projectile_y_q8 + projectile_dy_q8);
     if (map_at(projectile_x_q8 >> 8, projectile_y_q8 >> 8)) {
