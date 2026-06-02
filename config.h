@@ -34,7 +34,7 @@
 
 /* ---- C-ROM tile numbers (see tools/gen_gfx.py) ----------------------- */
 #define TILE_BLANK 0
-#define TILE_BRICK 1
+#define TILE_BRICK 1                /* mipmapped Doom wall texture tile      */
 #define TILE_SOLID 2                /* all pixels = palette index 1          */
 
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */

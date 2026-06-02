@@ -1,5 +1,7 @@
 build/main.o
 .tools/
+__pycache__/
+tools/__pycache__/
 rom/
 build/
 build/raycast.o

@@ -42,6 +42,7 @@ DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
+GFX_STAMP=rom/.generated-gfx
 CUSTOM_GENERATE_TARGETS+=doom-assets
 
 # This is an autoconf-generated configuration for your environment
@@ -108,6 +109,13 @@ $(SROM1): rom/s1.bin
 # Note: build rules (%.gif -> %.c<1,2>) are defined in Makefile.build
 $(CROM1): rom/c1.bin
 $(CROM2): rom/c2.bin
+
+rom/c1.bin rom/c2.bin rom/s1.bin rom/m1.bin rom/v1.bin: $(GFX_STAMP)
+	@test -f $@
+
+$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(FREEDOOM_ZIP)
+	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --wall-texture BROWN1
+	touch $@
 
 
 
