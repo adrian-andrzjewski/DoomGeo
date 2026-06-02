@@ -21,7 +21,9 @@ The video chip then scales each precomposed Doom wall-texture column to the
 computed height. Floor and ceiling use Doom flat textures selected from the
 player-start sector and packed into 32 preprojected sprite-strip phase banks;
 the 68000 swaps backdrop tile IDs as the player moves so the planes scroll
-without a framebuffer span renderer. Doom pistol frames are rendered as a centered
+without a framebuffer span renderer. The offline flat sampler now smooths small
+2x2 texel neighborhoods before palette reduction, keeping floor and ceiling
+textures less noisy at Neo Geo resolution. Doom pistol frames are rendered as a centered
 sprite-strip overlay above the bottom 32-pixel `STBAR` status bar and animate
 when B is pressed; walking and strafing nudge the pistol strips with a small
 hardware-position bob so movement feels less static without adding any sprite
@@ -63,7 +65,8 @@ table instead of doing a 64-bit divide for each projected column.
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
-armor counters over the Doom status bar. Clips, shells, and rockets are tracked
+armor counters over the Doom status bar using the `STBAR` palette instead of
+debug-green minimap colors. Clips, shells, and rockets are tracked
 separately, and the status bar shows compact weapon `1`/`2`/`3`/`4` digits before
 the active ammo pool. Bullet, shell, and rocket pools now use compact Doom-like caps, and
 pickups remain in the map instead of disappearing when the matching resource is

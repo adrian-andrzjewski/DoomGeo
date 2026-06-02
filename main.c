@@ -1028,23 +1028,23 @@ static void update_status_numbers(void) {
     if (!player_has_weapon(weapon)) weapon = 0;
     weapon++;
     if (health != shown_health) {
-        draw_number3(3, 26, health, PAL_MAP_PLAYER);
+        draw_number3(3, 26, health, PAL_HUD);
         shown_health = health;
     }
     if (weapon != shown_weapon) {
-        fix_poke(16, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + weapon));
+        fix_poke(16, 26, PAL_HUD, (u16)(FIX_DIGIT_BASE + weapon));
         shown_weapon = weapon;
     }
     if (ammo != shown_ammo) {
-        draw_number3(18, 26, ammo, PAL_MAP_PLAYER);
+        draw_number3(18, 26, ammo, PAL_HUD);
         shown_ammo = ammo;
     }
     if (armor != shown_armor) {
-        draw_number3(33, 26, armor, PAL_MAP_PLAYER);
+        draw_number3(33, 26, armor, PAL_HUD);
         shown_armor = armor;
     }
     if (player_score != shown_score) {
-        draw_number3(24, 26, player_score, PAL_MAP_PLAYER);
+        draw_number3(24, 26, player_score, PAL_HUD);
         shown_score = player_score;
     }
     if (player_keys != shown_keys) {

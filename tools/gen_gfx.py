@@ -287,6 +287,10 @@ def quantize_color(color_index, playpal, palette):
     if color_index < 0:
         return 0
     rgb = playpal[color_index]
+    return quantize_rgb(rgb, palette)
+
+
+def quantize_rgb(rgb, palette):
     best = min(
         range(len(palette)),
         key=lambda i: (
@@ -296,6 +300,22 @@ def quantize_color(color_index, playpal, palette):
         ),
     )
     return best + 1
+
+
+def smooth_flat_color(flat, playpal, sx, sy):
+    indices = (
+        flat[sy & 63][sx & 63],
+        flat[sy & 63][(sx + 1) & 63],
+        flat[(sy + 1) & 63][sx & 63],
+        flat[(sy + 1) & 63][(sx + 1) & 63],
+    )
+    r = g = b = 0
+    for index in indices:
+        pr, pg, pb = playpal[index]
+        r += pr
+        g += pg
+        b += pb
+    return (r // 4, g // 4, b // 4)
 
 
 def sample_texture_tile(texture, playpal, palette, src_x, src_y, src_w, src_h):
@@ -427,7 +447,7 @@ def flat_grid_tiles(flat, playpal, palette, cols, rows, ceiling=False, phase=0):
                     lateral = int((screen_x - center_x) * distance / 40.0)
                     sx = (lateral + (phase_offset >> 1)) & 63
                     sy = (forward + phase_offset) & 63
-                    q = quantize_color(flat[sy][sx], playpal, palette)
+                    q = quantize_rgb(smooth_flat_color(flat, playpal, sx, sy), palette)
                     if shade_step < 24 and q > 1:
                         q -= 1
                     if shade_step < 12 and q > 1:
@@ -518,12 +538,14 @@ def weapon_tiles(iwad, zip_member, patch_names):
     for _name, patch in patches:
         src_h = len(patch)
         src_w = len(patch[0])
-        x0 = max(0, (dst_w - src_w) // 2)
-        y0 = max(0, dst_h - src_h)
+        x0 = (dst_w - src_w) // 2
+        y0 = dst_h - src_h
         canvas = [[-1] * dst_w for _ in range(dst_h)]
 
         for y, row in enumerate(patch):
             dy = y0 + y
+            if dy < 0:
+                continue
             if dy >= dst_h:
                 break
             for x, color in enumerate(row):
