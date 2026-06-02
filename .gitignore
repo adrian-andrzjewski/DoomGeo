@@ -1,4 +1,7 @@
 build/main.o
+.tools/
+rom/
+build/
 build/raycast.o
 build/rom.elf
 build/.generated
