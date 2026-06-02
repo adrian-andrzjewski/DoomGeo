@@ -23,8 +23,9 @@ Doom floor casting: the converter still reads the player-start Doom flats,
 quantizes each into a 4x4 Neo Geo tile block, and each backdrop row samples that
 block from the raycaster's current position, direction, camera plane, and an
 approximate row distance. This keeps the planes tied to the wall perspective,
-so the real Doom flat texture now moves and turns with the camera instead of
-sitting as a fixed solid band.
+and the refresh key tracks smaller position and turn changes so the real Doom
+flat texture moves and turns with the camera instead of sitting as a fixed
+solid band.
 The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
 `BROWNGRN`, `BROWN1`, and `SUPPORT2` E1M1 linedefs can select their own

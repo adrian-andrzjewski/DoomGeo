@@ -1303,12 +1303,12 @@ static void update_background_scroll(void) {
     u32 key;
     rc_player_q8(&x_q8, &y_q8);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
-    key = (u32)((x_q8 >> 5) & 0x3F)
-        | ((u32)((y_q8 >> 5) & 0x3F) << 6)
-        | ((u32)(((dir_x + 256) >> 4) & 0x1F) << 12)
-        | ((u32)(((dir_y + 256) >> 4) & 0x1F) << 17)
-        | ((u32)(((plane_x + 256) >> 5) & 0x0F) << 22)
-        | ((u32)(((plane_y + 256) >> 5) & 0x0F) << 26);
+    key = (u32)((x_q8 >> 4) & 0x3F)
+        | ((u32)((y_q8 >> 4) & 0x3F) << 6)
+        | ((u32)(((dir_x + 256) >> 3) & 0x3F) << 12)
+        | ((u32)(((dir_y + 256) >> 3) & 0x3F) << 18)
+        | ((u32)(((plane_x + 256) >> 5) & 0x0F) << 24)
+        | ((u32)(((plane_y + 256) >> 5) & 0x0F) << 28);
     if (key == bg_scroll_key) return;
 
     for (u16 i = 0; i < BG_COUNT; i++) {
