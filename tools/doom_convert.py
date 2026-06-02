@@ -43,10 +43,26 @@ class LineDef:
     side_front: int
     side_back: int
 
-    @property
-    def solid(self) -> bool:
-        two_sided = (self.flags & 0x0004) != 0
-        return not two_sided or self.side_back == 0xFFFF
+
+@dataclass(frozen=True)
+class SideDef:
+    texture_x: int
+    texture_y: int
+    top_texture: str
+    bottom_texture: str
+    mid_texture: str
+    sector: int
+
+
+@dataclass(frozen=True)
+class Sector:
+    floor_height: int
+    ceiling_height: int
+    floor_pic: str
+    ceiling_pic: str
+    light_level: int
+    special: int
+    tag: int
 
 
 @dataclass(frozen=True)
@@ -137,10 +153,62 @@ def parse_linedefs(data: bytes) -> list[LineDef]:
     ]
 
 
+def decode_lump_name(raw: bytes) -> str:
+    return raw.rstrip(b"\0").decode("ascii", "replace").upper()
+
+
+def parse_sidedefs(data: bytes) -> list[SideDef]:
+    if len(data) % 30:
+        raise ValueError("SIDEDEFS lump has invalid size")
+    result: list[SideDef] = []
+    for i in range(0, len(data), 30):
+        tex_x, tex_y, top, bottom, mid, sector = struct.unpack_from("<hh8s8s8sh", data, i)
+        result.append(
+            SideDef(tex_x, tex_y, decode_lump_name(top), decode_lump_name(bottom), decode_lump_name(mid), sector)
+        )
+    return result
+
+
+def parse_sectors(data: bytes) -> list[Sector]:
+    if len(data) % 26:
+        raise ValueError("SECTORS lump has invalid size")
+    result: list[Sector] = []
+    for i in range(0, len(data), 26):
+        floor, ceiling, floor_pic, ceiling_pic, light, special, tag = struct.unpack_from("<hh8s8shhh", data, i)
+        result.append(
+            Sector(floor, ceiling, decode_lump_name(floor_pic), decode_lump_name(ceiling_pic), light, special, tag)
+        )
+    return result
+
+
 def parse_things(data: bytes) -> list[Thing]:
     if len(data) % 10:
         raise ValueError("THINGS lump has invalid size")
     return [Thing(*struct.unpack_from("<hhHHH", data, i)) for i in range(0, len(data), 10)]
+
+
+def is_solid_linedef(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> bool:
+    ml_blocking = 0x0001
+    ml_twosided = 0x0004
+    player_height = 56
+
+    if line.side_back == 0xFFFF or (line.flags & ml_twosided) == 0:
+        return True
+    if (line.flags & ml_blocking) != 0:
+        return True
+    if line.side_front >= len(sidedefs) or line.side_back >= len(sidedefs):
+        return True
+
+    front_side = sidedefs[line.side_front]
+    back_side = sidedefs[line.side_back]
+    if front_side.sector >= len(sectors) or back_side.sector >= len(sectors):
+        return True
+
+    front = sectors[front_side.sector]
+    back = sectors[back_side.sector]
+    open_bottom = max(front.floor_height, back.floor_height)
+    open_top = min(front.ceiling_height, back.ceiling_height)
+    return (open_top - open_bottom) < player_height
 
 
 def grid_coord(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int) -> tuple[float, float]:
@@ -298,6 +366,8 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_LINEDEFS {stats['linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SOLID_LINEDEFS {stats['solid_linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_CULLED_LINEDEFS {stats['culled_linedefs']}\n")
+        f.write(f"#define DOOM_CONVERTED_SIDEDEFS {stats['sidedefs']}\n")
+        f.write(f"#define DOOM_CONVERTED_SECTORS {stats['sectors']}\n")
         f.write(f"#define DOOM_CONVERTED_THINGS {stats['things']}\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for row in grid:
@@ -316,6 +386,8 @@ def convert(args: argparse.Namespace) -> None:
     lumps = wad.map_lumps(args.map)
     vertices = parse_vertices(lumps["VERTEXES"])
     linedefs = parse_linedefs(lumps["LINEDEFS"])
+    sidedefs = parse_sidedefs(lumps["SIDEDEFS"])
+    sectors = parse_sectors(lumps["SECTORS"])
     things = parse_things(lumps["THINGS"])
     if not vertices:
         raise ValueError("map has no vertices")
@@ -341,7 +413,7 @@ def convert(args: argparse.Namespace) -> None:
     culled_count = 0
     min_solid_len = scale * args.detail_cull
     for line in linedefs:
-        if not line.solid:
+        if not is_solid_linedef(line, sidedefs, sectors):
             continue
         a = vertices[line.v1]
         b = vertices[line.v2]
@@ -373,6 +445,8 @@ def convert(args: argparse.Namespace) -> None:
             "linedefs": len(linedefs),
             "solid_linedefs": solid_count,
             "culled_linedefs": culled_count,
+            "sidedefs": len(sidedefs),
+            "sectors": len(sectors),
             "things": len(things),
         },
     )
