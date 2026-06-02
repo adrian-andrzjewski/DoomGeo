@@ -37,11 +37,11 @@ has its own distance-shaded palette range. The converter also emits a compact
 per-cell texture phase from Doom sidedef offsets and distance along each solid
 linedef, so wall columns no longer all restart at the same coarse grid-cell
 edge. Doom pistol frames and the status-face set are baked with Doom patch
-offsets so the weapon sits at the same screen anchor as the original psprite
-path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
-The weapon bake lowers the cropped psprite window inside the Neo Geo strip chain,
-keeping the pistol hand and barrel anchored from the bottom of the playfield
-instead of floating as a center-screen object.
+offsets while keeping the bottom 32-pixel `STBAR` as a separate HUD surface.
+The weapon bake keeps the cropped psprite window raised above the face slot, and
+the first pistol firing frame precomposes Doom's `PISFA0` flash over `PISGB0`
+so the gun reads as the original weapon instead of colliding visually with the
+status face.
 The pistol animates through the intended Doom firing patches when B is pressed;
 walking and strafing nudge the strips with a small hardware-position bob so
 movement feels less static without adding any sprite slots. Real shots also
@@ -116,11 +116,10 @@ picked up. Weapon frames start after that dedicated face block and both runtime
 frame setters clamp to their own generated banks, so the gun cannot accidentally
 read HUD face tiles or vice versa. The base `STBAR` rows and the dedicated face
 crop are corrected for the Neo Geo sprite-chain row order, keeping the Doom
-labels and face readable while leaving the already-aligned weapon strip path
-alone.
+labels and face readable while the weapon strip path stays in its own bank.
 The pistol crop keeps the original Doom patch offsets inside an eight-row Neo
-Geo strip window aligned to the playfield bottom, preserving the lower hand
-pixels before the status bar masks the final edge.
+Geo strip window, but raises the baked image enough that the lower hand no
+longer reads as part of the status face.
 Clips, shells, and rockets are tracked separately. Bullet, shell, and rocket
 pools now use compact Doom-like caps, and
 pickups remain in the map instead of disappearing when the matching resource is
@@ -142,7 +141,7 @@ compact ammo caps, and grant a small ammo/shell/rocket refill; thing type
 Supercharge pickups now convert from Doom thing type `2013`, use `SOUL` art,
 and raise health toward 200 through the existing status-face and health path.
 The weapon psprite bake now uses the same eight-row top position as the runtime
-Neo Geo sprite chain, with the Doom hand/gun patches lowered inside that window
+Neo Geo sprite chain, with the Doom hand/gun patches raised inside that window
 so the pistol reads as a held weapon above the status bar.
 Close live monsters apply a first-pass contact-damage tick from runtime position,
 even if they are not currently selected for one of the scarce visible sprite

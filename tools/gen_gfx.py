@@ -84,7 +84,7 @@ WEAPON_BASE = HUD_FACE_BASE + len(HUD_FACE_FRAMES) * HUD_FACE_TILES
 WEAPON_STRIPS = 7
 WEAPON_ROWS = 8
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
-WEAPON_FRAMES = ("PISGA0", "PISGB0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
+WEAPON_FRAMES = ("PISGA0", "PISGB0+PISFA0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
 CEILING_PERSPECTIVE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
 FLOOR_PERSPECTIVE_BASE = CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
 SPRITE_CACHE_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
@@ -94,7 +94,7 @@ WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
 WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
 DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
-WEAPON_BAKE_Y_ADJUST = 0
+WEAPON_BAKE_Y_ADJUST = -32
 
 
 def encode_tile(px):
@@ -691,48 +691,52 @@ def weapon_tiles(iwad, zip_member, patch_names):
 
     wad = Wad(read_wad(iwad, zip_member))
     playpal = playpal_rgb(wad)
-    patches = []
+    frames = []
     for patch_name in patch_names:
-        patch_name = patch_name.upper()
-        lump_ids = wad.by_name.get(patch_name)
-        if not lump_ids:
-            raise ValueError(f"weapon patch {patch_name!r} not found in WAD")
-        data = wad.lump_data(lump_ids[0])
-        _width, _height, left, top = patch_header(data)
-        patches.append((patch_name, decode_patch(data), left, top))
+        frame_patches = []
+        for part_name in patch_name.upper().split("+"):
+            part_name = part_name.strip()
+            lump_ids = wad.by_name.get(part_name)
+            if not lump_ids:
+                raise ValueError(f"weapon patch {part_name!r} not found in WAD")
+            data = wad.lump_data(lump_ids[0])
+            _width, _height, left, top = patch_header(data)
+            frame_patches.append((part_name, decode_patch(data), left, top))
+        frames.append((patch_name.upper(), frame_patches))
 
     palette_src = []
-    for _name, patch, _left, _top in patches:
-        palette_src.extend(patch)
+    for _frame_name, frame_patches in frames:
+        for _name, patch, _left, _top in frame_patches:
+            palette_src.extend(patch)
     palette = texture_palette(palette_src, playpal)
     dst_w = WEAPON_STRIPS * 16
     dst_h = WEAPON_ROWS * 16
 
     tiles = []
-    max_w = max(len(patch[0]) for _name, patch, _left, _top in patches)
-    max_h = max(len(patch) for _name, patch, _left, _top in patches)
-    for _name, patch, left, top in patches:
-        src_h = len(patch)
-        src_w = len(patch[0])
-        # Doom psprites are positioned from a screen-space anchor and each
-        # patch's own left/top offsets. Bake that convention offline so the
-        # 68000 only swaps complete tile frames at runtime.
-        screen_x = DOOM_PSPR_SX - left
-        screen_y = DOOM_PSPR_SY - top
-        x0 = screen_x - WEAPON_SCREEN_LEFT
-        y0 = screen_y - WEAPON_SCREEN_TOP + WEAPON_BAKE_Y_ADJUST
+    max_w = max(len(patch[0]) for _frame_name, frame_patches in frames for _name, patch, _left, _top in frame_patches)
+    max_h = max(len(patch) for _frame_name, frame_patches in frames for _name, patch, _left, _top in frame_patches)
+    for _frame_name, frame_patches in frames:
         canvas = [[-1] * dst_w for _ in range(dst_h)]
 
-        for y, row in enumerate(patch):
-            dy = y0 + y
-            if dy < 0:
-                continue
-            if dy >= dst_h:
-                break
-            for x, color in enumerate(row):
-                dx = x0 + x
-                if color >= 0 and 0 <= dx < dst_w:
-                    canvas[dy][dx] = color
+        for _name, patch, left, top in frame_patches:
+            # Doom psprites are positioned from a screen-space anchor and each
+            # patch's own left/top offsets. Bake that convention offline so the
+            # 68000 only swaps complete tile frames at runtime.
+            screen_x = DOOM_PSPR_SX - left
+            screen_y = DOOM_PSPR_SY - top
+            x0 = screen_x - WEAPON_SCREEN_LEFT
+            y0 = screen_y - WEAPON_SCREEN_TOP + WEAPON_BAKE_Y_ADJUST
+
+            for y, row in enumerate(patch):
+                dy = y0 + y
+                if dy < 0:
+                    continue
+                if dy >= dst_h:
+                    break
+                for x, color in enumerate(row):
+                    dx = x0 + x
+                    if color >= 0 and 0 <= dx < dst_w:
+                        canvas[dy][dx] = color
 
         for row in range(WEAPON_ROWS):
             for strip in range(WEAPON_STRIPS):
@@ -742,7 +746,7 @@ def weapon_tiles(iwad, zip_member, patch_names):
                         tile[y][x] = quantize_color(canvas[row * 16 + y][strip * 16 + x], playpal, palette)
                 tiles.append(tile)
 
-    return tiles, "+".join(name for name, _patch, _left, _top in patches), palette, max_w, max_h
+    return tiles, "+".join(frame_name for frame_name, _frame_patches in frames), palette, max_w, max_h
 
 
 def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile):
