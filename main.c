@@ -264,6 +264,19 @@ static void player_take_damage(u16 amount) {
     else player_health = (u16)(player_health - amount);
 }
 
+static u8 monster_ranged_damage(u16 thing_type) {
+    switch (thing_type) {
+    case 3004: /* former human */
+        return 3;
+    case 9:    /* shotgun guy */
+        return 5;
+    case 3001: /* imp */
+        return 4;
+    default:
+        return 0;
+    }
+}
+
 static void update_monster_damage(void) {
     if (hurt_timer) {
         hurt_timer--;
@@ -273,11 +286,18 @@ static void update_monster_damage(void) {
 
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
+        u8 ranged_damage;
         if (thing < 0) continue;
         if (!thing_is_monster(g_runtime_things[thing].type)) continue;
         if (enemies[slot].dist_q8 < 300) {
             player_take_damage(4);
             hurt_timer = 24;
+            return;
+        }
+        ranged_damage = monster_ranged_damage(g_runtime_things[thing].type);
+        if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18) {
+            player_take_damage(ranged_damage);
+            hurt_timer = 48;
             return;
         }
     }
