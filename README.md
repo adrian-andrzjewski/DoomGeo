@@ -63,20 +63,23 @@ table instead of doing a 64-bit divide for each projected column.
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
-armor counters over the Doom status bar. Clips and shells are tracked
-separately, and the status bar shows compact weapon `1`/`2`/`3` digits before the
-active ammo pool. Bullet and shell pools now use compact Doom-like caps, and
+armor counters over the Doom status bar. Clips, shells, and rockets are tracked
+separately, and the status bar shows compact weapon `1`/`2`/`3`/`4` digits before
+the active ammo pool. Bullet, shell, and rocket pools now use compact Doom-like caps, and
 pickups remain in the map instead of disappearing when the matching resource is
 already full. Shotgun guys now drop a shotgun pickup, and collecting one equips
 Doom's shotgun frames, adds shells, and makes B fire a wider spread shot that
 can hit a second visible target for reduced damage. Chaingun pickups are also
 converted from Doom thing type `2002`, rendered with the `MGUN` pickup sprite,
 and equip a third weapon slot that uses the `CHGG` weapon frames for a faster
-held-fire bullet stream. Trying to fire empty flashes
+held-fire bullet stream. Rocket launchers now convert from thing type `2003`
+with `LAUN` pickup art, use `MISG` weapon frames, track rockets separately from
+bullets and shells, and apply compact splash damage around the auto-aimed
+target. Trying to fire empty flashes
 a compact fix-layer `AMMO` message instead of failing silently. Close visible
 monsters apply a first-pass contact-damage tick with armor absorption.
 Pickups briefly flash compact center feedback using existing fix glyphs:
-`KEY`, `AMMO`, `MED`, `ARM`, `2` for the shotgun, or `3` for the chaingun.
+`KEY`, `AMMO`, `MED`, `ARM`, or weapon digits `2`/`3`/`4`.
 Former humans, shotgun guys, and imps also apply slower ranged damage when they
 are visible and close enough, so the player has pressure to move, aim, and use
 doors instead of only avoiding contact. Combat uses a compact line-of-sight

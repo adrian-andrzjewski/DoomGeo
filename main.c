@@ -158,6 +158,7 @@ static u8  monster_ai_tick = 0;
 static u8  player_keys = 0;
 static u8  player_has_shotgun = 0;
 static u8  player_has_chaingun = 0;
+static u8  player_has_rocket_launcher = 0;
 static u8  current_weapon = 0;
 static u8  pickup_message_weapon = 0;
 static u8  chaingun_flash = 0;
@@ -176,6 +177,7 @@ static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
 static volatile u16 player_ammo = 50;
 static volatile u16 player_shells = 0;
+static volatile u16 player_rockets = 0;
 static u16 player_score = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
@@ -186,7 +188,8 @@ static u8 shown_weapon = 0xFF;
 
 enum {
     PLAYER_MAX_BULLETS = 200,
-    PLAYER_MAX_SHELLS = 50
+    PLAYER_MAX_SHELLS = 50,
+    PLAYER_MAX_ROCKETS = 50
 };
 
 typedef struct EnemyDraw {
@@ -285,6 +288,7 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2007:
     case 2001:
     case 2002:
+    case 2003:
     case 2008:
     case 2010:
     case 2011:
@@ -293,6 +297,7 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2015:
     case 2018:
     case 2019:
+    case 2046:
     case 2048:
         return 1;
     default:
@@ -310,6 +315,21 @@ static u8 thing_is_explosion(u16 thing_type) {
 
 static u8 thing_is_shootable(u16 thing_type) {
     return thing_is_monster(thing_type) || thing_is_barrel(thing_type);
+}
+
+static u8 player_has_weapon(u8 weapon) {
+    switch (weapon) {
+    case 0:
+        return 1;
+    case 1:
+        return player_has_shotgun;
+    case 2:
+        return player_has_chaingun;
+    case 3:
+        return player_has_rocket_launcher;
+    default:
+        return 0;
+    }
 }
 
 static u8 key_bit_for_thing(u16 thing_type) {
@@ -525,6 +545,23 @@ static void damage_best_visible_enemy(u8 damage) {
     damage_visible_enemy(best_visible_enemy(), damage);
 }
 
+static void damage_rocket_target(void) {
+    int target = best_visible_enemy();
+    short x;
+    short y;
+    if (target < 0) return;
+    x = thing_x_q8[target];
+    y = thing_y_q8[target];
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        u16 type = runtime_thing_type(i);
+        if (enemy_dead[i] || !thing_is_shootable(type)) continue;
+        if (iabs16(thing_x_q8[i] - x) + iabs16(thing_y_q8[i] - y) < 560) {
+            damage_enemy_at(i, thing_is_barrel(type) ? 1 : 8);
+        }
+    }
+    hide_enemies();
+}
+
 static void damage_shotgun_spread(void) {
     int targets[ENEMY_VISIBLE_COUNT] = {-1, -1};
     int scores[ENEMY_VISIBLE_COUNT] = {9999, 9999};
@@ -706,6 +743,7 @@ static u8 apply_pickup(u16 thing_type) {
         current_weapon = 1;
         add_capped_u16(&player_shells, 8, PLAYER_MAX_SHELLS);
         weapon_frame = 0xFF;
+        shown_ammo = 0xFFFF;
         shown_weapon = 0xFF;
         pickup_message_weapon = 2;
         pickup_message_type = 2;
@@ -716,8 +754,20 @@ static u8 apply_pickup(u16 thing_type) {
         current_weapon = 2;
         add_capped_u16(&player_ammo, 20, PLAYER_MAX_BULLETS);
         weapon_frame = 0xFF;
+        shown_ammo = 0xFFFF;
         shown_weapon = 0xFF;
         pickup_message_weapon = 3;
+        pickup_message_type = 2;
+        break;
+    case 2003: /* rocket launcher */
+        if (player_has_rocket_launcher && player_rockets >= PLAYER_MAX_ROCKETS) return 0;
+        player_has_rocket_launcher = 1;
+        current_weapon = 3;
+        add_capped_u16(&player_rockets, 2, PLAYER_MAX_ROCKETS);
+        weapon_frame = 0xFF;
+        shown_ammo = 0xFFFF;
+        shown_weapon = 0xFF;
+        pickup_message_weapon = 4;
         pickup_message_type = 2;
         break;
     case 2007: /* clip */
@@ -729,7 +779,7 @@ static u8 apply_pickup(u16 thing_type) {
         pickup_message_type = 3;
         break;
     case 2010: /* rocket */
-        if (!add_capped_u16(&player_ammo, 1, PLAYER_MAX_BULLETS)) return 0;
+        if (!add_capped_u16(&player_rockets, 1, PLAYER_MAX_ROCKETS)) return 0;
         pickup_message_type = 3;
         break;
     case 2011: /* stimpack */
@@ -761,6 +811,10 @@ static u8 apply_pickup(u16 thing_type) {
         if (player_armor >= 200) return 0;
         if (player_armor < 200) player_armor = 200;
         pickup_message_type = 5;
+        break;
+    case 2046: /* box of rockets */
+        if (!add_capped_u16(&player_rockets, 5, PLAYER_MAX_ROCKETS)) return 0;
+        pickup_message_type = 3;
         break;
     case 2048: /* ammo box */
         if (!add_capped_u16(&player_ammo, 50, PLAYER_MAX_BULLETS)) return 0;
@@ -961,7 +1015,9 @@ static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
 }
 
 static u16 weapon_ammo(void) {
-    return current_weapon == 1 && player_has_shotgun ? player_shells : player_ammo;
+    if (current_weapon == 1 && player_has_shotgun) return player_shells;
+    if (current_weapon == 3 && player_has_rocket_launcher) return player_rockets;
+    return player_ammo;
 }
 
 static void update_status_numbers(void) {
@@ -969,16 +1025,14 @@ static void update_status_numbers(void) {
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
     u8 weapon = current_weapon;
-    if (weapon == 2 && !player_has_chaingun) weapon = 0;
-    if (weapon == 1 && !player_has_shotgun) weapon = 0;
+    if (!player_has_weapon(weapon)) weapon = 0;
     weapon++;
     if (health != shown_health) {
         draw_number3(3, 26, health, PAL_MAP_PLAYER);
         shown_health = health;
     }
     if (weapon != shown_weapon) {
-        u16 pal = (weapon == 1 || (weapon == 2 && player_has_shotgun) || (weapon == 3 && player_has_chaingun)) ? PAL_MAP_PLAYER : PAL_MAP_WALL;
-        fix_poke(16, 26, pal, (u16)(FIX_DIGIT_BASE + weapon));
+        fix_poke(16, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + weapon));
         shown_weapon = weapon;
     }
     if (ammo != shown_ammo) {
@@ -1133,10 +1187,11 @@ static void set_weapon_frame(u8 frame) {
 }
 
 static void toggle_weapon(void) {
-    if (!player_has_shotgun && !player_has_chaingun) return;
-    if (current_weapon == 0) current_weapon = player_has_shotgun ? 1 : 2;
-    else if (current_weapon == 1) current_weapon = player_has_chaingun ? 2 : 0;
-    else current_weapon = 0;
+    if (!player_has_shotgun && !player_has_chaingun && !player_has_rocket_launcher) return;
+    for (u8 i = 0; i < 4; i++) {
+        current_weapon = (u8)((current_weapon + 1) & 3);
+        if (player_has_weapon(current_weapon)) break;
+    }
     weapon_frame = 0xFF;
     shown_ammo = 0xFFFF;
     shown_weapon = 0xFF;
@@ -1182,11 +1237,15 @@ static void update_weapon(u8 pressed) {
             } else if (!fire_prev) {
                 ammo_message_timer = 45;
             }
+        } else if (!fire_prev && current_weapon == 3 && player_has_rocket_launcher && player_rockets > 0) {
+            player_rockets--;
+            fire_timer = 20;
+            damage_rocket_target();
         } else if (!fire_prev && current_weapon == 1 && player_has_shotgun && player_shells > 0) {
             player_shells--;
             fire_timer = 16;
             damage_shotgun_spread();
-        } else if (!fire_prev && player_ammo > 0) {
+        } else if (!fire_prev && current_weapon == 0 && player_ammo > 0) {
             current_weapon = 0;
             shown_weapon = 0xFF;
             player_ammo--;
@@ -1198,10 +1257,12 @@ static void update_weapon(u8 pressed) {
     }
     fire_prev = b_now;
 
-    u8 frame = current_weapon == 2 && player_has_chaingun ? 8 : (current_weapon == 1 && player_has_shotgun ? 4 : 0);
+    u8 frame = current_weapon == 3 && player_has_rocket_launcher ? 10 : (current_weapon == 2 && player_has_chaingun ? 8 : (current_weapon == 1 && player_has_shotgun ? 4 : 0));
     if (fire_timer) {
         if (current_weapon == 2 && player_has_chaingun) {
             frame = (u8)(8 + (chaingun_flash & 1));
+        } else if (current_weapon == 3 && player_has_rocket_launcher) {
+            frame = fire_timer > 10 ? 11 : 10;
         } else {
             u8 base = current_weapon == 1 && player_has_shotgun ? 4 : 0;
             if (fire_timer > 12) frame = (u8)(base + 1);
@@ -1408,6 +1469,7 @@ static void restart_level(void) {
     player_keys = 0;
     player_has_shotgun = 0;
     player_has_chaingun = 0;
+    player_has_rocket_launcher = 0;
     current_weapon = 0;
     pickup_message_weapon = 0;
     chaingun_flash = 0;
@@ -1415,6 +1477,7 @@ static void restart_level(void) {
     player_armor = 0;
     player_ammo = 50;
     player_shells = 0;
+    player_rockets = 0;
     player_score = 0;
     hurt_flash = 0;
     hurt_flash_on = 0;
