@@ -59,6 +59,8 @@ share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar. Pistol shots spend ammo, and close
 visible monsters apply a first-pass contact-damage tick with armor absorption.
+Monsters now keep compact per-thing hit points, so pistol shots damage targets
+over multiple hits instead of deleting every visible enemy immediately.
 
 ## Building
 

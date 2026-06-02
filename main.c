@@ -85,6 +85,7 @@ static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
 static u8  hurt_timer = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
+static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static volatile u16 player_health = 100;
@@ -154,6 +155,30 @@ static u8 thing_is_pickup(u16 thing_type) {
     }
 }
 
+static u8 monster_start_hp(u16 thing_type) {
+    switch (thing_type) {
+    case 3004: /* former human */
+        return 2;
+    case 9:    /* shotgun guy */
+        return 3;
+    case 3001: /* imp */
+        return 4;
+    case 3002: /* demon */
+    case 58:   /* spectre */
+        return 8;
+    default:
+        return 5;
+    }
+}
+
+static u8 monster_hp(int thing_index) {
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (enemy_hp[thing_index] == 0) {
+        enemy_hp[thing_index] = monster_start_hp(g_runtime_things[thing_index].type);
+    }
+    return enemy_hp[thing_index];
+}
+
 static int enemy_sprite_def_for_type(u16 thing_type) {
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
         if (g_enemy_sprite_defs[i].thing_type == thing_type) return i;
@@ -172,26 +197,35 @@ static void load_enemy_palette(u16 slot, int def) {
     enemy_palette_def[slot] = def;
 }
 
-static void kill_enemy_at(int thing_index) {
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
-    if (!thing_is_monster(g_runtime_things[thing_index].type)) return;
+static u8 damage_enemy_at(int thing_index, u8 damage) {
+    u8 killed = 0;
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (!thing_is_monster(g_runtime_things[thing_index].type)) return 0;
     {
         short x = g_runtime_things[thing_index].x_q8;
         short y = g_runtime_things[thing_index].y_q8;
+        u8 hp = monster_hp(thing_index);
+        if (damage >= hp) hp = 0;
+        else hp = (u8)(hp - damage);
+
         for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
             if (thing_is_monster(g_runtime_things[i].type) && g_runtime_things[i].x_q8 == x && g_runtime_things[i].y_q8 == y) {
-                enemy_dead[i] = 1;
+                enemy_hp[i] = hp;
+                if (hp == 0) {
+                    enemy_dead[i] = 1;
+                    killed = 1;
+                }
             }
         }
     }
+    return killed;
 }
 
-static void kill_visible_enemies(void) {
+static void damage_visible_enemies(void) {
     u8 killed = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         if (enemies[slot].thing_index < 0) continue;
-        kill_enemy_at(enemies[slot].thing_index);
-        killed = 1;
+        if (damage_enemy_at(enemies[slot].thing_index, 1)) killed = 1;
     }
     if (killed) hide_enemies();
 }
@@ -428,7 +462,7 @@ static void update_weapon(u8 pressed) {
         if (player_ammo > 0) {
             player_ammo--;
             fire_timer = 12;
-            kill_visible_enemies();
+            damage_visible_enemies();
         }
     }
     b_prev = b_now;
