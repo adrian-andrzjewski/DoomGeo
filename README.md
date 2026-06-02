@@ -48,7 +48,7 @@ pixel work is offloaded to the scaler hardware.
 | D-pad Up / Down     | Move forward/back |
 | D-pad Left / Right  | Turn              |
 | Hold A + Left/Right | Strafe            |
-| B                   | Fire pistol       |
+| B                   | Fire weapon       |
 | C                   | Toggle minimap    |
 | D                   | Open nearby door  |
 | Hold A + D          | Toggle weapon     |
@@ -97,9 +97,12 @@ tiny fix-layer center marker gives the player a stable aim point without
 spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
-WAD data for type, flags, and initial placement. Chase movement also keeps a
-small separation radius between live monsters, which reduces stacked enemies
-and makes the two projected world-sprite slots more readable. When health
+WAD data for type, flags, and initial placement. Monsters now keep a compact
+awake bit after seeing or being hit by the player, so they continue pursuit
+around corners instead of stopping the moment line of sight is broken. Chase
+movement also keeps a small separation radius between live monsters, which
+reduces stacked enemies and makes the two projected world-sprite slots more
+readable. When health
 reaches zero, movement and firing stop and the fix layer shows a compact `DEAD`
 message; pressing D resets the player, doors, pickups, monsters, and HUD for
 another run. Restart also clears the button-edge latches used by fire, doors,

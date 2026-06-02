@@ -164,6 +164,7 @@ static u8  chaingun_flash = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
+static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
@@ -401,6 +402,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
             if (thing_is_monster(runtime_thing_type(i)) && thing_x_q8[i] == x && thing_y_q8[i] == y) {
                 enemy_hp[i] = hp;
+                enemy_awake[i] = 1;
                 if (hp == 0) {
                     if (drop_type) {
                         thing_type_override[i] = drop_type;
@@ -409,6 +411,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                         enemy_dead[i] = 1;
                     }
                     enemy_hit_flash[i] = 0;
+                    enemy_awake[i] = 0;
                     killed = 1;
                 } else {
                     enemy_hit_flash[i] = 30;
@@ -589,9 +592,13 @@ static void update_monster_ai(void) {
         dy = py - thing_y_q8[i];
         adx = iabs16(dx);
         ady = iabs16(dy);
-        if (adx + ady > 2304) continue;
+        if (adx + ady > 3072) continue;
         if (adx < 288 && ady < 288) continue;
-        if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
+        if (!enemy_awake[i]) {
+            if (adx + ady > 2304) continue;
+            if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
+            enemy_awake[i] = 1;
+        }
 
         nx = thing_x_q8[i];
         ny = thing_y_q8[i];
@@ -1339,6 +1346,7 @@ static void restart_level(void) {
         enemy_dead[i] = 0;
         enemy_hp[i] = 0;
         enemy_hit_flash[i] = 0;
+        enemy_awake[i] = 0;
         thing_type_override[i] = 0;
     }
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
