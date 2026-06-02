@@ -336,7 +336,7 @@ static u8 thing_is_explosion(u16 thing_type) {
 }
 
 static u8 thing_is_corpse(u16 thing_type) {
-    return thing_type >= 9001 && thing_type <= 9004;
+    return thing_type >= 9001 && thing_type <= 9005;
 }
 
 static u8 thing_is_shootable(u16 thing_type) {
@@ -401,6 +401,8 @@ static u8 monster_start_hp(u16 thing_type) {
     case 3002: /* demon */
     case 58:   /* spectre */
         return 8;
+    case 3003: /* baron */
+        return 20;
     default:
         return 5;
     }
@@ -428,6 +430,8 @@ static u16 monster_corpse_type(u16 thing_type) {
     case 3002:
     case 58:
         return 9004; /* demon/spectre corpse */
+    case 3003:
+        return 9005; /* baron corpse */
     default:
         return 0;
     }
@@ -444,6 +448,8 @@ static u16 monster_score_value(u16 thing_type) {
     case 3002: /* demon */
     case 58:   /* spectre */
         return 400;
+    case 3003: /* baron */
+        return 1000;
     default:
         return 100;
     }
@@ -680,6 +686,8 @@ static u8 monster_ranged_damage(u16 thing_type) {
         return 5;
     case 3001: /* imp */
         return 4;
+    case 3003: /* baron */
+        return 8;
     default:
         return 0;
     }

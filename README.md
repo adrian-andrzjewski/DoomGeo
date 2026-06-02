@@ -41,8 +41,8 @@ math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Visible monsters are selected
 before pickups so the limited sprite slots keep combat readable; candidates are
 ranked by distance and screen relevance each frame, and tiny candidates hidden
-under the pistol overlay are skipped. Common E1M1 monster thing types map to their own pre-scaled sprite
-frames (`POSS`, `SPOS`, `TROO`, `SARG`) and live palette, and the pistol clears
+under the pistol overlay are skipped. Common Doom monster thing types map to
+their own pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`, `SARG`, `BOSS`) and live palette, and the pistol clears
 the currently rendered target set as the initial combat proof of concept. The
 optional minimap is drawn on the fix (text) layer, which always composites over
 sprites.
@@ -116,7 +116,7 @@ spending extra sprite slots; the same short timer also pauses their chase and
 attack logic, creating a compact Doom-like pain reaction. Former humans turn
 into clip pickups and shotgun guys turn into shotgun pickups when killed,
 reusing the existing projected pickup path. Other killed monsters now turn into
-projected Doom corpse frames (`TROOR0`, `SARGN0`, etc.) so fights leave a
+projected Doom corpse frames (`TROOR0`, `SARGN0`, `BOSSO0`, etc.) so fights leave a
 readable battlefield state instead of simply deleting every dead thing.
 Kills still add a small capped internal score for combat bookkeeping, but the
 visible status bar keeps Doom's ammo, health, face, armor, and key fields
