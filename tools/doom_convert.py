@@ -424,6 +424,7 @@ PICKUP_TYPES = {
 }
 
 RUNTIME_THING_TYPES = MONSTER_TYPES | PICKUP_TYPES
+EXIT_SPECIALS = {11, 51, 52, 124, 197, 198, 243, 244}
 
 def line_of_sight_grid(grid: list[list[int]], ax: float, ay: float, bx: float, by: float) -> bool:
     steps = max(1, int(math.hypot(bx - ax, by - ay) * 8))
@@ -474,6 +475,32 @@ def runtime_things(
     return [(x, y, typ, flags) for _score, x, y, typ, flags in rows]
 
 
+def runtime_exits(
+    linedefs: list[LineDef],
+    vertices: list[Vertex],
+    grid: list[list[int]],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> list[tuple[int, int, int]]:
+    exits: list[tuple[int, int, int]] = []
+    seen: set[tuple[int, int]] = set()
+    for line in linedefs:
+        if line.special not in EXIT_SPECIALS:
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        gx, gy = grid_coord((a.x + b.x) // 2, (a.y + b.y) // 2, min_x, max_y, scale, margin)
+        cell_x, cell_y = nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))
+        key = (cell_x, cell_y)
+        if key in seen:
+            continue
+        seen.add(key)
+        exits.append((int(round((cell_x + 0.5) * 256)), int(round((cell_y + 0.5) * 256)), line.special))
+    return exits
+
+
 def emit_header(
     out_path: str,
     grid: list[list[int]],
@@ -484,6 +511,7 @@ def emit_header(
     map_name: str,
     stats: dict[str, int],
     things: list[tuple[int, int, int, int]],
+    exits: list[tuple[int, int, int]],
 ) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     angle_rad = math.radians(angle)
@@ -515,8 +543,11 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_REJECT_BYTES {stats['reject_bytes']}\n")
         f.write(f"#define DOOM_CONVERTED_BLOCKMAP_WORDS {stats['blockmap_words']}\n")
         f.write(f"#define DOOM_CONVERTED_THINGS {stats['things']}\n")
+        f.write(f"#define DOOM_CONVERTED_EXITS {len(exits)}\n")
         f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
+        f.write(f"#define NG_RUNTIME_EXIT_COUNT {len(exits)}\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
+        f.write("typedef struct NgRuntimeExit { short x_q8; short y_q8; unsigned short special; } NgRuntimeExit;\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for row in grid:
             f.write("    {")
@@ -526,6 +557,10 @@ def emit_header(
         f.write("static const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {\n")
         for x_q8, y_q8, typ, flags in things:
             f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
+        f.write("};\n\n")
+        f.write("static const NgRuntimeExit g_runtime_exits[NG_RUNTIME_EXIT_COUNT] = {\n")
+        for x_q8, y_q8, special in exits:
+            f.write(f"    {{{x_q8},{y_q8},{special}}},\n")
         f.write("};\n\n")
         f.write("static inline int map_at(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
@@ -739,6 +774,7 @@ def convert(args: argparse.Namespace) -> None:
     sx, sy = carve_start_clearance(grid, sx, sy, player.angle)
     sx, sy = choose_start_pose(grid, sx, sy, player.angle)
     converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle)
+    converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin)
 
     emit_header(
         args.out,
@@ -763,6 +799,7 @@ def convert(args: argparse.Namespace) -> None:
             "things": len(things),
         },
         converted_things,
+        converted_exits,
     )
     if args.assets_header and args.assets_source:
         emit_assets(

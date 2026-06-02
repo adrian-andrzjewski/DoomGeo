@@ -84,6 +84,7 @@ static u8  bg_phase = 0xFF;
 static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
 static u8  hurt_timer = 0;
+static u8  level_complete = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
@@ -317,6 +318,29 @@ static void collect_nearby_pickups(void) {
             apply_pickup(thing->type);
             enemy_dead[i] = 1;
             hide_enemies();
+        }
+    }
+}
+
+static void draw_exit_message(void) {
+    const u16 col = (SCRW / 16) - 2;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, (u16)(FIX_EXIT_BASE + 1));
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, (u16)(FIX_EXIT_BASE + 2));
+    fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, (u16)(FIX_EXIT_BASE + 3));
+}
+
+static void check_exit_reached(void) {
+    int px, py;
+    if (level_complete) return;
+    rc_player_q8(&px, &py);
+    for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
+        const NgRuntimeExit *exit = &g_runtime_exits[i];
+        if (iabs16(px - exit->x_q8) <= 128 && iabs16(py - exit->y_q8) <= 128) {
+            level_complete = 1;
+            draw_exit_message();
+            return;
         }
     }
 }
@@ -646,6 +670,7 @@ int main(void) {
         u8 pressed = (u8)~REG_P1CNT;    
         rc_input(pressed);
         collect_nearby_pickups();
+        check_exit_reached();
         rc_render();                    /* DDA during active display          */
         wait_vblank();
         watchdog_kick();

@@ -65,6 +65,11 @@ pistol picks the visible monster closest to the crosshair instead of damaging
 every visible target at once. A tiny fix-layer center marker gives the player a
 stable aim point without spending any sprite slots.
 
+The converter also preserves Doom exit linedefs as a compact runtime trigger
+list. Reaching the converted E1M1 exit cell now raises a fix-layer `EXIT`
+message, which is the first pass toward level completion behavior without
+keeping generic WAD directory/lump metadata in the cartridge.
+
 ## Building
 
 The `doom-neogeo-port` branch expects a local ngdevkit/GnGeo install under

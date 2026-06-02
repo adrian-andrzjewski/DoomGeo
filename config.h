@@ -71,6 +71,7 @@
 #define FIX_SOLID  1                /* all index 15 -> opaque, palette picks color */
 #define FIX_DIGIT_BASE 2            /* 2..11 = compact 8x8 HUD digits       */
 #define FIX_AIM    12               /* tiny center aim marker                */
+#define FIX_EXIT_BASE 13            /* 13..16 = EXIT message glyphs          */
 
  
 #define MAP_FIX_COL 1             
