@@ -48,6 +48,8 @@ static fix cameraXbuf[NUM_COLS]; /* constant camera x in [-1,+1] per column */
 
 static u16 scb2buf[NUM_COLS];    /* (HSHRINK<<8)|vshrink                    */
 static u16 scb3buf[NUM_COLS];    /* Y/size word                             */
+static u16 curscb2[NUM_COLS];    /* control words currently in VRAM         */
+static u16 curscb3[NUM_COLS];
 static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
 static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
@@ -88,6 +90,8 @@ void rc_init(void) {
     for (int c = 0; c < NUM_COLS; c++) {
         curpal[c] = 0xFF; /* force first write */
         curtex[c] = 0xFF;
+        curscb2[c] = 0xFFFF;
+        curscb3[c] = 0xFFFF;
     }
     rc_invalidate_view();
 }
@@ -236,17 +240,44 @@ void rc_render(void) {
 }
 
 void rc_blit(void) {
+    int scb2_changes = 0;
+    int scb3_changes = 0;
     if (!wall_upload_dirty) return;
 
-    /* stream vertical shrink for every wall slice */
-    vram_addr(VRAM_SCB2 + WALL_BASE);
-    vram_mod(1);
-    for (int c = 0; c < NUM_COLS; c++) vram_w(scb2buf[c]);
+    for (int c = 0; c < NUM_COLS; c++) {
+        if (scb2buf[c] != curscb2[c]) scb2_changes++;
+        if (scb3buf[c] != curscb3[c]) scb3_changes++;
+    }
 
-    /* stream Y/size */
-    vram_addr(VRAM_SCB3 + WALL_BASE);
-    vram_mod(1);
-    for (int c = 0; c < NUM_COLS; c++) vram_w(scb3buf[c]);
+    if (scb2_changes > NUM_COLS / 2) {
+        vram_addr(VRAM_SCB2 + WALL_BASE);
+        vram_mod(1);
+        for (int c = 0; c < NUM_COLS; c++) {
+            vram_w(scb2buf[c]);
+            curscb2[c] = scb2buf[c];
+        }
+    } else {
+        for (int c = 0; c < NUM_COLS; c++) {
+            if (scb2buf[c] == curscb2[c]) continue;
+            vram_poke((u16)(VRAM_SCB2 + WALL_BASE + c), scb2buf[c]);
+            curscb2[c] = scb2buf[c];
+        }
+    }
+
+    if (scb3_changes > NUM_COLS / 2) {
+        vram_addr(VRAM_SCB3 + WALL_BASE);
+        vram_mod(1);
+        for (int c = 0; c < NUM_COLS; c++) {
+            vram_w(scb3buf[c]);
+            curscb3[c] = scb3buf[c];
+        }
+    } else {
+        for (int c = 0; c < NUM_COLS; c++) {
+            if (scb3buf[c] == curscb3[c]) continue;
+            vram_poke((u16)(VRAM_SCB3 + WALL_BASE + c), scb3buf[c]);
+            curscb3[c] = scb3buf[c];
+        }
+    }
 
     /* directional shading */
     for (int c = 0; c < NUM_COLS; c++) {
