@@ -332,6 +332,10 @@ static u8 enemy_coord_selected(int count, short x, short y) {
     return 0;
 }
 
+static u8 enemy_obscured_by_weapon(int sx, int h) {
+    return h < 80 && sx > (SCRW / 2 - 40) && sx < (SCRW / 2 + 40);
+}
+
 static void update_enemy(void) {
     int found = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
@@ -347,6 +351,7 @@ static void update_enemy(void) {
             const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
             const DoomSpriteScale *meta;
             u16 slot = (u16)found;
+            if (enemy_obscured_by_weapon(sx, h)) continue;
 
             enemies[slot].thing_index = i;
             enemies[slot].sprite_def = def_idx;
