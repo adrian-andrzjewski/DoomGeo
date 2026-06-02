@@ -75,6 +75,9 @@ projected Doom targets can be lined up with keyboard or arcade-stick input.
 Player movement keeps the original axis-separated slide feel, but collision now
 tests a small Doom-like body radius instead of only the player's center cell, so
 corners and closed doors behave less like thin grid lines.
+The converter preserves the Doom player start depth on cardinal-facing starts
+while using the nearest safe lateral grid center, which keeps the opening view
+closer to the WAD without putting the player against coarse converted walls.
 
 The wall and sprite projection heights use the raycaster's reciprocal lookup
 table instead of doing a 64-bit divide for each projected column.
@@ -225,9 +228,9 @@ For visual regression work, run the native Doom comparison capture:
 DOOM_MAP=E1M1 tools/capture_compare.sh
 ```
 
-The script launches native Doom with the same Freedoom WAD, launches GnGeo with
-the current ROM, and writes native/Neo Geo/side-by-side screenshots under
-`.tools/screens/`.
+The script launches native Doom with the same `DOOM_IWAD` used by the ROM
+conversion, launches GnGeo with the current ROM, and writes native/Neo
+Geo/side-by-side screenshots under `.tools/screens/`.
  
 You must supply your own Neo Geo BIOS — it is copyrighted and not included.
 

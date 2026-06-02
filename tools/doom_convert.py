@@ -400,6 +400,12 @@ def choose_start_pose(grid: list[list[int]], raw_x: float, raw_y: float, angle: 
     best_score = float("inf")
     base_x = int(math.floor(raw_x))
     base_y = int(math.floor(raw_y))
+    raw_start_ok = (
+        1 <= base_x < width - 1
+        and 1 <= base_y < height - 1
+        and grid[base_y][base_x] == 0
+        and forward_clearance(grid, raw_x, raw_y, angle) >= 0.75
+    )
 
     for radius in range(0, 3):
         for y in range(max(1, base_y - radius), min(height - 1, base_y + radius + 1)):
@@ -417,6 +423,13 @@ def choose_start_pose(grid: list[list[int]], raw_x: float, raw_y: float, angle: 
                     best_score = score
                     best = (cx, cy)
         if best is not None:
+            if raw_start_ok:
+                cardinal = angle % 360
+                if cardinal in (90, 270):
+                    return best[0], raw_y
+                if cardinal in (0, 180):
+                    return raw_x, best[1]
+                return raw_x, raw_y
             return best
 
     cell_x, cell_y = nearest_open(grid, base_x, base_y)

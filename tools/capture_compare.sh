@@ -13,6 +13,7 @@ FREEDOOM_VERSION="${FREEDOOM_VERSION:-0.13.0}"
 FREEDOOM_ZIP=".tools/assets/freedoom-${FREEDOOM_VERSION}.zip"
 FREEDOOM_DIR=".tools/assets/freedoom-${FREEDOOM_VERSION}"
 FREEDOOM_WAD="${FREEDOOM_DIR}/freedoom1.wad"
+DOOM_IWAD="${DOOM_IWAD:-.tools/assets/doom1.wad.zip}"
 native_pid=""
 make_pid=""
 
@@ -52,9 +53,11 @@ window_for_pid_or_name() {
     local name="$2"
     local wid=""
     for _ in $(seq 1 80); do
-        wid="$(xdotool search --onlyvisible --name "$name" 2>/dev/null | tail -n1 || true)"
-        if [ -z "$wid" ]; then
+        if [ -n "$pid" ]; then
             wid="$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | tail -n1 || true)"
+        fi
+        if [ -z "$wid" ] && [ -n "$name" ]; then
+            wid="$(xdotool search --onlyvisible --name "$name" 2>/dev/null | tail -n1 || true)"
         fi
         if [ -n "$wid" ] && xwininfo -id "$wid" >/dev/null 2>&1; then
             echo "$wid"
@@ -84,12 +87,26 @@ switch_workspace() {
 }
 
 capture_window() {
-    local wid="$1"
-    local out="$2"
-    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    sleep 0.2
-    xwd -silent -id "$wid" -out "${out%.png}.xwd"
-    convert "${out%.png}.xwd" "$out"
+    local pid="$1"
+    local name="$2"
+    local out="$3"
+    local wid=""
+    local xwd_out="${out%.png}.xwd"
+    for _ in $(seq 1 10); do
+        wid="$(window_for_pid_or_name "$pid" "$name" || true)"
+        if [ -n "$wid" ] && xwininfo -id "$wid" >/dev/null 2>&1; then
+            xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+            sleep 0.3
+            rm -f "$xwd_out"
+            if xwd -silent -id "$wid" -out "$xwd_out" >/dev/null 2>&1 && [ -s "$xwd_out" ]; then
+                convert "$xwd_out" "$out"
+                return 0
+            fi
+        fi
+        sleep 0.3
+    done
+    echo "failed to capture window for pid=$pid name=$name" >&2
+    return 1
 }
 
 episode="${MAP:1:1}"
@@ -105,11 +122,19 @@ require_cmd xwd
 require_cmd convert
 require_cmd unzip
 
-if [ ! -f "$FREEDOOM_ZIP" ]; then
-    make "$FREEDOOM_ZIP"
-fi
-if [ ! -f "$FREEDOOM_WAD" ]; then
-    unzip -q "$FREEDOOM_ZIP" "freedoom-${FREEDOOM_VERSION}/freedoom1.wad" -d .tools/assets
+native_iwad="$DOOM_IWAD"
+if [[ "$native_iwad" == *.zip ]]; then
+    native_member="$(unzip -Z1 "$native_iwad" | grep -Ei '\.wad$' | head -n1 || true)"
+    if [ -z "$native_member" ]; then
+        echo "no WAD member found inside ${native_iwad}" >&2
+        exit 1
+    fi
+    native_extract_root=".tools/assets/native-$(basename "${native_iwad%.zip}")"
+    native_iwad="${native_extract_root}/${native_member}"
+    if [ ! -f "$native_iwad" ]; then
+        mkdir -p "$native_extract_root"
+        unzip -q "$DOOM_IWAD" "$native_member" -d "$native_extract_root"
+    fi
 fi
 
 native_bin="$(doom_runner)"
@@ -124,20 +149,30 @@ switch_workspace
 trap cleanup_spawned EXIT
 
 setsid env SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy \
-    "$native_bin" -iwad "$FREEDOOM_WAD" -warp "$episode" "$level" -skill 1 -nomusic -nosound -window \
+    "$native_bin" -iwad "$native_iwad" -warp "$episode" "$level" -skill 1 -nomusic -nosound -window \
     > "${LOGDIR}/native-doom-compare.log" 2>&1 < /dev/null &
 native_pid=$!
 disown "$native_pid" 2>/dev/null || true
 sleep 1.2
-native_wid="$(window_for_pid_or_name "$native_pid" "$native_title")"
-capture_window "$native_wid" "$native_png"
+capture_window "$native_pid" "$native_title" "$native_png"
 
 setsid env SDL_VIDEODRIVER=x11 make gngeo > "${LOGDIR}/gngeo-compare.log" 2>&1 < /dev/null &
 make_pid=$!
 disown "$make_pid" 2>/dev/null || true
-sleep 2.0
-neo_wid="$(window_for_pid_or_name "$make_pid" "GnGeo")"
-capture_window "$neo_wid" "$neogeo_png"
+sleep 4.0
+neo_pid=""
+for _ in $(seq 1 40); do
+    neo_pid="$(pgrep -n -x ngdevkit-gngeo 2>/dev/null || true)"
+    if [ -n "$neo_pid" ]; then
+        break
+    fi
+    sleep 0.1
+done
+if [ -z "$neo_pid" ]; then
+    echo "ngdevkit-gngeo process not found" >&2
+    exit 1
+fi
+capture_window "$neo_pid" "" "$neogeo_png"
 
 convert "$native_png" -resize 640x480\> "${native_png%.png}-fit.png"
 convert "$neogeo_png" -resize 640x480\> "${neogeo_png%.png}-fit.png"
