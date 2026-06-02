@@ -184,6 +184,7 @@ static u8  door_prev = 0;
 static u8  map_prev = 0;
 static u8  restart_prev = 0;
 static u8  hurt_timer = 0;
+static u8  floor_damage_timer = 0;
 static u8  level_complete = 0;
 static u32 bg_scroll_key = 0xFFFFFFFFUL;
 static u8  key_message_timer = 0;
@@ -1365,6 +1366,21 @@ static void update_center_message(void) {
     }
 }
 
+static void update_floor_damage(void) {
+    int px, py;
+    u8 damage;
+    if (!game_active()) return;
+    if (floor_damage_timer) {
+        floor_damage_timer--;
+        return;
+    }
+    rc_player_q8(&px, &py);
+    damage = map_cell_damage(px >> 8, py >> 8);
+    if (!damage) return;
+    player_take_damage(damage);
+    floor_damage_timer = 32;
+}
+
 static void check_exit_reached(void) {
     int px, py;
     if (level_complete) return;
@@ -2056,6 +2072,7 @@ static void restart_level(void) {
     map_prev = 0;
     restart_prev = 0;
     hurt_timer = 0;
+    floor_damage_timer = 0;
     level_complete = 0;
     bg_scroll_key = 0xFFFFFFFFUL;
     key_message_timer = 0;
@@ -2146,6 +2163,7 @@ int main(void) {
             enum { A = 0x10, D = 0x80 };
             u8 d_now = pressed & D;
             rc_input(pressed);
+            update_floor_damage();
             update_monster_ai();
             collect_nearby_pickups();
             check_exit_reached();

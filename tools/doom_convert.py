@@ -524,6 +524,81 @@ def line_of_sight_grid(grid: list[list[int]], ax: float, ay: float, bx: float, b
     return True
 
 
+def sector_damage_amount(special: int) -> int:
+    if special in (5, 7):
+        return 5
+    if special in (16,):
+        return 20
+    return 0
+
+
+def sector_segments(
+    sector_index: int,
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    vertices: list[Vertex],
+) -> list[tuple[Vertex, Vertex]]:
+    segments: list[tuple[Vertex, Vertex]] = []
+    for line in linedefs:
+        front_sector = -1
+        back_sector = -1
+        if line.side_front != 0xFFFF and line.side_front < len(sidedefs):
+            front_sector = sidedefs[line.side_front].sector
+        if line.side_back != 0xFFFF and line.side_back < len(sidedefs):
+            back_sector = sidedefs[line.side_back].sector
+        if front_sector == sector_index or back_sector == sector_index:
+            segments.append((vertices[line.v1], vertices[line.v2]))
+    return segments
+
+
+def point_in_sector(x: float, y: float, segments: list[tuple[Vertex, Vertex]]) -> bool:
+    inside = False
+    for a, b in segments:
+        ay = float(a.y)
+        by = float(b.y)
+        if (ay > y) == (by > y):
+            continue
+        ax = float(a.x)
+        bx = float(b.x)
+        cross_x = ax + (y - ay) * (bx - ax) / (by - ay)
+        if cross_x > x:
+            inside = not inside
+    return inside
+
+
+def sector_damage_grid(
+    grid: list[list[int]],
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    sectors: list[Sector],
+    vertices: list[Vertex],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> list[list[int]]:
+    damage_grid = [[0 for _ in row] for row in grid]
+    damaging = [
+        (sector_damage_amount(sector.special), sector_segments(i, linedefs, sidedefs, vertices))
+        for i, sector in enumerate(sectors)
+        if sector_damage_amount(sector.special)
+    ]
+    if not damaging:
+        return damage_grid
+
+    for gy, row in enumerate(grid):
+        for gx, cell in enumerate(row):
+            if cell:
+                continue
+            doom_x = min_x + ((gx + 0.5) - margin) * scale
+            doom_y = max_y - ((gy + 0.5) - margin) * scale
+            for amount, segments in damaging:
+                if segments and point_in_sector(doom_x, doom_y, segments):
+                    damage_grid[gy][gx] = amount
+                    break
+    return damage_grid
+
+
 def runtime_things(
     things: list[Thing],
     grid: list[list[int]],
@@ -620,6 +695,7 @@ def emit_header(
     grid: list[list[int]],
     texture_grid: list[list[int]],
     texture_phase_grid: list[list[int]],
+    damage_grid: list[list[int]],
     start_x: float,
     start_y: float,
     angle: int,
@@ -689,6 +765,12 @@ def emit_header(
             f.write(",".join(str(cell) for cell in row))
             f.write("},\n")
         f.write("};\n\n")
+        f.write("static const unsigned char g_map_damage[MAP_H][MAP_W] = {\n")
+        for row in damage_grid:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
         f.write("static const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {\n")
         for x_q8, y_q8, typ, flags in things:
             f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
@@ -720,6 +802,10 @@ def emit_header(
         f.write("static inline unsigned char map_cell_texture_phase(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
         f.write("    return g_map_tex_phase[y][x];\n")
+        f.write("}\n\n")
+        f.write("static inline unsigned char map_cell_damage(int x, int y) {\n")
+        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+        f.write("    return g_map_damage[y][x];\n")
         f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
 
 
@@ -945,12 +1031,14 @@ def convert(args: argparse.Namespace) -> None:
     converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle)
     converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin)
     converted_doors = runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin)
+    damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
 
     emit_header(
         args.out,
         grid,
         texture_grid,
         texture_phase_grid,
+        damage_grid,
         sx,
         sy,
         player.angle,

@@ -205,6 +205,9 @@ raises a fix-layer `EXIT` message and freezes player control, monster movement,
 monster damage, and active projectiles until D restarts the level. This keeps
 level progression behavior in the ROM without keeping generic WAD
 directory/lump metadata in the cartridge.
+Converted damaging sector specials now emit a tiny floor-damage grid, so E1M1
+nukage cells periodically hurt the player through the same armor, hurt flash,
+and status-face path as monster damage.
 
 ## Building
 
