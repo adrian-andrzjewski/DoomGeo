@@ -66,6 +66,33 @@ class Sector:
 
 
 @dataclass(frozen=True)
+class Seg:
+    v1: int
+    v2: int
+    angle: int
+    linedef: int
+    side: int
+    offset: int
+
+
+@dataclass(frozen=True)
+class Subsector:
+    numsegs: int
+    firstseg: int
+
+
+@dataclass(frozen=True)
+class Node:
+    x: int
+    y: int
+    dx: int
+    dy: int
+    bbox: tuple[int, int, int, int, int, int, int, int]
+    child0: int
+    child1: int
+
+
+@dataclass(frozen=True)
 class Thing:
     x: int
     y: int
@@ -118,7 +145,7 @@ class Wad:
                 result[name] = self.lump_data(i)
             if len(result) >= len(wanted):
                 break
-        for required in ("THINGS", "LINEDEFS", "VERTEXES"):
+        for required in wanted:
             if required not in result:
                 raise ValueError(f"map {marker} missing required lump {required}")
         return result
@@ -185,6 +212,36 @@ def parse_things(data: bytes) -> list[Thing]:
     if len(data) % 10:
         raise ValueError("THINGS lump has invalid size")
     return [Thing(*struct.unpack_from("<hhHHH", data, i)) for i in range(0, len(data), 10)]
+
+
+def parse_segs(data: bytes) -> list[Seg]:
+    if len(data) % 12:
+        raise ValueError("SEGS lump has invalid size")
+    return [Seg(*struct.unpack_from("<HHHHHH", data, i)) for i in range(0, len(data), 12)]
+
+
+def parse_subsectors(data: bytes) -> list[Subsector]:
+    if len(data) % 4:
+        raise ValueError("SSECTORS lump has invalid size")
+    return [Subsector(*struct.unpack_from("<HH", data, i)) for i in range(0, len(data), 4)]
+
+
+def parse_nodes(data: bytes) -> list[Node]:
+    if len(data) % 28:
+        raise ValueError("NODES lump has invalid size")
+    result: list[Node] = []
+    for i in range(0, len(data), 28):
+        x, y, dx, dy = struct.unpack_from("<hhhh", data, i)
+        bbox = struct.unpack_from("<hhhhhhhh", data, i + 8)
+        child0, child1 = struct.unpack_from("<HH", data, i + 24)
+        result.append(Node(x, y, dx, dy, bbox, child0, child1))
+    return result
+
+
+def parse_blockmap_words(data: bytes) -> list[int]:
+    if len(data) % 2:
+        raise ValueError("BLOCKMAP lump has invalid size")
+    return [struct.unpack_from("<h", data, i)[0] for i in range(0, len(data), 2)]
 
 
 def is_solid_linedef(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> bool:
@@ -368,6 +425,11 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_CULLED_LINEDEFS {stats['culled_linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SIDEDEFS {stats['sidedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SECTORS {stats['sectors']}\n")
+        f.write(f"#define DOOM_CONVERTED_SEGS {stats['segs']}\n")
+        f.write(f"#define DOOM_CONVERTED_SSECTORS {stats['subsectors']}\n")
+        f.write(f"#define DOOM_CONVERTED_NODES {stats['nodes']}\n")
+        f.write(f"#define DOOM_CONVERTED_REJECT_BYTES {stats['reject_bytes']}\n")
+        f.write(f"#define DOOM_CONVERTED_BLOCKMAP_WORDS {stats['blockmap_words']}\n")
         f.write(f"#define DOOM_CONVERTED_THINGS {stats['things']}\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for row in grid:
@@ -381,6 +443,156 @@ def emit_header(
         f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
 
 
+def texture_ids(sidedefs: list[SideDef], sectors: list[Sector]) -> dict[str, int]:
+    ids = {"-": 0, "": 0}
+
+    def intern(name: str) -> None:
+        if name not in ids:
+            ids[name] = len(ids) - 1
+
+    for side in sidedefs:
+        intern(side.top_texture)
+        intern(side.bottom_texture)
+        intern(side.mid_texture)
+    for sector in sectors:
+        intern(sector.floor_pic)
+        intern(sector.ceiling_pic)
+    return ids
+
+
+def side_index(value: int) -> int:
+    return -1 if value == 0xFFFF else value
+
+
+def write_array(f, typename: str, name: str, rows: list[str], count_macro: str) -> None:
+    f.write(f"const {typename} {name}[{count_macro}] = {{\n")
+    for row in rows:
+        f.write(f"    {row},\n")
+    f.write("};\n\n")
+
+
+def write_scalar_array(f, typename: str, name: str, values: list[str], count_macro: str, per_row: int = 12) -> None:
+    f.write(f"const {typename} {name}[{count_macro}] = {{\n")
+    for i in range(0, len(values), per_row):
+        f.write("    ")
+        f.write(",".join(values[i : i + per_row]))
+        f.write(",\n")
+    f.write("};\n\n")
+
+
+def emit_assets(
+    header_path: str,
+    source_path: str,
+    vertices: list[Vertex],
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    sectors: list[Sector],
+    segs: list[Seg],
+    subsectors: list[Subsector],
+    nodes: list[Node],
+    things: list[Thing],
+    reject: bytes,
+    blockmap: list[int],
+) -> None:
+    os.makedirs(os.path.dirname(header_path), exist_ok=True)
+    tex_ids = texture_ids(sidedefs, sectors)
+    include_name = os.path.basename(header_path)
+
+    with open(header_path, "w", encoding="ascii") as f:
+        f.write("/* Generated by tools/doom_convert.py; do not edit by hand. */\n")
+        f.write("#ifndef DOOM_ASSETS_GENERATED_H\n#define DOOM_ASSETS_GENERATED_H\n\n")
+        f.write("#include <stdint.h>\n\n")
+        f.write("/* 16-bit fields keep these structures compact and naturally big-endian in the 68000 ROM. */\n")
+        f.write("typedef struct NgVertex { int16_t x; int16_t y; } NgVertex;\n")
+        f.write("typedef struct NgLine {\n")
+        f.write("    int16_t v1;\n")
+        f.write("    int16_t v2;\n")
+        f.write("    int16_t front_side;\n")
+        f.write("    int16_t back_side;\n")
+        f.write("    uint16_t flags;\n")
+        f.write("    uint16_t special;\n")
+        f.write("    uint16_t tag;\n")
+        f.write("} NgLine;\n")
+        f.write("typedef struct NgSide { int16_t texture_x; int16_t texture_y; uint16_t top_texture; uint16_t bottom_texture; uint16_t mid_texture; uint16_t sector; } NgSide;\n")
+        f.write("typedef struct NgSector { int16_t floor_height; int16_t ceiling_height; uint16_t floor_flat; uint16_t ceiling_flat; uint16_t light_level; uint16_t special; uint16_t tag; } NgSector;\n")
+        f.write("typedef struct NgSeg { int16_t v1; int16_t v2; int16_t angle; int16_t linedef; int16_t side; int16_t offset; } NgSeg;\n")
+        f.write("typedef struct NgSubsector { uint16_t numsegs; uint16_t firstseg; } NgSubsector;\n")
+        f.write("typedef struct NgNode { int16_t x; int16_t y; int16_t dx; int16_t dy; int16_t bbox[8]; uint16_t child[2]; } NgNode;\n")
+        f.write("typedef struct NgThing { int16_t x; int16_t y; uint16_t angle; uint16_t type; uint16_t flags; } NgThing;\n\n")
+        f.write(f"#define NG_VERTEX_COUNT {len(vertices)}\n")
+        f.write(f"#define NG_LINE_COUNT {len(linedefs)}\n")
+        f.write(f"#define NG_SIDE_COUNT {len(sidedefs)}\n")
+        f.write(f"#define NG_SECTOR_COUNT {len(sectors)}\n")
+        f.write(f"#define NG_SEG_COUNT {len(segs)}\n")
+        f.write(f"#define NG_SUBSECTOR_COUNT {len(subsectors)}\n")
+        f.write(f"#define NG_NODE_COUNT {len(nodes)}\n")
+        f.write(f"#define NG_THING_COUNT {len(things)}\n")
+        f.write(f"#define NG_REJECT_SIZE {len(reject)}\n")
+        f.write(f"#define NG_BLOCKMAP_WORD_COUNT {len(blockmap)}\n")
+        f.write(f"#define NG_TEXTURE_ID_COUNT {len(tex_ids) - 1}\n\n")
+        f.write("extern const NgVertex g_ng_vertices[NG_VERTEX_COUNT];\n")
+        f.write("extern const NgLine g_ng_lines[NG_LINE_COUNT];\n")
+        f.write("extern const NgSide g_ng_sides[NG_SIDE_COUNT];\n")
+        f.write("extern const NgSector g_ng_sectors[NG_SECTOR_COUNT];\n")
+        f.write("extern const NgSeg g_ng_segs[NG_SEG_COUNT];\n")
+        f.write("extern const NgSubsector g_ng_subsectors[NG_SUBSECTOR_COUNT];\n")
+        f.write("extern const NgNode g_ng_nodes[NG_NODE_COUNT];\n")
+        f.write("extern const NgThing g_ng_things[NG_THING_COUNT];\n")
+        f.write("extern const uint8_t g_ng_reject[NG_REJECT_SIZE];\n")
+        f.write("extern const int16_t g_ng_blockmap[NG_BLOCKMAP_WORD_COUNT];\n\n")
+        f.write("#endif /* DOOM_ASSETS_GENERATED_H */\n")
+
+    with open(source_path, "w", encoding="ascii") as f:
+        f.write("/* Generated by tools/doom_convert.py; do not edit by hand. */\n")
+        f.write(f"#include \"{include_name}\"\n\n")
+        write_array(f, "NgVertex", "g_ng_vertices", [f"{{{v.x},{v.y}}}" for v in vertices], "NG_VERTEX_COUNT")
+        write_array(
+            f,
+            "NgLine",
+            "g_ng_lines",
+            [
+                f"{{{line.v1},{line.v2},{side_index(line.side_front)},{side_index(line.side_back)},0x{line.flags & 0xffff:04x},0x{line.special & 0xffff:04x},0x{line.tag & 0xffff:04x}}}"
+                for line in linedefs
+            ],
+            "NG_LINE_COUNT",
+        )
+        write_array(
+            f,
+            "NgSide",
+            "g_ng_sides",
+            [
+                f"{{{side.texture_x},{side.texture_y},{tex_ids[side.top_texture]},{tex_ids[side.bottom_texture]},{tex_ids[side.mid_texture]},{side.sector}}}"
+                for side in sidedefs
+            ],
+            "NG_SIDE_COUNT",
+        )
+        write_array(
+            f,
+            "NgSector",
+            "g_ng_sectors",
+            [
+                f"{{{sector.floor_height},{sector.ceiling_height},{tex_ids[sector.floor_pic]},{tex_ids[sector.ceiling_pic]},{sector.light_level},{sector.special},{sector.tag}}}"
+                for sector in sectors
+            ],
+            "NG_SECTOR_COUNT",
+        )
+        write_array(f, "NgSeg", "g_ng_segs", [f"{{{seg.v1},{seg.v2},{seg.angle},{seg.linedef},{seg.side},{seg.offset}}}" for seg in segs], "NG_SEG_COUNT")
+        write_array(f, "NgSubsector", "g_ng_subsectors", [f"{{{ss.numsegs},{ss.firstseg}}}" for ss in subsectors], "NG_SUBSECTOR_COUNT")
+        write_array(
+            f,
+            "NgNode",
+            "g_ng_nodes",
+            [
+                f"{{{node.x},{node.y},{node.dx},{node.dy},{{{','.join(str(v) for v in node.bbox)}}},{{{node.child0},{node.child1}}}}}"
+                for node in nodes
+            ],
+            "NG_NODE_COUNT",
+        )
+        write_array(f, "NgThing", "g_ng_things", [f"{{{thing.x},{thing.y},{thing.angle},{thing.type},{thing.flags}}}" for thing in things], "NG_THING_COUNT")
+        write_scalar_array(f, "uint8_t", "g_ng_reject", [f"0x{b:02x}" for b in reject], "NG_REJECT_SIZE", 16)
+        write_scalar_array(f, "int16_t", "g_ng_blockmap", [str(word) for word in blockmap], "NG_BLOCKMAP_WORD_COUNT", 12)
+
+
 def convert(args: argparse.Namespace) -> None:
     wad = Wad(read_wad(args.iwad, args.zip_member))
     lumps = wad.map_lumps(args.map)
@@ -388,7 +600,12 @@ def convert(args: argparse.Namespace) -> None:
     linedefs = parse_linedefs(lumps["LINEDEFS"])
     sidedefs = parse_sidedefs(lumps["SIDEDEFS"])
     sectors = parse_sectors(lumps["SECTORS"])
+    segs = parse_segs(lumps["SEGS"])
+    subsectors = parse_subsectors(lumps["SSECTORS"])
+    nodes = parse_nodes(lumps["NODES"])
     things = parse_things(lumps["THINGS"])
+    reject = lumps["REJECT"]
+    blockmap = parse_blockmap_words(lumps["BLOCKMAP"])
     if not vertices:
         raise ValueError("map has no vertices")
 
@@ -447,9 +664,29 @@ def convert(args: argparse.Namespace) -> None:
             "culled_linedefs": culled_count,
             "sidedefs": len(sidedefs),
             "sectors": len(sectors),
+            "segs": len(segs),
+            "subsectors": len(subsectors),
+            "nodes": len(nodes),
+            "reject_bytes": len(reject),
+            "blockmap_words": len(blockmap),
             "things": len(things),
         },
     )
+    if args.assets_header and args.assets_source:
+        emit_assets(
+            args.assets_header,
+            args.assets_source,
+            vertices,
+            linedefs,
+            sidedefs,
+            sectors,
+            segs,
+            subsectors,
+            nodes,
+            things,
+            reject,
+            blockmap,
+        )
     print(
         f"{args.map.upper()}: {len(vertices)} vertices, {solid_count}/{len(linedefs)} solid lines "
         f"({culled_count} detail culled), "
@@ -463,6 +700,8 @@ def main() -> int:
     parser.add_argument("--zip-member", help="WAD member inside a zip archive")
     parser.add_argument("--map", default="E1M1", help="Doom map marker to convert")
     parser.add_argument("--out", required=True, help="Generated C header path")
+    parser.add_argument("--assets-header", help="Generated Neo Geo map asset declarations")
+    parser.add_argument("--assets-source", help="Generated Neo Geo map asset data")
     parser.add_argument("--width", type=int, default=38)
     parser.add_argument("--height", type=int, default=27)
     parser.add_argument(
@@ -472,6 +711,8 @@ def main() -> int:
         help="Cull solid linedefs shorter than this fraction of one output cell",
     )
     args = parser.parse_args()
+    if bool(args.assets_header) != bool(args.assets_source):
+        parser.error("--assets-header and --assets-source must be provided together")
     try:
         convert(args)
     except Exception as exc:

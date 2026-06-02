@@ -39,6 +39,9 @@ DOOM_MAP?=E1M1
 DOOM_MAP_WIDTH?=38
 DOOM_MAP_HEIGHT?=27
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
+DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
+DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
+DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
 CUSTOM_GENERATE_TARGETS+=doom-assets
 
 # This is an autoconf-generated configuration for your environment
@@ -63,19 +66,23 @@ include emu.mk
 # 
 # Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
 ELF=$(BUILDDIR)/rom.elf
-$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o
+$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
 
-$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o: $(DOOM_MAP_HEADER)
+$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
+$(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
 	curl -L --fail --output $@ $(FREEDOOM_URL)
 
 $(DOOM_MAP_HEADER): tools/doom_convert.py $(FREEDOOM_ZIP) | $(BUILDDIR)
-	$(PYTHON) tools/doom_convert.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@
+	$(PYTHON) tools/doom_convert.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
-doom-assets: $(DOOM_MAP_HEADER)
+$(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
+
+doom-assets: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE)
 
 
 
