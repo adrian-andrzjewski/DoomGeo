@@ -11,7 +11,7 @@
  * NUM_COLS wall columns, each COLW pixels wide. COLW must divide SCRW.
  * Sprite horizontal width = HSHRINK+1, so HSHRINK = COLW-1.
  */
-#define NUM_COLS 80
+#define NUM_COLS 64                 /* 64 walls + 20 backdrop strips < 96/line */
 #define COLW     (SCRW / NUM_COLS)  /* 4 px                                  */
 #define HSHRINK  (COLW - 1)        
  
