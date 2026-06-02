@@ -102,9 +102,11 @@ a compact fix-layer `AMMO` message instead of failing silently. Close visible
 monsters apply a first-pass contact-damage tick with armor absorption.
 Pickups briefly flash compact center feedback using existing fix glyphs:
 `KEY`, `AMMO`, `MED`, `ARM`, or weapon digits `2`/`3`/`4`.
-Former humans, shotgun guys, and imps also apply slower ranged damage when they
-are visible and close enough, so the player has pressure to move, aim, and use
-doors instead of only avoiding contact. Combat uses a compact line-of-sight
+Former humans and shotgun guys still apply compact hitscan-style ranged damage,
+while imps and Barons now launch projected Doom fireball sprites (`BAL1`/`BAL7`)
+that travel toward the player and deal damage on impact. This gives the player
+visible pressure to move, aim, and use doors instead of only avoiding contact.
+Combat uses a compact line-of-sight
 sample against the converted map, so closed doors and walls block player shots,
 shotgun spread targets, monster ranged damage, and monster chase wake-up. Damage
 briefly tints the playfield red by swapping palettes during vblank, giving clear

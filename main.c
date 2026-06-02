@@ -179,6 +179,14 @@ static u8  pickup_message_timer = 0;
 static u8  pickup_message_type = 0;
 static u8  key_message_visible = 0;
 static u8  monster_ai_tick = 0;
+static u8  projectile_active = 0;
+static u16 projectile_type = 0;
+static u8  projectile_timer = 0;
+static u8  projectile_damage = 0;
+static short projectile_x_q8 = 0;
+static short projectile_y_q8 = 0;
+static short projectile_dx_q8 = 0;
+static short projectile_dy_q8 = 0;
 static u8  player_keys = 0;
 static u8  player_has_shotgun = 0;
 static u8  player_has_chaingun = 0;
@@ -323,6 +331,10 @@ static u8 thing_is_barrel(u16 thing_type) {
 
 static u8 thing_is_explosion(u16 thing_type) {
     return thing_type == 9000;
+}
+
+static u8 thing_is_projectile(u16 thing_type) {
+    return thing_type == 9006 || thing_type == 9007;
 }
 
 static u8 thing_is_corpse(u16 thing_type) {
@@ -683,6 +695,57 @@ static u8 monster_ranged_damage(u16 thing_type) {
     }
 }
 
+static u16 monster_projectile_type(u16 thing_type) {
+    switch (thing_type) {
+    case 3001: /* imp */
+        return 9006;
+    case 3003: /* baron */
+        return 9007;
+    default:
+        return 0;
+    }
+}
+
+static void spawn_monster_projectile(int thing, u16 type, u8 damage) {
+    int px, py, dx, dy, adx, ady, steps;
+    if (thing < 0 || projectile_active) return;
+    rc_player_q8(&px, &py);
+    projectile_x_q8 = thing_x_q8[thing];
+    projectile_y_q8 = thing_y_q8[thing];
+    dx = px - projectile_x_q8;
+    dy = py - projectile_y_q8;
+    adx = iabs16(dx);
+    ady = iabs16(dy);
+    steps = ((adx > ady ? adx : ady) / 76);
+    if (steps < 8) steps = 8;
+    if (steps > 34) steps = 34;
+    projectile_dx_q8 = (short)(dx / steps);
+    projectile_dy_q8 = (short)(dy / steps);
+    projectile_timer = (u8)steps;
+    projectile_type = type;
+    projectile_damage = damage;
+    projectile_active = 1;
+}
+
+static void update_projectile(void) {
+    int px, py;
+    if (!projectile_active) return;
+    projectile_x_q8 = (short)(projectile_x_q8 + projectile_dx_q8);
+    projectile_y_q8 = (short)(projectile_y_q8 + projectile_dy_q8);
+    if (map_at(projectile_x_q8 >> 8, projectile_y_q8 >> 8)) {
+        projectile_active = 0;
+        return;
+    }
+    rc_player_q8(&px, &py);
+    if (iabs16(px - projectile_x_q8) <= 112 && iabs16(py - projectile_y_q8) <= 112) {
+        player_take_damage(projectile_damage);
+        projectile_active = 0;
+        return;
+    }
+    if (projectile_timer) projectile_timer--;
+    if (!projectile_timer) projectile_active = 0;
+}
+
 static void update_monster_damage(void) {
     if (hurt_timer) {
         hurt_timer--;
@@ -704,8 +767,10 @@ static void update_monster_damage(void) {
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
-            player_take_damage(ranged_damage);
-            hurt_timer = 48;
+            u16 projectile = monster_projectile_type(runtime_thing_type(thing));
+            if (projectile) spawn_monster_projectile(thing, projectile, ranged_damage);
+            else player_take_damage(ranged_damage);
+            hurt_timer = projectile ? 32 : 48;
             return;
         }
     }
@@ -1441,8 +1506,7 @@ static u8 enemy_obscured_by_weapon(int sx, int h) {
     return h < 80 && sx > (SCRW / 2 - 40) && sx < (SCRW / 2 + 40);
 }
 
-static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist_q8) {
-    u16 thing_type = runtime_thing_type(thing_index);
+static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash) {
     int idx;
     int def_idx = enemy_sprite_def_for_type(thing_type);
     const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
@@ -1452,7 +1516,7 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
     enemies[slot].sprite_def = def_idx;
     enemies[slot].dist_q8 = dist_q8;
     enemies[slot].screen_h = h;
-    if (enemy_hit_flash[thing_index] || enemy_slot_flash[slot]) load_enemy_hit_palette(slot);
+    if (flash || enemy_slot_flash[slot]) load_enemy_hit_palette(slot);
     else load_enemy_palette(slot, def_idx);
 
     if (h > 110) idx = 0;
@@ -1463,6 +1527,7 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
     if (thing_is_pickup(thing_type) && idx > 1) idx = 1;
     if (thing_is_corpse(thing_type) && idx > 2) idx = 2;
     if (thing_is_explosion(thing_type) && idx > 2) idx = 2;
+    if (thing_is_projectile(thing_type) && idx > 2) idx = 2;
     if (idx >= def->scale_count) idx = def->scale_count - 1;
     meta = &g_enemy_scales[def->first_scale + idx];
 
@@ -1477,8 +1542,13 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
     enemies[slot].screen_w = meta->width;
     {
         int bottom = (GAME_H + h) / 2;
-        if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
-        int top = bottom - meta->height;
+        int top;
+        if (thing_is_projectile(thing_type)) {
+            top = (GAME_H - meta->height) / 2;
+        } else {
+            if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
+            top = bottom - meta->height;
+        }
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
             u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
@@ -1493,6 +1563,11 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
             }
         }
     }
+}
+
+static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist_q8) {
+    u8 flash = (thing_index >= 0 && enemy_hit_flash[thing_index]) ? 1 : 0;
+    render_type_slot(slot, thing_index, runtime_thing_type(thing_index), sx, h, dist_q8, flash);
 }
 
 typedef struct ThingCandidate {
@@ -1548,11 +1623,20 @@ static int select_visible_things(int found, u8 want_monsters) {
     return found;
 }
 
+static int render_visible_projectile(int found) {
+    int sx, h, dist_q8;
+    if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
+    if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
+    render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0);
+    return found + 1;
+}
+
 static void update_enemy(void) {
     int found = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
 
     found = select_visible_things(found, 1);
+    found = render_visible_projectile(found);
     found = select_visible_things(found, 0);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }
@@ -1580,6 +1664,14 @@ static void restart_level(void) {
     pickup_message_type = 0;
     key_message_visible = 0;
     monster_ai_tick = 0;
+    projectile_active = 0;
+    projectile_type = 0;
+    projectile_timer = 0;
+    projectile_damage = 0;
+    projectile_x_q8 = 0;
+    projectile_y_q8 = 0;
+    projectile_dx_q8 = 0;
+    projectile_dy_q8 = 0;
     player_keys = 0;
     player_has_shotgun = 0;
     player_has_chaingun = 0;
@@ -1665,6 +1757,7 @@ int main(void) {
         update_hurt_flash();
         update_background_scroll();
         rc_blit();                      /* push to VRAM during vblank         */
+        update_projectile();
         if (level_complete) hide_enemies();
         else update_enemy();
         update_monster_damage();
