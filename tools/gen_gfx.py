@@ -26,7 +26,7 @@ from doom_convert import (
     read_wad,
 )
 
-C_PAD = 0x100000  # pad each C ROM to 1 MiB for larger precomputed tile banks
+C_PAD = 0x200000  # pad each C ROM to 2 MiB for larger precomputed tile banks
 S_PAD = 0x20000   # 128 KiB fix ROM, all blank
 M_PAD = 0x10000   # 64 KiB Z80 program, all 0x00 (NOP) -> silent
 V_PAD = 0x10000   # 64 KiB ADPCM samples, empty
@@ -45,7 +45,7 @@ HUD_TILES = HUD_COLS * HUD_ROWS
 BG_COLS = 20
 BG_HALF_ROWS = 6
 BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
-BG_PHASES = 32
+BG_PHASES = 64
 CEILING_BASE = HUD_BASE + HUD_TILES
 FLOOR_BASE = CEILING_BASE + BG_PHASES * BG_HALF_TILES
 WEAPON_BASE = FLOOR_BASE + BG_PHASES * BG_HALF_TILES
@@ -422,7 +422,10 @@ def flat_grid_tiles(flat, playpal, palette, cols, rows, ceiling=False, phase=0):
     height = rows * 16
     center_x = width // 2
 
-    phase_offset = (phase * 64) // BG_PHASES
+    phase_u = phase & 7
+    phase_v = (phase >> 3) & 7
+    lateral_offset = phase_u * 8
+    forward_offset = phase_v * 8
 
     for row in range(rows):
         for col in range(cols):
@@ -445,8 +448,8 @@ def flat_grid_tiles(flat, playpal, palette, cols, rows, ceiling=False, phase=0):
                 for x in range(16):
                     screen_x = col * 16 + x
                     lateral = int((screen_x - center_x) * distance / 40.0)
-                    sx = (lateral + (phase_offset >> 1)) & 63
-                    sy = (forward + phase_offset) & 63
+                    sx = (lateral + lateral_offset) & 63
+                    sy = (forward + forward_offset) & 63
                     q = quantize_rgb(smooth_flat_color(flat, playpal, sx, sy), palette)
                     if shade_step < 24 and q > 1:
                         q -= 1
@@ -760,6 +763,8 @@ def main():
         c2 += b
     assert len(c1) == len(tiles) * 64 and len(c2) == len(tiles) * 64
 
+    if len(c1) > C_PAD or len(c2) > C_PAD:
+        raise ValueError(f"C-ROM tile data exceeds configured pad: c1={len(c1):#x} c2={len(c2):#x} pad={C_PAD:#x}")
     c1 += bytes(C_PAD - len(c1))
     c2 += bytes(C_PAD - len(c2))
 
