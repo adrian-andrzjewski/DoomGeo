@@ -43,8 +43,8 @@ static void restore_flat_palettes(void) {
     }
 
     for (u16 row = 0; row < BG_SPLIT; row++) {
-        u16 ceiling_scale = (u16)(58 + row * 17);
-        u16 floor_scale = (u16)(78 + row * 26);
+        u16 ceiling_scale = (u16)(90 + row * 24);
+        u16 floor_scale = (u16)(150 + row * 42);
         set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
         set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
     }
@@ -99,8 +99,8 @@ static void set_muzzle_depth_palette_range(u16 base, const u8 rgb[][3], u16 colo
 
 static void set_muzzle_palettes(void) {
     for (u16 row = 0; row < BG_SPLIT; row++) {
-        u16 ceiling_scale = (u16)(135 + row * 20);
-        u16 floor_scale = (u16)(175 + row * 30);
+        u16 ceiling_scale = (u16)(160 + row * 24);
+        u16 floor_scale = (u16)(225 + row * 42);
         set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
         set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
     }
@@ -130,8 +130,8 @@ static void set_bonus_depth_palette_range(u16 base, const u8 rgb[][3], u16 color
 
 static void set_bonus_palettes(void) {
     for (u16 row = 0; row < BG_SPLIT; row++) {
-        u16 ceiling_scale = (u16)(94 + row * 18);
-        u16 floor_scale = (u16)(118 + row * 28);
+        u16 ceiling_scale = (u16)(128 + row * 24);
+        u16 floor_scale = (u16)(190 + row * 42);
         set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
         set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
     }

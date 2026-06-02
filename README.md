@@ -29,6 +29,9 @@ small player steps no longer re-upload the whole plane when the selected baked
 view is unchanged. The baked sampler uses a denser Doom-flat texel scale,
 keeping the planes tied to the wall perspective while making the near floor
 read as a receding textured surface without adding more per-scanline sprites.
+The runtime row palettes bias the nearest floor tiles brighter and keep the
+ceiling darker, so the sampled flats read as visible 3D surfaces instead of a
+black void.
 The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
 `BROWNGRN`, `BROWN1`, and `SUPPORT2` E1M1 linedefs can select their own
