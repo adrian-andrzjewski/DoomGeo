@@ -538,7 +538,16 @@ static void update_monster_damage(void) {
     }
 }
 
-static u8 can_monster_step(short x_q8, short y_q8) {
+static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        if (i == self) continue;
+        if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
+        if (iabs16(x_q8 - thing_x_q8[i]) < 128 && iabs16(y_q8 - thing_y_q8[i]) < 128) return 1;
+    }
+    return 0;
+}
+
+static u8 can_monster_step(int self, short x_q8, short y_q8) {
     int cx = x_q8 >> 8;
     int cy = y_q8 >> 8;
     if (map_at(cx, cy)) return 0;
@@ -546,6 +555,7 @@ static u8 can_monster_step(short x_q8, short y_q8) {
     if (map_at((x_q8 + 52) >> 8, cy)) return 0;
     if (map_at(cx, (y_q8 - 52) >> 8)) return 0;
     if (map_at(cx, (y_q8 + 52) >> 8)) return 0;
+    if (monster_step_occupied(self, x_q8, y_q8)) return 0;
     return 1;
 }
 
@@ -569,7 +579,7 @@ static void update_monster_ai(void) {
         ny = thing_y_q8[i];
         if (adx > ady) nx = (short)(nx + (dx < 0 ? -12 : 12));
         else ny = (short)(ny + (dy < 0 ? -12 : 12));
-        if (can_monster_step(nx, ny)) {
+        if (can_monster_step(i, nx, ny)) {
             thing_x_q8[i] = nx;
             thing_y_q8[i] = ny;
         }

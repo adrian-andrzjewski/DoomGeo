@@ -88,10 +88,12 @@ pickup path instead of adding corpse sprites. A tiny fix-layer center marker
 gives the player a stable aim point without spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
-WAD data for type, flags, and initial placement. When health reaches zero,
-movement and firing stop and the fix layer shows a compact `DEAD` message;
-pressing D resets the player, doors, pickups, monsters, and HUD for another
-run.
+WAD data for type, flags, and initial placement. Chase movement also keeps a
+small separation radius between live monsters, which reduces stacked enemies
+and makes the two projected world-sprite slots more readable. When health
+reaches zero, movement and firing stop and the fix layer shows a compact `DEAD`
+message; pressing D resets the player, doors, pickups, monsters, and HUD for
+another run.
 
 The converter also preserves Doom door and exit linedefs as compact runtime
 trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
