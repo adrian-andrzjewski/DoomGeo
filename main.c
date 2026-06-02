@@ -1749,8 +1749,8 @@ static void update_enemy(void) {
     int found = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
 
-    found = select_visible_things(found, 1);
     found = render_visible_projectile(found);
+    found = select_visible_things(found, 1);
     found = select_visible_things(found, 0);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }

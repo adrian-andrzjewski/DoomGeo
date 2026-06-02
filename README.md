@@ -39,10 +39,11 @@ with a small hardware-position bob so movement feels less static without adding
 any sprite slots. The converter emits a compact grid-space runtime list from WAD `THINGS`;
 the renderer projects up to three visible monster candidates with the same camera
 math as the wall renderer while staying at the Neo Geo's
-96-sprites-per-scanline ceiling in the worst case. Visible monsters are selected
-before pickups so the limited sprite slots keep combat readable; candidates are
-ranked by distance and screen relevance each frame, and tiny candidates hidden
-under the pistol overlay are skipped. The converter only emits monster thing
+96-sprites-per-scanline ceiling in the worst case. Active monster projectiles
+reserve the first visible world-sprite slot so incoming fire stays readable,
+then visible monsters/barrels are selected before pickups and corpses;
+candidates are ranked by distance and screen relevance each frame, and tiny
+candidates hidden under the pistol overlay are skipped. The converter only emits monster thing
 types that currently have pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`,
 `SARG`, `BOSS`) and live palettes, so unsupported later-Doom IDs do not silently
 fall back to the wrong enemy art. The pistol clears
