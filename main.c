@@ -947,13 +947,33 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
     return 1;
 }
 
+static void move_monster_toward(int i, int dx, int dy, int adx, int ady) {
+    short x = thing_x_q8[i];
+    short y = thing_y_q8[i];
+    short sx = (short)(dx < 0 ? -12 : 12);
+    short sy = (short)(dy < 0 ? -12 : 12);
+
+    if (adx > ady) {
+        if (can_monster_step(i, (short)(x + sx), y)) {
+            thing_x_q8[i] = (short)(x + sx);
+        } else if (can_monster_step(i, x, (short)(y + sy))) {
+            thing_y_q8[i] = (short)(y + sy);
+        }
+    } else {
+        if (can_monster_step(i, x, (short)(y + sy))) {
+            thing_y_q8[i] = (short)(y + sy);
+        } else if (can_monster_step(i, (short)(x + sx), y)) {
+            thing_x_q8[i] = (short)(x + sx);
+        }
+    }
+}
+
 static void update_monster_ai(void) {
     int px, py;
     if (++monster_ai_tick & 7) return;
     rc_player_q8(&px, &py);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, adx, ady;
-        short nx, ny;
         if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
         if (enemy_hit_flash[i]) continue;
         dx = px - thing_x_q8[i];
@@ -968,14 +988,7 @@ static void update_monster_ai(void) {
             enemy_awake[i] = 1;
         }
 
-        nx = thing_x_q8[i];
-        ny = thing_y_q8[i];
-        if (adx > ady) nx = (short)(nx + (dx < 0 ? -12 : 12));
-        else ny = (short)(ny + (dy < 0 ? -12 : 12));
-        if (can_monster_step(i, nx, ny)) {
-            thing_x_q8[i] = nx;
-            thing_y_q8[i] = ny;
-        }
+        move_monster_toward(i, dx, dy, adx, ady);
     }
 }
 

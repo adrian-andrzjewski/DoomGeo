@@ -151,9 +151,10 @@ throttled chase steps toward the player while still using the compact converted
 WAD data for type, flags, and initial placement. Monsters now keep a compact
 awake bit after seeing or being hit by the player, so they continue pursuit
 around corners instead of stopping the moment line of sight is broken. Chase
-movement also keeps a small separation radius between live monsters, which
-reduces stacked enemies and makes the projected world-sprite slots more
-readable. When health reaches zero, movement, firing, and active projectiles
+movement also tries the alternate axis when the preferred step is blocked, and
+keeps a small separation radius between live monsters. This reduces stuck or
+stacked enemies and makes the projected world-sprite slots more readable. When
+health reaches zero, movement, firing, and active projectiles
 stop and the fix layer shows a compact `DEAD` message; pressing D resets the
 player, doors, pickups, monsters, and HUD for another run. Restart also clears
 the button-edge latches used by fire, doors, weapon toggle, minimap, and
