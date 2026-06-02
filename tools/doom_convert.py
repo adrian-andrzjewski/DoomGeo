@@ -424,6 +424,7 @@ PICKUP_TYPES = {
     38,    # red skull
     39,    # yellow skull
     40,    # blue skull
+    2001,  # shotgun
     2007,  # clip
     2008,  # shells
     2010,  # rocket

@@ -149,6 +149,8 @@ static u8  ammo_message_timer = 0;
 static u8  key_message_visible = 0;
 static u8  monster_ai_tick = 0;
 static u8  player_keys = 0;
+static u8  player_has_shotgun = 0;
+static u8  current_weapon = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
@@ -161,6 +163,7 @@ static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
 static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
 static volatile u16 player_ammo = 50;
+static volatile u16 player_shells = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
@@ -234,6 +237,7 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 39:
     case 40:
     case 2007:
+    case 2001:
     case 2008:
     case 2010:
     case 2011:
@@ -302,7 +306,7 @@ static u16 monster_drop_type(u16 thing_type) {
     case 3004: /* former human */
         return 2007; /* clip */
     case 9:    /* shotgun guy */
-        return 2008; /* shells */
+        return 2001; /* shotgun */
     default:
         return 0;
     }
@@ -375,7 +379,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
     return killed;
 }
 
-static void damage_best_visible_enemy(void) {
+static void damage_best_visible_enemy(u8 damage) {
     int best_thing = -1;
     int best_slot = -1;
     int best_score = 9999;
@@ -399,7 +403,7 @@ static void damage_best_visible_enemy(void) {
             break;
         }
     }
-    if (damage_enemy_at(best_thing, 1)) hide_enemies();
+    if (damage_enemy_at(best_thing, damage)) hide_enemies();
     else {
         if (best_slot >= 0) {
             enemy_slot_flash[best_slot] = 30;
@@ -512,11 +516,17 @@ static void apply_pickup(u16 thing_type) {
     }
 
     switch (thing_type) {
+    case 2001: /* shotgun */
+        player_has_shotgun = 1;
+        current_weapon = 1;
+        player_shells += 8;
+        weapon_frame = 0xFF;
+        break;
     case 2007: /* clip */
         player_ammo += 10;
         break;
     case 2008: /* shells */
-        player_ammo += 4;
+        player_shells += 4;
         break;
     case 2010: /* rocket */
         player_ammo += 1;
@@ -546,6 +556,7 @@ static void apply_pickup(u16 thing_type) {
         break;
     }
     if (player_ammo > 999) player_ammo = 999;
+    if (player_shells > 999) player_shells = 999;
 }
 
 static void collect_nearby_pickups(void) {
@@ -668,9 +679,13 @@ static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
     fix_poke((u16)(col + 2), row, pal, (u16)(FIX_DIGIT_BASE + value % 10));
 }
 
+static u16 weapon_ammo(void) {
+    return current_weapon && player_has_shotgun ? player_shells : player_ammo;
+}
+
 static void update_status_numbers(void) {
     u16 health = player_health;
-    u16 ammo = player_ammo;
+    u16 ammo = weapon_ammo();
     u16 armor = player_armor;
     if (health != shown_health) {
         draw_number3(3, 26, health, PAL_MAP_PLAYER);
@@ -821,6 +836,13 @@ static void set_weapon_frame(u8 frame) {
     weapon_frame = frame;
 }
 
+static void toggle_weapon(void) {
+    if (!player_has_shotgun) return;
+    current_weapon ^= 1;
+    weapon_frame = 0xFF;
+    shown_ammo = 0xFFFF;
+}
+
 static void set_weapon_position(signed char bob_x, signed char bob_y) {
     u16 start_x = (u16)((SCRW - WEAPON_COUNT * 16) / 2);
     int top = GAME_H - WEAPON_WIN * 16 + bob_y;
@@ -853,21 +875,27 @@ static void update_weapon(u8 pressed) {
     static u8 b_prev = 0;
     u8 b_now = pressed & B;
     if (b_now && !b_prev && fire_timer == 0) {
-        if (player_ammo > 0) {
+        if (current_weapon && player_has_shotgun && player_shells > 0) {
+            player_shells--;
+            fire_timer = 16;
+            damage_best_visible_enemy(5);
+        } else if (player_ammo > 0) {
+            current_weapon = 0;
             player_ammo--;
             fire_timer = 12;
-            damage_best_visible_enemy();
+            damage_best_visible_enemy(1);
         } else {
             ammo_message_timer = 45;
         }
     }
     b_prev = b_now;
 
-    u8 frame = 0;
+    u8 frame = current_weapon && player_has_shotgun ? 4 : 0;
     if (fire_timer) {
-        if (fire_timer > 8) frame = 1;
-        else if (fire_timer > 4) frame = 2;
-        else frame = 3;
+        u8 base = current_weapon && player_has_shotgun ? 4 : 0;
+        if (fire_timer > 12) frame = (u8)(base + 1);
+        else if (fire_timer > 6) frame = (u8)(base + 2);
+        else frame = (u8)(base + 3);
         fire_timer--;
     }
     if (frame != weapon_frame) set_weapon_frame(frame);
@@ -1057,9 +1085,12 @@ static void restart_level(void) {
     key_message_visible = 0;
     monster_ai_tick = 0;
     player_keys = 0;
+    player_has_shotgun = 0;
+    current_weapon = 0;
     player_health = 100;
     player_armor = 0;
     player_ammo = 50;
+    player_shells = 0;
     hurt_flash = 0;
     hurt_flash_on = 0;
 
@@ -1106,14 +1137,17 @@ int main(void) {
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;    
         if (game_active()) {
-            enum { D = 0x80 };
+            enum { A = 0x10, D = 0x80 };
             static u8 d_prev = 0;
             u8 d_now = pressed & D;
             rc_input(pressed);
             update_monster_ai();
             collect_nearby_pickups();
             check_exit_reached();
-            if (d_now && !d_prev) open_nearby_door();
+            if (d_now && !d_prev) {
+                if (pressed & A) toggle_weapon();
+                else open_nearby_door();
+            }
             d_prev = d_now;
         } else {
             enum { D = 0x80 };

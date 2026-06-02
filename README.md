@@ -51,6 +51,7 @@ pixel work is offloaded to the scaler hardware.
 | B                   | Fire pistol       |
 | C                   | Toggle minimap    |
 | D                   | Open nearby door  |
+| Hold A + D          | Toggle weapon     |
 | D after DEAD/EXIT   | Restart level     |
 
 Turning is tuned deliberately slower than the original raycaster demo so the
@@ -62,10 +63,13 @@ table instead of doing a 64-bit divide for each projected column.
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
-armor counters over the Doom status bar. Pistol shots spend ammo, and trying to
-fire empty flashes a compact fix-layer `AMMO` message instead of failing
-silently. Close visible monsters apply a first-pass contact-damage tick with
-armor absorption.
+armor counters over the Doom status bar. Clips and shells are tracked
+separately; shotgun guys now drop a shotgun pickup, and collecting one equips
+Doom's shotgun frames, adds shells, and makes B fire a stronger
+shell-consuming shot until the player toggles back or runs dry. Trying to fire
+empty flashes a compact fix-layer `AMMO` message instead of failing silently.
+Close visible monsters apply a first-pass contact-damage tick with armor
+absorption.
 Former humans, shotgun guys, and imps also apply slower ranged damage when they
 are visible and close enough, so the player has pressure to move, aim, and use
 doors instead of only avoiding contact. Damage briefly tints the playfield red
