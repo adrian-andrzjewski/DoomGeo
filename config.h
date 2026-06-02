@@ -70,6 +70,7 @@
 #define FIX_BLANK  0                /* transparent (all index 0)             */
 #define FIX_SOLID  1                /* all index 15 -> opaque, palette picks color */
 #define FIX_DIGIT_BASE 2            /* 2..11 = compact 8x8 HUD digits       */
+#define FIX_AIM    12               /* tiny center aim marker                */
 
  
 #define MAP_FIX_COL 1             

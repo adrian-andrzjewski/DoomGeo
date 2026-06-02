@@ -350,6 +350,10 @@ static void update_status_numbers(void) {
     }
 }
 
+static void draw_crosshair(void) {
+    fix_poke(SCRW / 16, HORIZON / 8, PAL_MAP_PLAYER, FIX_AIM);
+}
+
 static void draw_minimap(void) {
     for (int my = 0; my < MAP_H; my++)
         for (int mx = 0; mx < MAP_W; mx++) {
@@ -635,6 +639,7 @@ int main(void) {
     init_weapon();
     hide_enemies();
     update_status_numbers();
+    draw_crosshair();
     rc_init();
 
     for (;;) {

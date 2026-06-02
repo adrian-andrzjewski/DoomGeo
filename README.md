@@ -62,7 +62,8 @@ visible monsters apply a first-pass contact-damage tick with armor absorption.
 Monsters now keep compact per-thing hit points, so pistol shots damage targets
 over multiple hits instead of deleting every visible enemy immediately; the
 pistol picks the visible monster closest to the crosshair instead of damaging
-every visible target at once.
+every visible target at once. A tiny fix-layer center marker gives the player a
+stable aim point without spending any sprite slots.
 
 ## Building
 

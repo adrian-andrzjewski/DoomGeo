@@ -96,6 +96,8 @@ DIGIT_GLYPHS = (
     (0x3C, 0x66, 0x66, 0x3E, 0x06, 0x0C, 0x38, 0x00),
 )
 
+CROSSHAIR_GLYPH = (0x00, 0x00, 0x18, 0x3C, 0x3C, 0x18, 0x00, 0x00)
+
 
 def encode_fix_glyph(rows):
     pixels = [0] * 64
@@ -729,6 +731,7 @@ def main():
     s1 += bytes([0xFF]) * FIX_TILE   # tile 1: solid index 15
     for glyph in DIGIT_GLYPHS:
         s1 += encode_fix_glyph(glyph)
+    s1 += encode_fix_glyph(CROSSHAIR_GLYPH)
     s1 += bytes(S_PAD - len(s1))
 
     files = {
