@@ -143,6 +143,7 @@ static u8  fire_timer = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
 static u8  monster_ai_tick = 0;
+static u8  player_keys = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
@@ -212,6 +213,12 @@ static u8 thing_is_monster(u16 thing_type) {
 
 static u8 thing_is_pickup(u16 thing_type) {
     switch (thing_type) {
+    case 5:
+    case 6:
+    case 13:
+    case 38:
+    case 39:
+    case 40:
     case 2007:
     case 2008:
     case 2010:
@@ -223,6 +230,38 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2019:
     case 2048:
         return 1;
+    default:
+        return 0;
+    }
+}
+
+static u8 key_bit_for_thing(u16 thing_type) {
+    switch (thing_type) {
+    case 5:
+    case 40:
+        return 1; /* blue */
+    case 13:
+    case 38:
+        return 2; /* red */
+    case 6:
+    case 39:
+        return 4; /* yellow */
+    default:
+        return 0;
+    }
+}
+
+static u8 key_bit_for_door(u16 special) {
+    switch (special) {
+    case 26:
+    case 32:
+        return 1; /* blue */
+    case 28:
+    case 33:
+        return 2; /* red */
+    case 27:
+    case 34:
+        return 4; /* yellow */
     default:
         return 0;
     }
@@ -401,6 +440,12 @@ static void update_monster_ai(void) {
 }
 
 static void apply_pickup(u16 thing_type) {
+    u8 key = key_bit_for_thing(thing_type);
+    if (key) {
+        player_keys |= key;
+        return;
+    }
+
     switch (thing_type) {
     case 2007: /* clip */
         player_ammo += 10;
@@ -495,9 +540,11 @@ static void open_nearby_door(void) {
     rc_player_q8(&px, &py);
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
         const NgRuntimeDoor *door = &g_runtime_doors[i];
+        u8 required_key = key_bit_for_door(door->special);
         int dx = px - ((int)door->x * 256 + 128);
         int dy = py - ((int)door->y * 256 + 128);
         if (g_runtime_door_open[i]) continue;
+        if (required_key && (player_keys & required_key) == 0) continue;
         if (iabs16(dx) <= 384 && iabs16(dy) <= 384) {
             g_runtime_door_open[i] = 1;
             if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);

@@ -418,6 +418,12 @@ MONSTER_TYPES = {
 }
 
 PICKUP_TYPES = {
+    5,     # blue keycard
+    6,     # yellow keycard
+    13,    # red keycard
+    38,    # red skull
+    39,    # yellow skull
+    40,    # blue skull
     2007,  # clip
     2008,  # shells
     2010,  # rocket

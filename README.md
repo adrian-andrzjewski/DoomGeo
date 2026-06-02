@@ -77,12 +77,13 @@ initial placement. When health reaches zero, movement and firing stop and the
 fix layer shows a compact `DEAD` message.
 
 The converter also preserves Doom door and exit linedefs as compact runtime
-trigger lists. Pressing D opens nearby converted door cells, affecting both
-movement and raycasting through the shared `map_at()` path. Reaching the
-converted E1M1 exit cell now raises a fix-layer `EXIT` message and freezes
-player control, monster movement, and monster damage. This keeps level
-progression behavior in the ROM without keeping generic WAD directory/lump
-metadata in the cartridge.
+trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
+bits. Pressing D opens nearby converted door cells, with keyed door specials
+requiring the matching key, and affects both movement and raycasting through the
+shared `map_at()` path. Reaching the converted E1M1 exit cell now raises a
+fix-layer `EXIT` message and freezes player control, monster movement, and
+monster damage. This keeps level progression behavior in the ROM without keeping
+generic WAD directory/lump metadata in the cartridge.
 
 ## Building
 
