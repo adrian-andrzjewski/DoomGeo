@@ -66,13 +66,6 @@ static void init_palettes(void) {
         u8 b = g_weapon_palette_rgb[i][2];
         pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
     }
-    for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
-        u8 r = g_enemy_palette_rgb[i][0];
-        u8 g = g_enemy_palette_rgb[i][1];
-        u8 b = g_enemy_palette_rgb[i][2];
-        pal_set(PAL_ENEMY, (u16)(i + 1), RGB(r, g, b));
-    }
-
     REG_BACKDROP = RGB(0, 0, 0);
 }
 
@@ -90,10 +83,29 @@ static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static int enemy_active = -1;
+static int enemy_sprite_def = -1;
 static int enemy_screen_x = SCRW / 2;
 static int enemy_screen_w = 0;
 
 static void hide_enemy(void);
+
+static int enemy_sprite_def_for_type(u16 thing_type) {
+    for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
+        if (g_enemy_sprite_defs[i].thing_type == thing_type) return i;
+    }
+    return 0;
+}
+
+static void load_enemy_palette(int def) {
+    if (def == enemy_sprite_def) return;
+    for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
+        u8 r = g_enemy_palette_rgb[def][i][0];
+        u8 g = g_enemy_palette_rgb[def][i][1];
+        u8 b = g_enemy_palette_rgb[def][i][2];
+        pal_set(PAL_ENEMY, (u16)(i + 1), RGB(r, g, b));
+    }
+    enemy_sprite_def = def;
+}
 
 static void kill_active_enemy(void) {
     if (enemy_active < 0 || enemy_active >= NG_RUNTIME_THING_COUNT) return;
@@ -292,6 +304,8 @@ static void update_enemy(void) {
     int sx, h, dist_q8;
     int idx;
     int best = -1;
+    int def_idx;
+    const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         const NgRuntimeThing *thing = &g_runtime_things[i];
@@ -306,14 +320,17 @@ static void update_enemy(void) {
         return;
     }
     enemy_active = best;
+    def_idx = enemy_sprite_def_for_type(g_runtime_things[best].type);
+    def = &g_enemy_sprite_defs[def_idx];
+    load_enemy_palette(def_idx);
 
     if (h > 110) idx = 0;
     else if (h > 76) idx = 1;
     else if (h > 48) idx = 2;
     else if (h > 30) idx = 3;
     else idx = 4;
-    if (idx >= ENEMY_SCALE_COUNT) idx = ENEMY_SCALE_COUNT - 1;
-    meta = &g_enemy_scales[idx];
+    if (idx >= def->scale_count) idx = def->scale_count - 1;
+    meta = &g_enemy_scales[def->first_scale + idx];
 
     set_enemy_tiles(meta);
     enemy_screen_x = sx - meta->width / 2;
