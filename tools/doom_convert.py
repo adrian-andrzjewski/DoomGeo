@@ -451,6 +451,7 @@ PICKUP_TYPES = {
     40,    # blue skull
     2001,  # shotgun
     2002,  # chaingun
+    2003,  # rocket launcher
     2007,  # clip
     2008,  # shells
     2010,  # rocket
@@ -460,6 +461,7 @@ PICKUP_TYPES = {
     2015,  # armor bonus
     2018,  # green armor
     2019,  # blue armor
+    2046,  # box of rockets
     2048,  # ammo box
     2035,  # explosive barrel
 }
