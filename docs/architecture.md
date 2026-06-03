@@ -48,6 +48,9 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
 - Weapon/fire frames and sprite scale levels are generated offline so the 68000
   does not compose Doom patches during play.
+- Monster sprite definitions include a compact Doom angle bucket. The runtime
+  stores one coarse facing vector per thing and picks from the baked rotation
+  frames while keeping the same limited world-sprite slot count.
 - Registered/commercial-only psprite lumps that are missing from shareware are
   replaced with pistol placeholder frames at build time, so the same runtime
   weapon table can be tested with shareware and then rebuilt with exact
@@ -76,7 +79,8 @@ current runtime accepts several compromises:
   non-visible so hidden/off-screen monsters cannot drive melee or ranged damage.
 - Monster chase uses a periodically refreshed grid distance field from the
   player, which is cheaper and more reliable on the converted map than asking
-  each monster to solve local wall avoidance independently.
+  each monster to solve local wall avoidance independently. That same movement
+  delta feeds the coarse facing vector for rotation-frame selection.
 
 The generated full map data is kept so later work can experiment with more
 Doom-like traversal without redoing the WAD parsing layer.

@@ -86,6 +86,10 @@ readable.
   if the player cannot use them yet.
 - Former humans, shotgun guys, imps, demons/spectres, Barons, and barrels have
   partial gameplay support.
+- Former humans, shotgun guys, imps, demons/spectres, and Barons now bake A/B
+  walk frames across the available Doom angle groups. Runtime sprite selection
+  tracks a coarse monster-facing vector so visible enemies are no longer locked
+  to a single front-facing frame.
 - Monsters keep health, awake state, pain flash/pause, attack cooldown, and a
   mutable position layer. Awakened monsters follow a coarse player distance
   field so they can move around converted E1M1 walls instead of getting stuck

@@ -302,6 +302,8 @@ static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
 static u8  enemy_attack_cooldown[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hidden_timer[NG_RUNTIME_THING_COUNT];
+static signed char monster_face_x[NG_RUNTIME_THING_COUNT];
+static signed char monster_face_y[NG_RUNTIME_THING_COUNT];
 static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
 static u8  death_drop_timer[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
@@ -760,10 +762,13 @@ static u8 monster_hp(int thing_index) {
 }
 
 static int first_sprite_def_for_type(u16 thing_type) {
+    int first = -1;
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
-        if (g_enemy_sprite_defs[i].thing_type == thing_type) return i;
+        if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
+        if (first < 0) first = i;
+        if (g_enemy_sprite_defs[i].angle == 0) return i;
     }
-    return -1;
+    return first;
 }
 
 static u16 fallback_sprite_type_for_missing_pickup(u16 thing_type) {
@@ -785,15 +790,50 @@ static u16 fallback_sprite_type_for_missing_pickup(u16 thing_type) {
     }
 }
 
-static int enemy_sprite_def_for_type(u16 thing_type) {
+static u8 monster_view_angle_bucket(int thing_index) {
+    int px, py;
+    int to_x;
+    int to_y;
+    int dot;
+    int cross;
+    int abs_cross;
+    int face_x;
+    int face_y;
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 1;
+    rc_player_q8(&px, &py);
+    to_x = px - thing_x_q8[thing_index];
+    to_y = py - thing_y_q8[thing_index];
+    face_x = monster_face_x[thing_index];
+    face_y = monster_face_y[thing_index];
+    if (face_x == 0 && face_y == 0) {
+        face_x = (to_x > 0) ? 1 : (to_x < 0 ? -1 : 0);
+        face_y = (to_y > 0) ? 1 : (to_y < 0 ? -1 : 0);
+    }
+    dot = face_x * to_x + face_y * to_y;
+    cross = face_x * to_y - face_y * to_x;
+    abs_cross = iabs16(cross);
+    if (dot > abs_cross * 2) return 1;
+    if (dot > 0) return 2;
+    if (-dot < abs_cross) return 3;
+    if (dot < -(abs_cross * 2)) return 5;
+    return 4;
+}
+
+static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
     int first = -1;
+    int first_angle = -1;
+    u8 wanted_angle = thing_is_monster(thing_type) ? monster_view_angle_bucket(thing_index) : 0;
+    u8 wanted_anim = thing_is_monster(thing_type) ? (u8)((monster_ai_tick >> 3) & 1) : 0;
+    u8 angle_hits = 0;
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
         if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
         if (first < 0) first = i;
-        /* Duplicate baked monster defs are the next animation frame. Pickups,
-           corpses, projectiles, and effects keep their first exact frame. */
-        if (thing_is_monster(thing_type) && ((monster_ai_tick >> 3) & 1)) return i;
-        return first;
+        if (!thing_is_monster(thing_type)) return first;
+        if (g_enemy_sprite_defs[i].angle == wanted_angle || g_enemy_sprite_defs[i].angle == 0) {
+            if (first_angle < 0) first_angle = i;
+            if (angle_hits == wanted_anim) return i;
+            angle_hits++;
+        }
     }
     if (thing_is_pickup(thing_type)) {
         u16 fallback_type = fallback_sprite_type_for_missing_pickup(thing_type);
@@ -802,6 +842,7 @@ static int enemy_sprite_def_for_type(u16 thing_type) {
             if (fallback >= 0) return fallback;
         }
     }
+    if (first_angle >= 0) return first_angle;
     return first >= 0 ? first : 0;
 }
 
@@ -1337,11 +1378,19 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
     return 1;
 }
 
+static void set_monster_facing_from_delta(int i, int dx, int dy) {
+    if (i < 0 || i >= NG_RUNTIME_THING_COUNT) return;
+    if (iabs16(dx) + iabs16(dy) < 8) return;
+    monster_face_x[i] = (dx > 0) ? 1 : (dx < 0 ? -1 : 0);
+    monster_face_y[i] = (dy > 0) ? 1 : (dy < 0 ? -1 : 0);
+}
+
 static void move_monster_toward(int i, int dx, int dy, int adx, int ady) {
     short x = thing_x_q8[i];
     short y = thing_y_q8[i];
     short sx = (short)(dx < 0 ? -WORLD_Q8(18) : WORLD_Q8(18));
     short sy = (short)(dy < 0 ? -WORLD_Q8(18) : WORLD_Q8(18));
+    set_monster_facing_from_delta(i, dx, dy);
 
     if (adx > ady) {
         if (can_monster_step(i, (short)(x + sx), y)) {
@@ -1482,6 +1531,7 @@ static u8 reveal_hidden_monster_near_player(int i, int px, int py) {
     if (best_score == 0x3FFFFFFF) return 0;
     thing_x_q8[i] = (short)best_x;
     thing_y_q8[i] = (short)best_y;
+    set_monster_facing_from_delta(i, px - best_x, py - best_y);
     enemy_hidden_timer[i] = 0;
     enemy_attack_cooldown[i] = 24;
     return 1;
@@ -2799,7 +2849,7 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
 
 static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash) {
     int idx;
-    int def_idx = enemy_sprite_def_for_type(thing_type);
+    int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
     const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
     const DoomSpriteScale *meta;
 
@@ -3048,6 +3098,8 @@ static void restart_level(void) {
         enemy_awake[i] = 0;
         enemy_attack_cooldown[i] = 0;
         enemy_hidden_timer[i] = 0;
+        monster_face_x[i] = 0;
+        monster_face_y[i] = 1;
         explosion_timer[i] = 0;
         death_drop_timer[i] = 0;
         thing_type_override[i] = 0;

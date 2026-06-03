@@ -995,7 +995,15 @@ def parse_monster_sprites(spec):
         if not item:
             continue
         thing_type, frame = item.split(":", 1)
-        result.append((int(thing_type), frame.strip().upper()))
+        angle = -1
+        if "@" in thing_type:
+            thing_type, angle_spec = thing_type.split("@", 1)
+            angle = int(angle_spec)
+        frame = frame.strip().upper()
+        if angle < 0:
+            suffix = frame[4:]
+            angle = next((int(ch) for ch in suffix if ch.isdigit()), 0)
+        result.append((int(thing_type), angle, frame))
     return result
 
 
@@ -1005,7 +1013,7 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     metas = []
     palettes = []
     next_tile = SPRITE_CACHE_BASE
-    for thing_type, frame in specs:
+    for thing_type, angle, frame in specs:
         first_scale = len(metas)
         frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile)
         if not frame_meta:
@@ -1013,7 +1021,7 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
         tiles.extend(frame_tiles)
         metas.extend(frame_meta)
         palettes.append(palette)
-        defs.append((thing_type, first_scale, len(frame_meta), frame))
+        defs.append((thing_type, angle, first_scale, len(frame_meta), frame))
     return tiles, defs, metas, palettes
 
 
@@ -1104,12 +1112,13 @@ def write_palette_header(path, wall_palette, wall_source, wall_alt_palettes, wal
         f.write("} DoomSpriteScale;\n\n")
         f.write("typedef struct DoomEnemySpriteDef {\n")
         f.write("    u16 thing_type;\n")
-        f.write("    u8 first_scale;\n")
+        f.write("    u8 angle;\n")
+        f.write("    u16 first_scale;\n")
         f.write("    u8 scale_count;\n")
         f.write("} DoomEnemySpriteDef;\n\n")
         f.write("static const DoomEnemySpriteDef g_enemy_sprite_defs[ENEMY_SPRITE_COUNT] = {\n")
-        for thing_type, first_scale, scale_count, _frame in sprite_defs:
-            f.write(f"    {{{thing_type},{first_scale},{scale_count}}},\n")
+        for thing_type, angle, first_scale, scale_count, _frame in sprite_defs:
+            f.write(f"    {{{thing_type},{angle},{first_scale},{scale_count}}},\n")
         f.write("};\n\n")
         f.write(f"#define ENEMY_SCALE_COUNT {len(sprite_meta)}\n")
         f.write("static const DoomSpriteScale g_enemy_scales[ENEMY_SCALE_COUNT] = {\n")
@@ -1132,7 +1141,7 @@ def main():
     ap.add_argument("--face-tune-grid", action="store_true", help="Bake face probes and STFST00 orientation variants into the face frame slots")
     ap.add_argument("--out-dir", default=None, help="Directory for generated c1/c2/s1/m1/v1 ROM blobs")
     ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
-    ap.add_argument("--monster-sprites", default="3004:POSSA1,3004:POSSB1,9:SPOSA1,9:SPOSB1,3001:TROOA1,3001:TROOB1,3002:SARGA1,3002:SARGB1,58:SARGA1,58:SARGB1,3003:BOSSA1,3003:BOSSB1,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2004:PLASA0,2005:CSAWA0,2006:BFUGA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,17:CELPA0,2035:BAR1A0,2046:BROKA0,2047:CELLA0,9000:BEXPC0,2048:AMMOA0,9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9006:BAL1A0,9007:BAL7A1A5", help="Comma-separated Doom thing_type:sprite_frame pairs")
+    ap.add_argument("--monster-sprites", default="3004:POSSA1,3004:POSSA2A8,3004:POSSA3A7,3004:POSSA4A6,3004:POSSA5,3004:POSSB1,3004:POSSB2B8,3004:POSSB3B7,3004:POSSB4B6,3004:POSSB5,9:SPOSA1,9:SPOSA2A8,9:SPOSA3A7,9:SPOSA4A6,9:SPOSA5,9:SPOSB1,9:SPOSB2B8,9:SPOSB3B7,9:SPOSB4B6,9:SPOSB5,3001:TROOA1,3001:TROOA2A8,3001:TROOA3A7,3001:TROOA4A6,3001:TROOA5,3001:TROOB1,3001:TROOB2B8,3001:TROOB3B7,3001:TROOB4B6,3001:TROOB5,3002:SARGA1,3002:SARGA2A8,3002:SARGA3A7,3002:SARGA4A6,3002:SARGA5,3002:SARGB1,3002:SARGB2B8,3002:SARGB3B7,3002:SARGB4B6,3002:SARGB5,58:SARGA1,58:SARGA2A8,58:SARGA3A7,58:SARGA4A6,58:SARGA5,58:SARGB1,58:SARGB2B8,58:SARGB3B7,58:SARGB4B6,58:SARGB5,3003:BOSSA1,3003:BOSSA2A8,3003:BOSSA3A7,3003:BOSSA4A6,3003:BOSSA5,3003:BOSSB1,3003:BOSSB2B8,3003:BOSSB3B7,3003:BOSSB4B6,3003:BOSSB5,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2004:PLASA0,2005:CSAWA0,2006:BFUGA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,17:CELPA0,2035:BAR1A0,2046:BROKA0,2047:CELLA0,9000:BEXPC0,2048:AMMOA0,9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9006:BAL1A0,9007:BAL7A1A5", help="Comma-separated Doom thing_type:sprite_frame pairs")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
 
@@ -1273,8 +1282,8 @@ def main():
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
     print(f"  hud faces: {face_source} tile={HUD_FACE_BASE}..{HUD_FACE_BASE + len(face_frames) * HUD_FACE_TILES - 1} ({HUD_FACE_COLS}x{HUD_FACE_ROWS}x{len(face_frames)})")
     print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")
-    for thing_type, first_scale, scale_count, frame in sprite_defs:
-        print(f"  monster sprite: thing={thing_type} frame={frame} scales={first_scale}..{first_scale + scale_count - 1}")
+    for thing_type, angle, first_scale, scale_count, frame in sprite_defs:
+        print(f"  monster sprite: thing={thing_type} angle={angle} frame={frame} scales={first_scale}..{first_scale + scale_count - 1}")
     for name, scale, base, strips, rows, width, height in sprite_meta:
         print(f"    sprite frame: {name} scale={scale:.2f} tile={base} strips={strips} rows={rows} size={width}x{height}")
     print(f"  tiles encoded: blank wall-cache solid "
