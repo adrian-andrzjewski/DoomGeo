@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import TypeAlias
 
 
 REPO_MARKERS = ("Makefile", "config.mk", "rom.mk")
@@ -26,6 +27,8 @@ REQUIRED_TOOLS = (
     "m68k-neogeo-elf-objcopy",
 )
 DEB_PACKAGES = ("ngdevkit-toolchain", "ngdevkit", "ngdevkit-gngeo")
+MSYS2_NGDEVKIT_REPO = "https://dciabrin.net/msys2-ngdevkit/$arch"
+ToolPrefix: TypeAlias = Path | str
 
 
 class BuildError(RuntimeError):
@@ -72,13 +75,30 @@ def has_local_toolchain(root: Path) -> bool:
     return all(tool_path(prefix, tool).exists() for tool in REQUIRED_TOOLS)
 
 
-def make_env(prefix: Path | None = None) -> dict[str, str]:
+def make_env(prefix: ToolPrefix | None = None) -> dict[str, str]:
     env = os.environ.copy()
     if prefix is not None:
-        bindir = str(prefix / "bin")
-        env["PATH"] = bindir + os.pathsep + env.get("PATH", "")
+        if isinstance(prefix, Path):
+            bindir = str(prefix / "bin")
+            env["PATH"] = bindir + os.pathsep + env.get("PATH", "")
+        elif not is_msys2():
+            bindir = prefix.rstrip("/") + "/bin"
+            env["PATH"] = bindir + os.pathsep + env.get("PATH", "")
         env["TOOLS_PREFIX"] = str(prefix)
     return env
+
+
+def is_msys2() -> bool:
+    return platform.system() == "Windows" and bool(os.environ.get("MSYSTEM"))
+
+
+def msys2_prefix() -> str | None:
+    prefix = os.environ.get("MINGW_PREFIX")
+    if prefix:
+        return prefix
+    if os.environ.get("MSYSTEM", "").upper() == "UCRT64":
+        return "/ucrt64"
+    return None
 
 
 def wsl_repo_path(root: Path) -> str:
@@ -106,14 +126,47 @@ def run_via_wsl(root: Path, subcommand: list[str]) -> None:
     )
 
 
-def resolve_prefix(root: Path, requested: str | None) -> Path | None:
+def resolve_prefix(root: Path, requested: str | None) -> ToolPrefix | None:
     if requested:
-        return Path(requested).expanduser().resolve()
+        if requested.startswith("/") and is_msys2():
+            return requested
+        return Path(requested)
     if has_local_toolchain(root):
         return local_prefix(root)
+    if is_msys2() and msys2_prefix():
+        return msys2_prefix()
     if all(command_exists(tool) for tool in REQUIRED_TOOLS):
         return None
     return local_prefix(root)
+
+
+def install_tools_msys2(root: Path) -> None:
+    if not is_msys2():
+        raise BuildError("MSYS2 install must run from an MSYS2 UCRT64 shell")
+    if os.environ.get("MSYSTEM", "").upper() != "UCRT64":
+        raise BuildError("MSYS2 install requires the UCRT64 environment")
+    pacman_conf = Path("/etc/pacman.conf")
+    existing = pacman_conf.read_text(encoding="utf-8", errors="ignore")
+    if "[ngdevkit]" not in existing:
+        with pacman_conf.open("a", encoding="utf-8") as handle:
+            handle.write(f"\n[ngdevkit]\nSigLevel = Optional TrustAll\nServer = {MSYS2_NGDEVKIT_REPO}\n")
+        print_step("added ngdevkit MSYS2 package repository")
+    run(["pacman", "--noconfirm", "-Sy", "--needed", "pactoys", "make", "zip", "unzip"], cwd=root)
+    run(
+        [
+            "pacboy",
+            "--noconfirm",
+            "-S",
+            "--needed",
+            "ngdevkit:u",
+            "ngdevkit-gngeo:u",
+            "imagemagick:u",
+            "sox:u",
+            "python-pillow:u",
+            "python-ruamel-yaml:u",
+        ],
+        cwd=root,
+    )
 
 
 def install_tools_from_debs(root: Path, deb_dir: Path) -> None:
@@ -158,6 +211,17 @@ def install_tools_system(root: Path) -> None:
     run(["sudo", "apt-get", "install", "-y", "ngdevkit", "ngdevkit-gngeo"], cwd=root)
 
 
+def install_tools_auto(root: Path, deb_dir: Path) -> None:
+    if is_msys2():
+        install_tools_msys2(root)
+    elif platform.system() == "Linux" and deb_dir.exists() and any(deb_dir.glob("ngdevkit_*.deb")):
+        install_tools_from_debs(root, deb_dir)
+    elif platform.system() == "Linux":
+        install_tools_system(root)
+    else:
+        raise BuildError("automatic install supports Linux or MSYS2 UCRT64")
+
+
 def build(root: Path, prefix_arg: str | None, target: str, run_emulator: bool) -> None:
     if platform.system() == "Windows" and not command_exists("make"):
         if command_exists("wsl"):
@@ -170,6 +234,8 @@ def build(root: Path, prefix_arg: str | None, target: str, run_emulator: bool) -
     args = ["make"]
     if prefix is not None:
         args.append(f"TOOLS_PREFIX={prefix}")
+    if is_msys2() and msys2_prefix():
+        args.append(f"PYTHON={msys2_prefix()}/bin/python3")
     args.append(target)
     run(args, cwd=root, env=env)
     if run_emulator:
@@ -334,6 +400,8 @@ def doctor(root: Path, prefix_arg: str | None) -> int:
     for tool in REQUIRED_TOOLS:
         if prefix is None:
             found = shutil.which(tool)
+        elif isinstance(prefix, str):
+            found = shutil.which(tool)
         else:
             found = str(tool_path(prefix, tool)) if tool_path(prefix, tool).exists() else None
         print(f"{tool}: {found or 'missing'}")
@@ -354,11 +422,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     install = sub.add_parser("install-tools", help="install ngdevkit tools")
     install.add_argument(
         "--method",
-        choices=("debs", "system"),
+        choices=("auto", "debs", "system", "msys2"),
         default="debs",
         help="debs extracts cached .deb packages under .tools; system installs from the ngdevkit PPA",
     )
     install.add_argument("--deb-dir", type=Path, default=Path(".tools") / "downloads")
+
+    installer = sub.add_parser("install", help="one-command installer for the build toolchain")
+    installer.add_argument(
+        "--method",
+        choices=("auto", "debs", "system", "msys2"),
+        default="auto",
+        help="auto selects MSYS2, cached .debs, or the Ubuntu PPA based on the host",
+    )
+    installer.add_argument("--deb-dir", type=Path, default=Path(".tools") / "downloads")
 
     build_cmd = sub.add_parser("build", help="build the Neo Geo ROM")
     build_cmd.add_argument("--target", default="all")
@@ -386,11 +463,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "doctor":
             return doctor(root, args.tools_prefix)
-        if args.command == "install-tools":
-            if args.method == "system":
+        if args.command in ("install-tools", "install"):
+            deb_dir = (root / args.deb_dir).resolve()
+            if args.method == "auto":
+                install_tools_auto(root, deb_dir)
+            elif args.method == "system":
                 install_tools_system(root)
+            elif args.method == "msys2":
+                install_tools_msys2(root)
             else:
-                install_tools_from_debs(root, (root / args.deb_dir).resolve())
+                install_tools_from_debs(root, deb_dir)
             return 0
         if args.command == "build":
             build(root, args.tools_prefix, args.target, args.run)

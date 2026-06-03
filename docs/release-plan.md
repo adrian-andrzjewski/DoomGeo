@@ -11,17 +11,21 @@ the other only accompanies and tracks the plan.
 - [x] Package both CLIs as standalone Linux and Windows binaries in GitHub Actions.
 - [x] Build the Neo Geo ROM in GitHub Actions on Ubuntu 24.04.
 - [x] Add a GitHub Pages bundle that plays the ROM through a WebAssembly/asm.js browser emulator frontend.
-- [ ] Add a fully native Windows/MSYS2 ROM build job after validating ngdevkit UCRT64 in CI.
+- [x] Add a fully native Windows/MSYS2 ROM build job after validating ngdevkit UCRT64 in CI.
 - [ ] Add signed release uploads for tagged builds.
 - [ ] Add a smoke-run screenshot capture job for the Linux ROM build.
-- [ ] Decide whether the final user-facing build helper should install ngdevkit through MSYS2, WSL, Docker, or all three on Windows.
+- [x] Decide whether the final user-facing build helper should install ngdevkit through MSYS2, WSL, Docker, or all three on Windows.
 
 ## Evidence
 
 - Linux ROM builds are expected to produce `build/rom/puzzledp.zip`.
+- Windows/MSYS2 ROM builds are expected to produce the same `puzzledp.zip`
+  through the UCRT64 ngdevkit packages.
 - Standalone helper builds are expected to produce `doomgeo-build` and
   `doomgeo-plan` artifacts for Linux, plus `.exe` variants for Windows.
 - The Pages bundle is expected to publish `index.html`, `rom/puzzledp.zip`,
   and `rom/neogeo.zip`.
 - Repo-local installs are removable with `doomgeo-build uninstall`; `--all`
   also removes cached WAD/package downloads under `.tools`.
+- The installer decision is MSYS2 UCRT64 for native Windows builds, with WSL
+  delegation kept as a fallback when the helper is launched from normal Windows.

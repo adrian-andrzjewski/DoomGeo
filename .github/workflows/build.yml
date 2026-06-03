@@ -101,6 +101,51 @@ jobs:
             dist/${{ matrix.plan_name }}
           if-no-files-found: error
 
+  windows-rom:
+    name: Windows MSYS2 ROM
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            pactoys
+            make
+            zip
+            unzip
+
+      - name: Install ngdevkit for MSYS2
+        shell: msys2 {0}
+        run: python3 tools/doomgeo_build.py install --method msys2
+
+      - name: Verify Windows build helper
+        shell: msys2 {0}
+        run: |
+          python3 -m py_compile tools/doomgeo_build.py tools/doomgeo_plan.py
+          python3 tools/doomgeo_build.py doctor --tools-prefix /ucrt64
+          python3 tools/doomgeo_plan.py list
+
+      - name: Build ROM on Windows
+        shell: msys2 {0}
+        run: python3 tools/doomgeo_build.py build --tools-prefix /ucrt64
+
+      - name: Collect Windows ROM artifacts
+        shell: msys2 {0}
+        run: python3 tools/doomgeo_build.py package --out dist/windows-rom
+
+      - name: Upload Windows-built ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: doomgeo-mvs-windows-rom
+          path: dist/windows-rom/*
+          if-no-files-found: error
+
   pages:
     name: GitHub Pages playable build
     runs-on: ubuntu-24.04

@@ -20,7 +20,7 @@ by default. If cached ngdevkit `.deb` files are present under `.tools/downloads`
 install them locally with:
 
 ```sh
-python3 tools/doomgeo_build.py install-tools --method debs
+python3 tools/doomgeo_build.py install
 python3 tools/doomgeo_build.py doctor
 python3 tools/doomgeo_build.py build
 ```
@@ -38,8 +38,18 @@ The system method follows ngdevkit's documented Ubuntu path:
 ## Local Windows Build
 
 ngdevkit's current Windows path is native MSYS2 UCRT64. Run the helper from an
-MSYS2 UCRT64 shell after installing the upstream packages, or run it from normal
-Windows with WSL available and it will delegate the ROM build to WSL.
+MSYS2 UCRT64 shell and let the standalone installer command configure the
+upstream package repository and install the needed packages:
+
+```sh
+doomgeo-build.exe install --method msys2
+doomgeo-build.exe doctor --tools-prefix /ucrt64
+doomgeo-build.exe build --tools-prefix /ucrt64
+```
+
+If the helper is run from normal Windows with WSL available, ROM builds delegate
+to WSL as a fallback. Native Windows builds are intentionally standardized on
+MSYS2 UCRT64 because that is the upstream ngdevkit Windows package target.
 
 The Windows standalone binary still supports:
 
@@ -49,9 +59,8 @@ doomgeo-build.exe uninstall --dry-run
 doomgeo-plan.exe list
 ```
 
-Native Windows/MSYS2 ROM building is tracked in `docs/release-plan.md` because
-it needs CI validation against the upstream UCRT64 package repository before it
-should be treated as complete.
+GitHub Actions validates the native Windows/MSYS2 path by installing the same
+UCRT64 packages, building the ROM, and uploading a Windows-built ROM artifact.
 
 ## Uninstall
 
@@ -71,6 +80,7 @@ or system packages installed through apt/MSYS2.
 `.github/workflows/build.yml` has three responsibilities:
 
 - Build and upload the Neo Geo ROM on `ubuntu-24.04`.
+- Build and upload the Neo Geo ROM on Windows through MSYS2 UCRT64.
 - Package `doomgeo-build` and `doomgeo-plan` as standalone binaries on Linux
   and Windows.
 - Publish a GitHub Pages playable build on branch pushes.
