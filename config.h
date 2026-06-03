@@ -37,7 +37,13 @@
 #define WEAPON_COUNT 7
 #define WEAPON_WIN   8
 #define WEAPON_Y_OFFSET 0
-#define ENEMY_VISIBLE_COUNT 3
+/*
+ * Runtime sprite budget on active playfield scanlines:
+ *   20 backdrop + 64 wall columns + 7 weapon strips = 91 sprites.
+ * Neo Geo evaluates 96 sprites per scanline, so only one 4-strip world thing
+ * can be guaranteed visible without clipping/tint artifacts.
+ */
+#define ENEMY_VISIBLE_COUNT 1
 #define ENEMY_STRIPS 4
 #define ENEMY_BASE   (WEAPON_BASE + WEAPON_COUNT)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)

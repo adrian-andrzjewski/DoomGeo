@@ -332,8 +332,8 @@ static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
 static u8 secret_found_bits[MAP_SECRET_BYTES ? MAP_SECRET_BYTES : 1];
-static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
-static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
+static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1};
+static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
 static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
@@ -948,8 +948,9 @@ static void damage_rocket_target(void) {
 }
 
 static void damage_shotgun_spread(void) {
-    int targets[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
-    int scores[ENEMY_VISIBLE_COUNT] = {9999, 9999, 9999};
+    enum { SHOTGUN_TARGET_COUNT = 3 };
+    int targets[SHOTGUN_TARGET_COUNT] = {-1, -1, -1};
+    int scores[SHOTGUN_TARGET_COUNT] = {9999, 9999, 9999};
 
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
         int sx, h, dist_q8;
@@ -964,15 +965,15 @@ static void damage_shotgun_spread(void) {
         lateral = iabs16(sx - SCRW / 2);
         if (lateral > 54 && h < 100) continue;
         score = lateral + (dist_q8 >> 8);
-        insert_at = ENEMY_VISIBLE_COUNT;
-        for (u16 i = 0; i < ENEMY_VISIBLE_COUNT; i++) {
+        insert_at = SHOTGUN_TARGET_COUNT;
+        for (u16 i = 0; i < SHOTGUN_TARGET_COUNT; i++) {
             if (score < scores[i]) {
                 insert_at = i;
                 break;
             }
         }
-        if (insert_at >= ENEMY_VISIBLE_COUNT) continue;
-        for (int i = ENEMY_VISIBLE_COUNT - 1; i > insert_at; i--) {
+        if (insert_at >= SHOTGUN_TARGET_COUNT) continue;
+        for (int i = SHOTGUN_TARGET_COUNT - 1; i > insert_at; i--) {
             targets[i] = targets[i - 1];
             scores[i] = scores[i - 1];
         }
