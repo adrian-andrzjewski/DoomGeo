@@ -1929,7 +1929,7 @@ static void draw_weapon_status(void) {
     u8 bits = weapon_status_bits() & 0x0F;
     for (u8 weapon = 0; weapon < 4; weapon++) {
         u16 pal = (bits & (1 << weapon)) ? PAL_HUD : PAL_MAP_WALL;
-        if (weapon == current_weapon) pal = PAL_MAP_PLAYER;
+        if (weapon == current_weapon) pal = PAL_HUD;
         fix_poke((u16)(12 + weapon), HUD_FIX_BOTTOM_ROW, pal, (u16)(FIX_DIGIT_BASE + weapon + 1));
     }
     shown_weapon_status = weapon_status_bits();

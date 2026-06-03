@@ -19,6 +19,8 @@ after the current documentation pass.
 - Expand weapon selection and ammo rules to cover the full Doom weapon set.
 - Complete enemy sprite coverage, rotations, animation states, pain/death
   frames, and more faithful thing placement.
+- Continue tuning the low-sprite wall fallback so enemies remain visible without
+  making the walls too chunky.
 - Add more pickup/effect frames where the current sprite set still uses limited
   frame coverage.
 

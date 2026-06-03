@@ -53,7 +53,9 @@ current runtime accepts several compromises:
 - One projected wall height per column instead of multiple clipped subsector
   spans.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
-- A small number of visible world-sprite slots for monsters/pickups/projectiles.
+- A limited number of visible world-sprite slots for monsters/pickups/projectiles.
+  The current runtime uses 40 wall columns so five 4-strip world things can fit
+  alongside the backdrop and weapon under the 96-sprites-per-scanline limit.
 
 The generated full map data is kept so later work can experiment with more
 Doom-like traversal without redoing the WAD parsing layer.
