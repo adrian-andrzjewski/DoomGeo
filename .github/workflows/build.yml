@@ -116,9 +116,14 @@ jobs:
           pyinstaller --onefile --name doomgeo-build tools/doomgeo_build.py
           pyinstaller --onefile --name doomgeo-plan tools/doomgeo_plan.py
 
-      - name: Smoke test plan helper
+      - name: Smoke test standalone helpers
         shell: bash
-        run: ./dist/${{ matrix.plan_name }} status || true
+        run: |
+          ./dist/${{ matrix.build_name }} --help
+          ./dist/${{ matrix.build_name }} install --help
+          ./dist/${{ matrix.build_name }} build --help
+          ./dist/${{ matrix.build_name }} package --help
+          ./dist/${{ matrix.plan_name }} list
 
       - name: Upload standalone helpers
         uses: actions/upload-artifact@v4
