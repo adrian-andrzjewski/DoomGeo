@@ -54,6 +54,8 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 - A reserved attack angle bucket carries front-facing attack frames. Runtime
   attack timers briefly select that bucket for melee, hitscan, and projectile
   attacks instead of allocating extra sprites.
+- A second reserved bucket carries front-facing pain frames. It is selected
+  during the hit-flash timer, sharing the existing palette flash and sprite slot.
 - Registered/commercial-only psprite lumps that are missing from shareware are
   replaced with pistol placeholder frames at build time, so the same runtime
   weapon table can be tested with shareware and then rebuilt with exact

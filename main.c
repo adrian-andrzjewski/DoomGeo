@@ -835,7 +835,10 @@ static u8 monster_view_angle_bucket(int thing_index) {
 static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
     int first = -1;
     int first_angle = -1;
-    u8 wanted_angle = thing_is_monster(thing_type) ? ((thing_index >= 0 && enemy_attack_anim[thing_index]) ? 9 : monster_view_angle_bucket(thing_index)) : 0;
+    u8 wanted_angle = thing_is_monster(thing_type)
+        ? ((thing_index >= 0 && enemy_attack_anim[thing_index]) ? 9
+        : ((thing_index >= 0 && enemy_hit_flash[thing_index]) ? 10 : monster_view_angle_bucket(thing_index)))
+        : 0;
     u8 wanted_anim = thing_is_monster(thing_type) ? (u8)((monster_ai_tick >> 3) & 1) : 0;
     u8 angle_hits = 0;
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {

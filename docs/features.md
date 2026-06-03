@@ -93,6 +93,9 @@ readable.
 - The same monsters also bake front-facing attack frames. A short runtime attack
   timer swaps the visible sprite to those frames when a monster fires, throws a
   projectile, or bites.
+- Front-facing pain frames are baked for the supported monsters and selected
+  during the existing hit-flash window, so weapon impacts read as a sprite
+  reaction rather than only a palette flash.
 - Monsters keep health, awake state, pain flash/pause, attack cooldown, and a
   mutable position layer. Awakened monsters follow a coarse player distance
   field so they can move around converted E1M1 walls instead of getting stuck
