@@ -89,7 +89,7 @@ def make_env(prefix: ToolPrefix | None = None) -> dict[str, str]:
 
 
 def is_msys2() -> bool:
-    return platform.system() == "Windows" and bool(os.environ.get("MSYSTEM"))
+    return bool(os.environ.get("MSYSTEM"))
 
 
 def msys2_prefix() -> str | None:

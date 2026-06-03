@@ -116,6 +116,7 @@ jobs:
           install: >-
             git
             pactoys
+            python
             make
             zip
             unzip
