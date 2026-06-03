@@ -80,6 +80,15 @@ HUD_FACE_FRAMES = tuple(
     + [f"STFEVL{pain}" for pain in range(5)]
     + ["STFDEAD0"]
 )
+HUD_FACE_TUNE_TRANSFORMS = tuple(
+    (
+        bool(index & 0x01),  # swap 16px columns
+        bool(index & 0x02),  # mirror pixels horizontally inside each tile
+        bool(index & 0x04),  # swap 16px rows
+        bool(index & 0x08),  # mirror pixels vertically inside each tile
+    )
+    for index in range(16)
+)
 WEAPON_BASE = HUD_FACE_BASE + len(HUD_FACE_FRAMES) * HUD_FACE_TILES
 WEAPON_STRIPS = 7
 WEAPON_ROWS = 8
@@ -94,7 +103,7 @@ WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
 WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
 DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
-WEAPON_BAKE_Y_ADJUST = -80
+WEAPON_BAKE_Y_ADJUST = -24
 
 
 def encode_tile(px):
@@ -106,7 +115,7 @@ def encode_tile(px):
             p0 = p1 = p2 = p3 = 0
             for pix in range(8):
                 ci = px[y][xo + pix]
-                bit = 7 - pix
+                bit = pix
                 p0 |= ((ci >> 0) & 1) << bit
                 p1 |= ((ci >> 1) & 1) << bit
                 p2 |= ((ci >> 2) & 1) << bit
@@ -636,7 +645,7 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
     return tiles, patch_name, palette, src_w, src_h
 
 
-def stbar_with_face(wad, face_name):
+def stbar_with_face(wad, face_name, face_dx=0, face_dy=0):
     patch_ids = wad.by_name.get("STBAR")
     if not patch_ids:
         raise ValueError("patch 'STBAR' not found in WAD")
@@ -649,38 +658,114 @@ def stbar_with_face(wad, face_name):
     _face_w, _face_h, face_left, face_top = patch_header(face_data)
     face = decode_patch(face_data)
     for fy, face_row in enumerate(face):
-        dy = 0 - face_top + fy
+        dy = face_dy - face_top + fy
         if dy < 0:
             continue
         if dy >= len(stbar):
             break
         for fx, color in enumerate(face_row):
-            dx = 143 - face_left + fx
+            dx = 143 + face_dx - face_left + fx
             if color >= 0 and 0 <= dx < len(stbar[dy]):
                 stbar[dy][dx] = color
     return stbar
 
 
-def hud_face_tiles(iwad, zip_member, face_names, palette):
+def tile_quadrant_probe():
+    tile = tile_blank()
+    values = (1, 5, 10, 15)
+    positions = ((0, 0), (8, 0), (0, 8), (8, 8))
+    for value, (x0, y0) in zip(values, positions):
+        for y in range(8):
+            for x in range(8):
+                tile[y0 + y][x0 + x] = value
+    return tile
+
+
+def tile_bit_order_probe():
+    tile = tile_blank()
+    values = (1, 5, 10, 15)
+    for y in range(16):
+        for x in range(16):
+            tile[y][x] = values[x // 4]
+    return tile
+
+
+def hud_face_probe_tiles(kind):
+    if kind == "solid-order":
+        return [
+            [[value] * 16 for _ in range(16)]
+            for value in (1, 5, 10, 15)
+        ]
+    if kind == "quadrants":
+        return [tile_quadrant_probe() for _ in range(HUD_FACE_TILES)]
+    if kind == "bit-order":
+        return [tile_bit_order_probe() for _ in range(HUD_FACE_TILES)]
+    raise ValueError(f"unknown face probe kind {kind!r}")
+
+
+def hud_face_tile_set(
+    wad,
+    playpal,
+    palette,
+    face_name,
+    face_dx=0,
+    face_dy=0,
+    swap_cols=True,
+    mirror_x=True,
+    swap_rows=False,
+    mirror_y=False,
+):
+    stbar = stbar_with_face(wad, face_name, face_dx, face_dy)
+    tiles = [None] * HUD_FACE_TILES
+    for row in range(HUD_FACE_ROWS):
+        src_row_base = (HUD_FACE_ROWS - 1 - row) if swap_rows else row
+        for col in range(HUD_FACE_COLS):
+            tile = [[0] * 16 for _ in range(16)]
+            src_col_base = (HUD_FACE_COLS - 1 - col) if swap_cols else col
+            src_col = HUD_FACE_COL + src_col_base
+            for y in range(16):
+                sy = src_row_base * 16 + ((15 - y) if mirror_y else y)
+                for x in range(16):
+                    sx = src_col * 16 + ((15 - x) if mirror_x else x)
+                    if 0 <= sy < len(stbar) and 0 <= sx < len(stbar[sy]):
+                        tile[y][x] = quantize_color(stbar[sy][sx], playpal, palette)
+            tiles[row * HUD_FACE_COLS + col] = tile
+    return tiles
+
+
+def hud_face_tiles(iwad, zip_member, face_names, palette, face_tune_grid=False):
     if not iwad:
         return [tile_solid() for _ in range(HUD_FACE_TILES * len(HUD_FACE_FRAMES))], "fallback-faces"
 
     wad = Wad(read_wad(iwad, zip_member))
     playpal = playpal_rgb(wad)
     tiles = []
+    if face_tune_grid:
+        for frame in range(len(HUD_FACE_FRAMES)):
+            if frame == 0:
+                tiles.extend(hud_face_probe_tiles("solid-order"))
+                continue
+            if frame == 1:
+                tiles.extend(hud_face_probe_tiles("bit-order"))
+                continue
+            tune_frame = frame - 2
+            swap_cols, mirror_x, swap_rows, mirror_y = HUD_FACE_TUNE_TRANSFORMS[tune_frame % len(HUD_FACE_TUNE_TRANSFORMS)]
+            tiles.extend(
+                hud_face_tile_set(
+                    wad,
+                    playpal,
+                    palette,
+                    "STFST00",
+                    swap_cols=swap_cols,
+                    mirror_x=mirror_x,
+                    swap_rows=swap_rows,
+                    mirror_y=mirror_y,
+                )
+            )
+        return tiles, "STFST00 extraction-tune"
+
     for face_name in face_names:
-        stbar = stbar_with_face(wad, face_name.upper())
-        for row in range(HUD_FACE_ROWS):
-            for col in range(HUD_FACE_COLS):
-                tile = [[0] * 16 for _ in range(16)]
-                src_col = HUD_FACE_COL + (HUD_FACE_COLS - 1 - col)
-                for y in range(16):
-                    sy = row * 16 + y
-                    for x in range(16):
-                        sx = src_col * 16 + (15 - x)
-                        if 0 <= sy < len(stbar) and 0 <= sx < len(stbar[sy]):
-                            tile[y][x] = quantize_color(stbar[sy][sx], playpal, palette)
-                tiles.append(tile)
+        tiles.extend(hud_face_tile_set(wad, playpal, palette, face_name.upper()))
     return tiles, "+".join(face_names)
 
 
@@ -926,13 +1011,15 @@ def main():
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
     ap.add_argument("--face-frames", default=",".join(HUD_FACE_FRAMES), help="Comma-separated Doom status face patch frames")
+    ap.add_argument("--face-tune-grid", action="store_true", help="Bake face probes and STFST00 orientation variants into the face frame slots")
+    ap.add_argument("--out-dir", default=None, help="Directory for generated c1/c2/s1/m1/v1 ROM blobs")
     ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
     ap.add_argument("--monster-sprites", default="3004:POSSA1,3004:POSSB1,9:SPOSA1,9:SPOSB1,3001:TROOA1,3001:TROOB1,3002:SARGA1,3002:SARGB1,58:SARGA1,58:SARGB1,3003:BOSSA1,3003:BOSSB1,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2035:BAR1A0,2046:BROKA0,9000:BEXPC0,2048:AMMOA0,9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9006:BAL1A0,9007:BAL7A1A5", help="Comma-separated Doom thing_type:sprite_frame pairs")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
 
     here = os.path.dirname(os.path.abspath(__file__))
-    out = os.path.join(here, "..", "rom")
+    out = args.out_dir if args.out_dir else os.path.join(here, "..", "rom")
     os.makedirs(out, exist_ok=True)
 
     wall_tiles, wall_source, wall_palette = wall_texture_tiles(args.iwad, args.zip_member, args.wall_texture)
@@ -948,7 +1035,7 @@ def main():
     face_frames = [item.strip().upper() for item in args.face_frames.split(",") if item.strip()]
     if len(face_frames) != len(HUD_FACE_FRAMES):
         raise ValueError(f"expected {len(HUD_FACE_FRAMES)} status face frames, got {len(face_frames)}")
-    face_tiles, face_source = hud_face_tiles(args.iwad, args.zip_member, face_frames, hud_palette)
+    face_tiles, face_source = hud_face_tiles(args.iwad, args.zip_member, face_frames, hud_palette, args.face_tune_grid)
     ceiling_flat, floor_flat = map_start_flats(args.iwad, args.zip_member, args.map)
     ceiling_source, ceiling_palette, ceiling_tiles = flat_texture_tiles(args.iwad, args.zip_member, ceiling_flat, ceiling=True)
     floor_source, floor_palette, floor_tiles = flat_texture_tiles(args.iwad, args.zip_member, floor_flat)

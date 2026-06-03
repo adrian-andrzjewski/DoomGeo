@@ -80,6 +80,55 @@ $(BUILDDIR)/raycast.o: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
 $(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
 
+FACE_TEST_ROM=$(BUILDDIR)/face-test-rom
+FACE_TEST_ASSET_ROM=$(BUILDDIR)/face-test-assets
+FACE_TEST_GFX_STAMP=$(FACE_TEST_ASSET_ROM)/.generated-gfx
+FACE_TEST_ELF=$(BUILDDIR)/face_test.elf
+FACE_TEST_PROM=$(FACE_TEST_ROM)/202-p1.p1
+FACE_TEST_CART=$(FACE_TEST_ROM)/$(GAMEROM).zip
+
+$(BUILDDIR)/face_test.o: $(GFX_HEADER)
+$(FACE_TEST_ELF): $(BUILDDIR)/face_test.o
+	$(M68KGCC) -o $@ $^ $(NGLDFLAGS) $(LDFLAGS)
+
+$(FACE_TEST_ROM):
+	mkdir -p $@
+
+$(FACE_TEST_ASSET_ROM):
+	mkdir -p $@
+
+$(FACE_TEST_GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(FACE_TEST_ASSET_ROM)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --face-tune-grid --out-dir $(FACE_TEST_ASSET_ROM)
+	touch $@
+
+$(FACE_TEST_PROM): $(FACE_TEST_ELF) | $(FACE_TEST_ROM)
+	$(M68KOBJCOPY) -O binary -S -R .text2 --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab status=none
+
+$(FACE_TEST_ROM)/202-c1.c1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/c1.bin $@
+$(FACE_TEST_ROM)/202-c2.c2: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/c2.bin $@
+$(FACE_TEST_ROM)/202-s1.s1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/s1.bin $@
+$(FACE_TEST_ROM)/202-m1.m1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/m1.bin $@
+$(FACE_TEST_ROM)/202-v1.v1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/v1.bin $@
+
+$(FACE_TEST_ROM)/neogeo.zip: $(ROM)/neogeo.zip | $(FACE_TEST_ROM)
+	cp $< $@
+
+$(FACE_TEST_CART): $(FACE_TEST_PROM) $(FACE_TEST_ROM)/202-c1.c1 $(FACE_TEST_ROM)/202-c2.c2 $(FACE_TEST_ROM)/202-s1.s1 $(FACE_TEST_ROM)/202-m1.m1 $(FACE_TEST_ROM)/202-v1.v1 $(FACE_TEST_ROM)/neogeo.zip
+	cd $(FACE_TEST_ROM) && for i in `ls -1 | grep -v -e \.bin -e \.zip`; do ln -nsf $$i $${i%.*}.bin; done; \
+	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
+
+face-test-rom: $(FACE_TEST_CART)
+
+face-test-gngeo: $(FACE_TEST_CART)
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(FACE_TEST_ROM) $(GAMEROM)
+
+.PHONY: face-test-rom face-test-gngeo
+
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
 	curl -L --fail --output $@ $(FREEDOOM_URL)
