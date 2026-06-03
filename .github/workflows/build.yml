@@ -213,6 +213,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import binascii
+          import glob
           import zipfile
 
           expected_rom = {
@@ -238,9 +239,14 @@ jobs:
                       if actual != crc:
                           raise SystemExit(f"{path}:{name} CRC {actual:08x} != {crc:08x}")
 
-          check("dist/pages/rom/puzzledp.zip", expected_rom)
-          check("dist/pages/rom/asm/puzzledp.zip", expected_rom)
-          check("dist/pages/rom/neogeo.zip", expected_bios)
+          main_rom = glob.glob("dist/pages/rom/web-*/puzzledp.zip")
+          main_bios = glob.glob("dist/pages/rom/web-*/neogeo.zip")
+          asm_rom = glob.glob("dist/pages/rom/asm/web-*/puzzledp.zip")
+          if len(main_rom) != 1 or len(main_bios) != 1 or len(asm_rom) != 1:
+              raise SystemExit(f"unexpected web package layout: {main_rom=} {main_bios=} {asm_rom=}")
+          check(main_rom[0], expected_rom)
+          check(asm_rom[0], expected_rom)
+          check(main_bios[0], expected_bios)
           PY
 
       - name: Upload Pages artifact

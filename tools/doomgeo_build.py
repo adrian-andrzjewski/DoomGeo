@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import binascii
+import hashlib
 import os
 import platform
 import shutil
@@ -348,6 +349,14 @@ def write_zip_entries(path: Path, entries: dict[str, bytes]) -> None:
             archive.writestr(name, data)
 
 
+def web_asset_version(paths: list[Path]) -> str:
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.name.encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
+
+
 def build_fbneo_rom_zip(source_zip: Path, out_zip: Path) -> None:
     import zipfile
 
@@ -394,6 +403,7 @@ def html_page(
     subtitle: str,
     game_url: str,
     download_url: str,
+    bios_url: str,
     extra_link: str | None = None,
 ) -> str:
     extra_action = f'\n      <a class="button" href="{extra_link}">Open ASM Build</a>' if extra_link else ""
@@ -482,7 +492,7 @@ def html_page(
     </div>
     <div class="actions">
       <a class="button" href="__DOWNLOAD_URL__">Download ROM</a>
-      <a class="button" href="rom/neogeo.zip">Download web BIOS</a>
+      <a class="button" href="__BIOS_URL__">Download web BIOS</a>
       __EXTRA_ACTION__
     </div>
   </main>
@@ -491,7 +501,7 @@ def html_page(
     window.EJS_core = "fbneo";
     window.EJS_gameName = "__GAME_NAME__";
     window.EJS_gameUrl = "__GAME_URL__";
-    window.EJS_biosUrl = "rom/neogeo.zip";
+    window.EJS_biosUrl = "__BIOS_URL__";
     window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
     window.EJS_startOnLoaded = false;
   </script>
@@ -504,6 +514,7 @@ def html_page(
         .replace("__SUBTITLE__", subtitle)
         .replace("__GAME_URL__", game_url)
         .replace("__DOWNLOAD_URL__", download_url)
+        .replace("__BIOS_URL__", bios_url)
         .replace("__EXTRA_ACTION__", extra_action)
     )
 
@@ -521,16 +532,23 @@ def build_pages(
         raise BuildError(f"ROM not found: {rom}")
     if not bios.exists():
         raise BuildError(f"BIOS not found: {bios}")
-    rom_out = out_dir / "rom"
+    version_inputs = [rom, bios]
+    if asm_rom_source:
+        version_inputs.append((root / asm_rom_source).resolve())
+    version = web_asset_version(version_inputs)
+    rom_out = out_dir / "rom" / f"web-{version}"
     rom_out.mkdir(parents=True, exist_ok=True)
+    main_rom_url = f"rom/web-{version}/puzzledp.zip"
+    bios_url = f"rom/web-{version}/neogeo.zip"
     build_fbneo_rom_zip(rom, rom_out / "puzzledp.zip")
     build_fbneo_bios_zip(bios, rom_out / "neogeo.zip")
     (out_dir / "index.html").write_text(
         html_page(
             "DoomGeo-MVS",
             "Neo Geo Doom prototype running in a browser through the EmulatorJS FBNeo WebAssembly core.",
-            "rom/puzzledp.zip",
-            "rom/puzzledp.zip",
+            main_rom_url,
+            main_rom_url,
+            bios_url,
             "asm.html" if asm_rom_source else None,
         ),
         encoding="utf-8",
@@ -539,15 +557,17 @@ def build_pages(
         asm_rom = (root / asm_rom_source).resolve()
         if not asm_rom.exists():
             raise BuildError(f"ASM ROM not found: {asm_rom}")
-        asm_out = rom_out / "asm"
+        asm_out = out_dir / "rom" / "asm" / f"web-{version}"
         asm_out.mkdir(parents=True, exist_ok=True)
+        asm_rom_url = f"rom/asm/web-{version}/puzzledp.zip"
         build_fbneo_rom_zip(asm_rom, asm_out / "puzzledp.zip")
         (out_dir / "asm.html").write_text(
             html_page(
                 "DoomGeo-MVS ASM",
                 "A separate 68000 assembly cartridge build with a controller-driven Neo Geo sprite scene.",
-                "rom/asm/puzzledp.zip",
-                "rom/asm/puzzledp.zip",
+                asm_rom_url,
+                asm_rom_url,
+                bios_url,
             ),
             encoding="utf-8",
         )

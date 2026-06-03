@@ -103,10 +103,12 @@ The Pages job consumes the ROM artifact and writes:
 ```text
 dist/pages/index.html
 dist/pages/asm.html
-dist/pages/rom/puzzledp.zip
-dist/pages/rom/asm/puzzledp.zip
-dist/pages/rom/neogeo.zip
+dist/pages/rom/web-<hash>/puzzledp.zip
+dist/pages/rom/web-<hash>/neogeo.zip
+dist/pages/rom/asm/web-<hash>/puzzledp.zip
 ```
 
 The web players use the hosted EmulatorJS loader, set `EJS_core = "fbneo"`, and
-point `EJS_gameUrl`/`EJS_biosUrl` at those generated files.
+point `EJS_gameUrl`/`EJS_biosUrl` at those generated files. The `<hash>` path
+component is generated from the source artifacts so browser/CDN caches cannot
+reuse a stale ROM zip with older CRCs.
