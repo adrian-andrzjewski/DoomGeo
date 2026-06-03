@@ -140,6 +140,8 @@ readable.
 - Opening the minimap redraws the 38x23 fix-layer view incrementally in small
   frame budgets while repainting the player marker, so the map appears without
   the old one-frame stall.
+- Death and exit transitions close the minimap before drawing their compact
+  fix-layer messages, avoiding stale map cells behind terminal status text.
 
 ## Build And Packaging
 

@@ -428,6 +428,7 @@ static void map_bit_set(u8 *bits, u16 index);
 static void draw_minimap_cell(int mx, int my);
 static void draw_minimap_source_cell(int map_x, int map_y);
 static void redraw_minimap_thing_cell(int thing_index);
+static void close_minimap_for_terminal_message(void);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
@@ -1332,8 +1333,12 @@ static void player_take_damage(u16 amount) {
         if (!player_armor) player_armor_class = 0;
     }
     hurt_flash = 5;
-    if (amount >= player_health) player_health = 0;
-    else player_health = (u16)(player_health - amount);
+    if (amount >= player_health) {
+        player_health = 0;
+        close_minimap_for_terminal_message();
+    } else {
+        player_health = (u16)(player_health - amount);
+    }
     if (original_amount && player_health) face_pain_timer = 18;
 }
 
@@ -2113,6 +2118,7 @@ static void check_exit_reached(void) {
         const NgRuntimeExit *exit = &g_runtime_exits[i];
         if (iabs16(px - exit->x_q8) <= WORLD_Q8(128) && iabs16(py - exit->y_q8) <= WORLD_Q8(128)) {
             level_complete = 1;
+            close_minimap_for_terminal_message();
             hide_enemies();
             draw_exit_message();
             return;
@@ -2642,6 +2648,13 @@ static void clear_minimap(void) {
     for (int my = 0; my < MINIMAP_H; my++)
         for (int mx = 0; mx < MINIMAP_W; mx++)
             map_cell(mx, my, 0, FIX_BLANK);
+}
+
+static void close_minimap_for_terminal_message(void) {
+    if (!map_on && !minimap_redraw_active) return;
+    map_on = 0;
+    clear_minimap();
+    prev_px = -1;
 }
 
 /* restore the cell the marker was on, then mark the new one */
