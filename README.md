@@ -15,12 +15,12 @@ drawing pixels.
 
 | Area | Status |
 | --- | --- |
-| WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things. |
+| WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
 | Rendering | 64 sprite-column wall raycaster, Doom wall/door atlases, depth palettes, and sprite-backed floor/ceiling approximation. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, and large red status digits. Digit placement still needs final alignment. |
 | Weapons | Pistol, shotgun, chaingun, and rocket launcher are playable. Fist, chainsaw, plasma rifle, and BFG are still missing. |
 | Gameplay | Pickups, keys, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters, barrels, corpses, drops, projectiles, and compact AI are present. |
-| Map | Fix-layer minimap with player, walls, pickups, threats, doors, and exits. It needs an instant/faster redraw pass. |
+| Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. It needs an instant/faster redraw pass. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
 | Browser build | GitHub Pages package runs the ROM through EmulatorJS/FBNeo, plus a separate 68000 ASM demo build. |
 

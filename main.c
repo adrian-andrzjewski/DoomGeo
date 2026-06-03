@@ -405,11 +405,14 @@ static u8 map_bit_get(const u8 *bits, u16 index);
 static void map_bit_set(u8 *bits, u16 index);
 
 static void draw_minimap_cell(int mx, int my);
+static void draw_minimap_source_cell(int map_x, int map_y);
 static void redraw_minimap_thing_cell(int thing_index);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
 }
+
+#define WORLD_Q8(value) ((value) * MAP_RENDER_SCALE)
 
 static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
 static void player_take_damage(u16 amount);
@@ -811,11 +814,11 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
 static void explode_barrel_at(int thing_index, short x_q8, short y_q8) {
     int px, py;
     rc_player_q8(&px, &py);
-    if (iabs16(px - x_q8) + iabs16(py - y_q8) < 520) player_take_damage(12);
+    if (iabs16(px - x_q8) + iabs16(py - y_q8) < WORLD_Q8(520)) player_take_damage(12);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u16 type = runtime_thing_type(i);
         if (i == thing_index || enemy_dead[i] || !thing_is_shootable(type)) continue;
-        if (iabs16(thing_x_q8[i] - x_q8) + iabs16(thing_y_q8[i] - y_q8) < 520) {
+        if (iabs16(thing_x_q8[i] - x_q8) + iabs16(thing_y_q8[i] - y_q8) < WORLD_Q8(520)) {
             damage_enemy_at(i, thing_is_barrel(type) ? 1 : 5);
         }
     }
@@ -871,8 +874,8 @@ static void forward_impact_effect_point(short *x, short *y) {
     int dir_x, dir_y, plane_x, plane_y;
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
-    *x = (short)(px + ((dir_x * 640) >> 8));
-    *y = (short)(py + ((dir_y * 640) >> 8));
+    *x = (short)(px + ((dir_x * WORLD_Q8(640)) >> 8));
+    *y = (short)(py + ((dir_y * WORLD_Q8(640)) >> 8));
 }
 
 static void spawn_weapon_impact_for_target(int target) {
@@ -896,11 +899,11 @@ static void fire_single_target_damage(u8 damage) {
 static void damage_rocket_radius(short x, short y) {
     int px, py;
     rc_player_q8(&px, &py);
-    if (iabs16(px - x) + iabs16(py - y) < 420) player_take_damage(8);
+    if (iabs16(px - x) + iabs16(py - y) < WORLD_Q8(420)) player_take_damage(8);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u16 type = runtime_thing_type(i);
         if (enemy_dead[i] || !thing_is_shootable(type)) continue;
-        if (iabs16(thing_x_q8[i] - x) + iabs16(thing_y_q8[i] - y) < 560) {
+        if (iabs16(thing_x_q8[i] - x) + iabs16(thing_y_q8[i] - y) < WORLD_Q8(560)) {
             damage_enemy_at(i, thing_is_barrel(type) ? 1 : 8);
         }
     }
@@ -915,7 +918,7 @@ static void rocket_forward_impact(short *x, short *y) {
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
     last_x = px;
     last_y = py;
-    for (int step = 128; step <= 2304; step += 128) {
+    for (int step = WORLD_Q8(128); step <= WORLD_Q8(2304); step += WORLD_Q8(128)) {
         int tx = px + ((dir_x * step) >> 8);
         int ty = py + ((dir_y * step) >> 8);
         if (map_at(tx >> 8, ty >> 8)) {
@@ -993,8 +996,8 @@ static void alert_monsters_by_sound(void) {
         dx = iabs16(px - thing_x_q8[i]);
         dy = iabs16(py - thing_y_q8[i]);
         range = dx + dy;
-        if (range > 2816) continue;
-        if (range > 1024 && !line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
+        if (range > WORLD_Q8(2816)) continue;
+        if (range > WORLD_Q8(1024) && !line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
         enemy_awake[i] = 1;
         enemy_attack_cooldown[i] = 28;
     }
@@ -1127,7 +1130,7 @@ static void update_projectile(void) {
         return;
     }
     rc_player_q8(&px, &py);
-    if (iabs16(px - projectile_x_q8) <= 112 && iabs16(py - projectile_y_q8) <= 112) {
+    if (iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
         player_take_damage(projectile_damage);
         projectile_active = 0;
         return;
@@ -1143,7 +1146,7 @@ static u8 update_close_monster_melee(void) {
         u16 type = runtime_thing_type(thing);
         if (enemy_dead[thing] || !thing_is_monster(type)) continue;
         if (enemy_hit_flash[thing] || enemy_attack_cooldown[thing]) continue;
-        if (iabs16(px - thing_x_q8[thing]) < 288 && iabs16(py - thing_y_q8[thing]) < 288) {
+        if (iabs16(px - thing_x_q8[thing]) < WORLD_Q8(288) && iabs16(py - thing_y_q8[thing]) < WORLD_Q8(288)) {
             player_take_damage(4);
             enemy_awake[thing] = 1;
             enemy_attack_cooldown[thing] = 32;
@@ -1190,7 +1193,7 @@ static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (i == self) continue;
         if (enemy_dead[i] || (!thing_is_monster(runtime_thing_type(i)) && !thing_is_barrel(runtime_thing_type(i)))) continue;
-        if (iabs16(x_q8 - thing_x_q8[i]) < 128 && iabs16(y_q8 - thing_y_q8[i]) < 128) return 1;
+        if (iabs16(x_q8 - thing_x_q8[i]) < WORLD_Q8(128) && iabs16(y_q8 - thing_y_q8[i]) < WORLD_Q8(128)) return 1;
     }
     return 0;
 }
@@ -1199,10 +1202,10 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
     int cx = x_q8 >> 8;
     int cy = y_q8 >> 8;
     if (map_at(cx, cy)) return 0;
-    if (map_at((x_q8 - 52) >> 8, cy)) return 0;
-    if (map_at((x_q8 + 52) >> 8, cy)) return 0;
-    if (map_at(cx, (y_q8 - 52) >> 8)) return 0;
-    if (map_at(cx, (y_q8 + 52) >> 8)) return 0;
+    if (map_at((x_q8 - WORLD_Q8(52)) >> 8, cy)) return 0;
+    if (map_at((x_q8 + WORLD_Q8(52)) >> 8, cy)) return 0;
+    if (map_at(cx, (y_q8 - WORLD_Q8(52)) >> 8)) return 0;
+    if (map_at(cx, (y_q8 + WORLD_Q8(52)) >> 8)) return 0;
     if (monster_step_occupied(self, x_q8, y_q8)) return 0;
     return 1;
 }
@@ -1210,8 +1213,8 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
 static void move_monster_toward(int i, int dx, int dy, int adx, int ady) {
     short x = thing_x_q8[i];
     short y = thing_y_q8[i];
-    short sx = (short)(dx < 0 ? -12 : 12);
-    short sy = (short)(dy < 0 ? -12 : 12);
+    short sx = (short)(dx < 0 ? -WORLD_Q8(12) : WORLD_Q8(12));
+    short sy = (short)(dy < 0 ? -WORLD_Q8(12) : WORLD_Q8(12));
 
     if (adx > ady) {
         if (can_monster_step(i, (short)(x + sx), y)) {
@@ -1240,10 +1243,10 @@ static void update_monster_ai(void) {
         dy = py - thing_y_q8[i];
         adx = iabs16(dx);
         ady = iabs16(dy);
-        if (adx + ady > 3072) continue;
-        if (adx < 288 && ady < 288) continue;
+        if (adx + ady > WORLD_Q8(3072)) continue;
+        if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)) continue;
         if (!enemy_awake[i]) {
-            if (adx + ady > 2304) continue;
+            if (adx + ady > WORLD_Q8(2304)) continue;
             if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
             enemy_awake[i] = 1;
             enemy_attack_cooldown[i] = 28;
@@ -1392,7 +1395,7 @@ static void collect_nearby_pickups(void) {
     rc_player_q8(&px, &py);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
-        if (iabs16(px - thing_x_q8[i]) <= 96 && iabs16(py - thing_y_q8[i]) <= 96) {
+        if (iabs16(px - thing_x_q8[i]) <= WORLD_Q8(96) && iabs16(py - thing_y_q8[i]) <= WORLD_Q8(96)) {
             if (apply_pickup(runtime_thing_type(i))) {
                 if (player_items < 999) player_items++;
                 enemy_dead[i] = 1;
@@ -1600,7 +1603,7 @@ static void check_exit_reached(void) {
     rc_player_q8(&px, &py);
     for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
         const NgRuntimeExit *exit = &g_runtime_exits[i];
-        if (iabs16(px - exit->x_q8) <= 128 && iabs16(py - exit->y_q8) <= 128) {
+        if (iabs16(px - exit->x_q8) <= WORLD_Q8(128) && iabs16(py - exit->y_q8) <= WORLD_Q8(128)) {
             level_complete = 1;
             hide_enemies();
             draw_exit_message();
@@ -1620,7 +1623,7 @@ static int closed_door_at_cell(int cell_x, int cell_y) {
 }
 
 static int trace_closed_door_in_view(int px, int py, int dir_x, int dir_y) {
-    enum { USE_RANGE_Q8 = 896, HUGE_DIST_Q8 = 0x3FFFFFFF };
+    enum { USE_RANGE_Q8 = WORLD_Q8(896), HUGE_DIST_Q8 = 0x3FFFFFFF };
     int map_x = px >> 8;
     int map_y = py >> 8;
     int step_x = dir_x < 0 ? -1 : 1;
@@ -1672,7 +1675,7 @@ static int trace_closed_door_in_view(int px, int py, int dir_x, int dir_y) {
 static void mark_runtime_cell_open(int x, int y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return;
     map_bit_set(g_runtime_cell_open, (u16)(y * MAP_W + x));
-    if (map_on) draw_minimap_cell(x, y);
+    if (map_on) draw_minimap_source_cell(x, y);
 }
 
 static u8 map_cell_runtime_open(int x, int y) {
@@ -1738,7 +1741,7 @@ static void open_door_index(u16 door_index) {
         if (!g_runtime_door_open[i]) opened = 1;
         g_runtime_door_open[i] = 1;
         carve_door_bridge_from_cell(g_runtime_doors[i].x, g_runtime_doors[i].y);
-        if (map_on) draw_minimap_cell(g_runtime_doors[i].x, g_runtime_doors[i].y);
+        if (map_on) draw_minimap_source_cell(g_runtime_doors[i].x, g_runtime_doors[i].y);
     }
     if (opened) {
         door_message_timer = 35;
@@ -1771,7 +1774,7 @@ static void open_nearby_door(void) {
         int dot = to_x * dir_x + to_y * dir_y;
         int lateral = iabs16(to_x * dir_y - to_y * dir_x);
         if (g_runtime_door_open[i]) continue;
-        if (adx > 512 || ady > 512 || dist > 768) continue;
+        if (adx > WORLD_Q8(512) || ady > WORLD_Q8(512) || dist > WORLD_Q8(768)) continue;
         if (dot <= 0 || lateral > dot * 2) continue;
         if (dist < best_score) {
             best = i;
@@ -1973,70 +1976,120 @@ static void force_fix_hud_redraw(void) {
     update_center_message();
 }
 
-static u8 minimap_has_closed_door(int mx, int my) {
+enum {
+    MINIMAP_W = 38,
+    MINIMAP_H = 27
+};
+
+static int minimap_view_x(int map_x) {
+    if (map_x < 0) return 0;
+    if (map_x >= MAP_W) return MINIMAP_W - 1;
+    return (map_x * MINIMAP_W) / MAP_W;
+}
+
+static int minimap_view_y(int map_y) {
+    if (map_y < 0) return 0;
+    if (map_y >= MAP_H) return MINIMAP_H - 1;
+    return (map_y * MINIMAP_H) / MAP_H;
+}
+
+static int minimap_src_x0(int view_x) {
+    return (view_x * MAP_W) / MINIMAP_W;
+}
+
+static int minimap_src_x1(int view_x) {
+    return (((view_x + 1) * MAP_W) + MINIMAP_W - 1) / MINIMAP_W;
+}
+
+static int minimap_src_y0(int view_y) {
+    return (view_y * MAP_H) / MINIMAP_H;
+}
+
+static int minimap_src_y1(int view_y) {
+    return (((view_y + 1) * MAP_H) + MINIMAP_H - 1) / MINIMAP_H;
+}
+
+static void draw_minimap_source_cell(int map_x, int map_y);
+
+static u8 minimap_has_closed_door(int vx, int vy) {
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
         if (g_runtime_door_open[i]) continue;
-        if (g_runtime_doors[i].x == mx && g_runtime_doors[i].y == my) return 1;
+        if (minimap_view_x(g_runtime_doors[i].x) == vx && minimap_view_y(g_runtime_doors[i].y) == vy) return 1;
     }
     return 0;
 }
 
-static u8 minimap_has_exit(int mx, int my) {
+static u8 minimap_has_exit(int vx, int vy) {
     for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
-        if ((g_runtime_exits[i].x_q8 >> 8) == mx && (g_runtime_exits[i].y_q8 >> 8) == my) return 1;
+        if (minimap_view_x(g_runtime_exits[i].x_q8 >> 8) == vx && minimap_view_y(g_runtime_exits[i].y_q8 >> 8) == vy) return 1;
     }
     return 0;
 }
 
-static u8 minimap_has_pickup(int mx, int my) {
+static u8 minimap_has_pickup(int vx, int vy) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
-        if ((thing_x_q8[i] >> 8) == mx && (thing_y_q8[i] >> 8) == my) return 1;
+        if (minimap_view_x(thing_x_q8[i] >> 8) == vx && minimap_view_y(thing_y_q8[i] >> 8) == vy) return 1;
     }
     return 0;
 }
 
-static u8 minimap_has_threat(int mx, int my) {
+static u8 minimap_has_threat(int vx, int vy) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u16 type = runtime_thing_type(i);
         if (enemy_dead[i] || (!thing_is_monster(type) && !thing_is_barrel(type) && !thing_is_explosion(type))) continue;
-        if ((thing_x_q8[i] >> 8) == mx && (thing_y_q8[i] >> 8) == my) return 1;
+        if (minimap_view_x(thing_x_q8[i] >> 8) == vx && minimap_view_y(thing_y_q8[i] >> 8) == vy) return 1;
     }
     return 0;
 }
 
-static void draw_minimap_cell(int mx, int my) {
-    if (minimap_has_threat(mx, my)) {
-        map_cell(mx, my, PAL_MAP_PLAYER, FIX_DEAD_A);
-    } else if (minimap_has_pickup(mx, my)) {
-        map_cell(mx, my, PAL_HUD, (u16)(FIX_DIGIT_BASE + 2));
-    } else if (minimap_has_exit(mx, my)) {
-        map_cell(mx, my, PAL_MAP_PLAYER, FIX_EXIT_BASE);
-    } else if (minimap_has_closed_door(mx, my)) {
-        map_cell(mx, my, PAL_HUD, FIX_DEAD_D);
-    } else if (map_at(mx, my)) {
-        map_cell(mx, my, PAL_MAP_WALL, FIX_SOLID);
+static u8 minimap_view_has_wall(int vx, int vy) {
+    int x0 = minimap_src_x0(vx);
+    int x1 = minimap_src_x1(vx);
+    int y0 = minimap_src_y0(vy);
+    int y1 = minimap_src_y1(vy);
+    for (int y = y0; y < y1; y++)
+        for (int x = x0; x < x1; x++)
+            if (map_at(x, y)) return 1;
+    return 0;
+}
+
+static void draw_minimap_cell(int vx, int vy) {
+    if (minimap_has_threat(vx, vy)) {
+        map_cell(vx, vy, PAL_MAP_PLAYER, FIX_DEAD_A);
+    } else if (minimap_has_pickup(vx, vy)) {
+        map_cell(vx, vy, PAL_HUD, (u16)(FIX_DIGIT_BASE + 2));
+    } else if (minimap_has_exit(vx, vy)) {
+        map_cell(vx, vy, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    } else if (minimap_has_closed_door(vx, vy)) {
+        map_cell(vx, vy, PAL_HUD, FIX_DEAD_D);
+    } else if (minimap_view_has_wall(vx, vy)) {
+        map_cell(vx, vy, PAL_MAP_WALL, FIX_SOLID);
     } else {
-        map_cell(mx, my, 0, FIX_BLANK);
+        map_cell(vx, vy, 0, FIX_BLANK);
     }
+}
+
+static void draw_minimap_source_cell(int map_x, int map_y) {
+    draw_minimap_cell(minimap_view_x(map_x), minimap_view_y(map_y));
 }
 
 static void redraw_minimap_thing_cell(int thing_index) {
     if (!map_on || thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
-    draw_minimap_cell(thing_x_q8[thing_index] >> 8, thing_y_q8[thing_index] >> 8);
+    draw_minimap_source_cell(thing_x_q8[thing_index] >> 8, thing_y_q8[thing_index] >> 8);
     prev_px = -1;
 }
 
 static void draw_minimap(void) {
-    for (int my = 0; my < MAP_H; my++)
-        for (int mx = 0; mx < MAP_W; mx++)
+    for (int my = 0; my < MINIMAP_H; my++)
+        for (int mx = 0; mx < MINIMAP_W; mx++)
             draw_minimap_cell(mx, my);
 }
 
 /* blank just the minimap's fix region */
 static void clear_minimap(void) {
-    for (int my = 0; my < MAP_H; my++)
-        for (int mx = 0; mx < MAP_W; mx++)
+    for (int my = 0; my < MINIMAP_H; my++)
+        for (int mx = 0; mx < MINIMAP_W; mx++)
             map_cell(mx, my, 0, FIX_BLANK);
 }
 
@@ -2045,6 +2098,8 @@ static void update_marker(void) {
     int px, py;
     if (!map_on) return;
     rc_player_cell(&px, &py);
+    px = minimap_view_x(px);
+    py = minimap_view_y(py);
     if (px == prev_px && py == prev_py) return;
     if (prev_px >= 0) {                 /* repaint old cell as its map content */
         draw_minimap_cell(prev_px, prev_py);

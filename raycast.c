@@ -45,7 +45,7 @@ static inline fix recip(fix b) {
 
 #define FBIG (1 << 28)            
 #define FMIN (FONE >> 6)          /* clamp tiny distances                   */
-#define PLAYER_RADIUS (FONE / 5)  /* Doom-ish collision body, in map cells   */
+#define PLAYER_RADIUS ((FONE / 5) * MAP_RENDER_SCALE)  /* Doom-ish collision body */
  
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
@@ -71,7 +71,7 @@ static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 
 static inline int projected_height_from_inv(fix inv_dist) {
-    int h = (int)(((s32)WALLH * inv_dist) >> FBITS);
+    int h = (int)((((s32)WALLH * MAP_RENDER_SCALE) * inv_dist) >> FBITS);
     return h < 1 ? 1 : h;
 }
 
@@ -155,7 +155,7 @@ static void try_move(fix dx, fix dy) {
 
 void rc_input(u8 pressed) {
     enum { UP=1, DOWN=2, LEFT=4, RIGHT=8, A=16 };
-    fix spd = FIX(MOVE_SPEED);
+    fix spd = FIX(MOVE_SPEED * MAP_RENDER_SCALE);
     if (pressed & UP)   try_move(fmul(dirX, spd), fmul(dirY, spd));
     if (pressed & DOWN) try_move(-fmul(dirX, spd), -fmul(dirY, spd));
     if (pressed & A) {                              /* strafe with A held    */
