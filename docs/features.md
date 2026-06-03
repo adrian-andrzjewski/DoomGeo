@@ -105,6 +105,9 @@ readable.
   attack through the Neo Geo sprite fallback path. Player weapon hits also
   target rendered enemies only, keeping combat feedback tied to visible sprites.
   Imps/Barons can launch visible fireball sprites.
+- Visible monsters are clamped to a minimum projected sprite size before
+  drawing, which keeps distant shooters readable under the reduced 20-column
+  wall pass instead of letting them collapse into near-invisible sprite strips.
 - Thing projection falls back to a q8 player/view-vector projection after a
   successful map line-of-sight check, which avoids false sprite culling from the
   coarse wall depth buffer.

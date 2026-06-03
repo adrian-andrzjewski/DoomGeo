@@ -600,6 +600,10 @@ static u8 thing_is_projectile(u16 thing_type) {
     return thing_type == 9006 || thing_type == 9007;
 }
 
+static u8 thing_is_runtime_threat(u16 thing_type) {
+    return thing_is_monster(thing_type) || thing_is_barrel(thing_type) || thing_is_explosion(thing_type);
+}
+
 static u8 thing_is_corpse(u16 thing_type) {
     return thing_type >= 9001 && thing_type <= 9005;
 }
@@ -2296,7 +2300,7 @@ static void load_hud_key_palette(u16 key) {
 static void render_hud_keys(void) {
     static const u8 key_bits[HUD_KEY_COUNT] = {1, 2, 4};
     static const u8 key_row[HUD_KEY_COUNT] = {24, 25, 26};
-    static const u8 key_col = 29;
+    static const u8 key_col = 30;
 
     for (u16 key = 0; key < HUD_KEY_COUNT; key++) {
         u16 spr = (u16)(HUD_KEY_BASE + key);
@@ -2873,6 +2877,8 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
     const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
     const DoomSpriteScale *meta;
 
+    if (thing_is_monster(thing_type) && h > 0 && h < 34) h = 34;
+
     enemies[slot].thing_index = thing_index;
     enemies[slot].sprite_def = def_idx;
     enemies[slot].dist_q8 = dist_q8;
@@ -2966,7 +2972,7 @@ static int select_visible_things(int found, u8 pass) {
         int score;
         int insert_at;
         u16 thing_type = runtime_thing_type(i);
-        u8 is_monster = thing_is_monster(thing_type) || thing_is_barrel(thing_type) || thing_is_explosion(thing_type);
+        u8 is_monster = thing_is_runtime_threat(thing_type);
         if (enemy_dead[i]) continue;
         if (pass == 1 && !is_monster) continue;
         if (pass == 2 && (!thing_is_pickup(thing_type) || !pickup_is_collectible(thing_type))) continue;
