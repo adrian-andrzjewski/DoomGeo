@@ -70,6 +70,8 @@ SDL_VIDEODRIVER=x11 make gngeo
 Useful variants:
 
 ```sh
+make key-test-rom
+make key-test-gngeo
 make DOOM_MAP=E1M2
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
 python3 tools/doomgeo_build.py build --target asm-rom

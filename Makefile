@@ -47,7 +47,8 @@ DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
 GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
-GFX_STAMP=rom/.generated-gfx
+GFX_ROM_DIR?=rom
+GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
 CUSTOM_GENERATE_TARGETS+=doom-assets
 
 # This is an autoconf-generated configuration for your environment
@@ -165,6 +166,12 @@ hud-test-rom: $(HUD_TEST_CART)
 hud-test-gngeo: $(HUD_TEST_CART)
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(HUD_TEST_ROM) $(GAMEROM)
 
+key-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
+
+key-test-gngeo:
+	$(MAKE) gngeo DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
+
 ASM_ROM=$(BUILDDIR)/asm-rom
 ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
 ASM_GFX_STAMP=$(ASM_ASSET_ROM)/.generated-gfx
@@ -243,7 +250,7 @@ doom-assets: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE)
 # latin characters for printing ASCII string, and tiles that are
 # displayed during the attract mode.
 # Note: build rules (%.gif -> %.fix) are defined in Makefile.build
-$(SROM1): rom/s1.bin
+$(SROM1): $(GFX_ROM_DIR)/s1.bin
 
 
 
@@ -255,15 +262,18 @@ $(SROM1): rom/s1.bin
 # By default, this makefile creates CROMs with tiles for displaying a ngdevkit
 # logo during the attract mode.
 # Note: build rules (%.gif -> %.c<1,2>) are defined in Makefile.build
-$(CROM1): rom/c1.bin
-$(CROM2): rom/c2.bin
+$(CROM1): $(GFX_ROM_DIR)/c1.bin
+$(CROM2): $(GFX_ROM_DIR)/c2.bin
 
-rom/c1.bin rom/c2.bin rom/s1.bin rom/m1.bin rom/v1.bin: $(GFX_STAMP)
+$(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin $(GFX_ROM_DIR)/s1.bin $(GFX_ROM_DIR)/m1.bin $(GFX_ROM_DIR)/v1.bin: $(GFX_STAMP)
 	@test -f $@
 
-$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER)
+$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR) $(GFX_ROM_DIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
 	touch $@
+
+$(GFX_ROM_DIR):
+	mkdir -p $@
 
 $(GFX_HEADER): $(GFX_STAMP)
 	@test -f $@

@@ -31,6 +31,10 @@ and emits generated C headers/sources under `build/`:
 
 The ROM does not load a WAD at runtime.
 
+The keycard verification ROM is built through recursive Make targets with
+`DOOM_MAP=E1M2`, `BUILDDIR=build/key-test`, and `ROM=build/key-test-rom`,
+keeping its generated map and object files separate from the default E1M1 build.
+
 ## Graphics Conversion
 
 `tools/gen_gfx.py` creates Neo Geo graphics ROM data directly:

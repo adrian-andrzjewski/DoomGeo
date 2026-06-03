@@ -64,6 +64,10 @@ readable.
 
 - Runtime things include common E1M1 pickups, keys, ammo, armor, health,
   backpack, weapons, barrels, monsters, projectiles, corpses, and explosions.
+- The default ROM starts on shareware `E1M1`; `make key-test-rom` and
+  `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
+  the real red keycard and red locked-door path can be verified without
+  changing the default map.
 - The chainsaw pickup uses the Doom `CSAWA0` world sprite and switches to the
   chainsaw weapon when collected.
 - Pickups update live ammo/health/armor/key/weapon state and remain in the map
