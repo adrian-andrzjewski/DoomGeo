@@ -264,6 +264,23 @@ make
 SDL_VIDEODRIVER=x11 make gngeo
 ```
 
+The automation helper wraps the same Makefile and is the entrypoint used by CI:
+
+```sh
+python3 tools/doomgeo_build.py doctor
+python3 tools/doomgeo_build.py build
+python3 tools/doomgeo_build.py package --out dist/rom
+python3 tools/doomgeo_build.py pages --out dist/pages
+```
+
+`doomgeo-build uninstall` removes the repo-local toolchain under
+`.tools/ngdevkit-local`; `doomgeo-build uninstall --all` also removes cached
+WAD/package downloads. `doomgeo-plan` only tracks `docs/release-plan.md` and
+does not build or modify generated assets. GitHub Actions packages both helpers
+as standalone Linux and Windows binaries, builds the ROM on Ubuntu 24.04, and
+publishes a GitHub Pages bundle that loads the generated cartridge through the
+EmulatorJS FBNeo WebAssembly/asm.js frontend.
+
 `tools/gen_gfx.py` emits the C/S/M/V ROMs directly in the Neo Geo's planar
 format, so the only ngdevkit dependency is the m68k toolchain. See the comments
 at the top of each tool for details.
