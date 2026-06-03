@@ -1705,9 +1705,9 @@ enum {
 
 enum {
     HUD_VALUE_Y = GAME_H - 7 + 11,
-    HUD_AMMO_X = 16 + 17 - 24,
-    HUD_HEALTH_X = 72 + 21 - 32,
-    HUD_FRAG_X = 136 + 27 - 40,
+    HUD_AMMO_X = 16 + 17 - 33,
+    HUD_HEALTH_X = 72 + 21 - 41,
+    HUD_FRAG_X = 136 + 27 - 54,
     HUD_ARMOR_X = 192 + 8 - 16
 };
 
