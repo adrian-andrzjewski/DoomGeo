@@ -154,7 +154,7 @@ static void restore_weapon_palette(void) {
 }
 
 static void restore_counter_palette(void) {
-    for (int i = 1; i < 16; i++) pal_set(0, (u16)i, RGB(31, 25, 2));
+    for (int i = 1; i < 16; i++) pal_set(0, (u16)i, RGB(22, 16, 1));
 }
 
 static void set_weapon_flash_palette(void) {
@@ -1763,14 +1763,14 @@ static void draw_counter_value(u16 col_right, u16 row, u16 value) {
 }
 
 static void render_ammo_counters(void) {
-    draw_counter_value(34, 25, player_ammo);
-    draw_counter_value(38, 25, player_max_bullets);
-    draw_counter_value(34, 26, player_shells);
-    draw_counter_value(38, 26, player_max_shells);
-    draw_counter_value(34, 27, player_rockets);
-    draw_counter_value(38, 27, player_max_rockets);
-    draw_counter_value(34, 28, player_cells);
-    draw_counter_value(38, 28, player_max_cells);
+    draw_counter_value(34, 26, player_ammo);
+    draw_counter_value(38, 26, player_max_bullets);
+    draw_counter_value(34, 27, player_shells);
+    draw_counter_value(38, 27, player_max_shells);
+    draw_counter_value(34, 28, player_rockets);
+    draw_counter_value(38, 28, player_max_rockets);
+    draw_counter_value(34, 29, player_cells);
+    draw_counter_value(38, 29, player_max_cells);
 }
 
 static u8 face_frame_for_health(void);
