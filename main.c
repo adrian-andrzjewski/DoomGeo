@@ -226,14 +226,6 @@ static void set_hurt_palettes(void) {
             pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)i, RGB(28, 2, 1));
         }
     }
-    for (int p = 0; p < DEPTH_BANDS * 2; p++) {
-        for (int i = 1; i < 16; i++) pal_set((u16)(PAL_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
-        for (int i = 1; i < 16; i++) pal_set((u16)(PAL_DOOR_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
-        for (u16 alt = 0; alt < WALL_ALT_TEXTURE_COUNT; alt++) {
-            u16 base = (u16)(PAL_WALL_ALT_DEPTH_BASE + alt * PAL_WALL_ALT_DEPTH_STRIDE);
-            for (int i = 1; i < 16; i++) pal_set((u16)(base + p), (u16)i, RGB(28, 2, 2));
-        }
-    }
 }
 
 static void update_hurt_flash(void) {
@@ -880,6 +872,24 @@ static u8 weapon_target_project(int thing, int *sx, int *h, int *dist_q8) {
 static int best_visible_enemy(void) {
     int best_thing = -1;
     int best_score = 9999;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        int thing = enemies[slot].thing_index;
+        int center_x;
+        int score;
+        if (thing < 0) continue;
+        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
+        if (enemy_dead[thing]) continue;
+        center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
+        if (iabs16(center_x - SCRW / 2) > 76 && enemies[slot].screen_h < 112) continue;
+        score = iabs16(center_x - SCRW / 2) + (enemies[slot].dist_q8 >> 7) - (enemies[slot].screen_h >> 2);
+        if (score < best_score) {
+            best_score = score;
+            best_thing = thing;
+        }
+    }
+    if (best_thing >= 0) return best_thing;
+
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
         int sx, h, dist_q8;
         int score;
@@ -2078,6 +2088,7 @@ static void render_hud_keys(void) {
         u16 spr = (u16)(HUD_KEY_BASE + key);
         scb2(spr, 0x0F, 0x00);
         scb3(spr, SCRH + 32, 0, 1);
+        scb4(spr, 0);
         fix_poke(key_col, key_row[key], 0, FIX_BLANK);
         if (player_keys & key_bits[key]) {
             load_hud_key_palette(key);
@@ -2422,6 +2433,7 @@ static void init_hud(void) {
     }
     hud_face_frame = 0xFF;
     set_hud_face_frame(face_frame_for_health());
+    render_hud_keys();
 }
 
 static void set_weapon_frame(u8 frame) {
