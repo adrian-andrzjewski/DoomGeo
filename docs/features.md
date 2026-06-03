@@ -114,6 +114,9 @@ readable.
 - Barrels explode and can apply radius damage.
 - Killed monsters show a short three-step Doom death sequence before settling
   into corpse frames or drops where implemented.
+- Former humans and shotgun guys now spawn separate dynamic clip/shotgun drops,
+  so their corpse remains visible while the dropped pickup can still be
+  collected.
 
 ## Map And Level Flow
 

@@ -314,6 +314,10 @@ static u16 death_anim_drop_type[NG_RUNTIME_THING_COUNT];
 static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
+static u8  dynamic_drop_active[8];
+static u16 dynamic_drop_type[8];
+static short dynamic_drop_x_q8[8];
+static short dynamic_drop_y_q8[8];
 static u8 secret_found_bits[MAP_SECRET_BYTES ? MAP_SECRET_BYTES : 1];
 static u8 monster_path_dist[MAP_H][MAP_W];
 static u16 monster_path_queue[MAP_W * MAP_H];
@@ -804,6 +808,23 @@ static u8 monster_hp(int thing_index) {
     return enemy_hp[thing_index];
 }
 
+static void spawn_dynamic_drop(u16 thing_type, short x_q8, short y_q8) {
+    u8 slot = 0;
+    if (!thing_type) return;
+    for (u8 i = 0; i < 8; i++) {
+        if (!dynamic_drop_active[i]) {
+            slot = i;
+            break;
+        }
+    }
+    dynamic_drop_active[slot] = 1;
+    dynamic_drop_type[slot] = thing_type;
+    dynamic_drop_x_q8[slot] = x_q8;
+    dynamic_drop_y_q8[slot] = y_q8;
+    bg_scroll_key = 0xFFFFFFFFUL;
+    hide_enemies();
+}
+
 static int first_sprite_def_for_type(u16 thing_type) {
     int first = -1;
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
@@ -1244,8 +1265,7 @@ static void update_enemy_hit_flash(void) {
             if (!death_anim_timer[i]) {
                 thing_type_override[i] = death_anim_final_type[i];
                 if (death_anim_drop_type[i]) {
-                    death_drop_type[i] = death_anim_drop_type[i];
-                    death_drop_timer[i] = 18;
+                    spawn_dynamic_drop(death_anim_drop_type[i], thing_x_q8[i], thing_y_q8[i]);
                 } else {
                     death_drop_type[i] = 0;
                     death_drop_timer[i] = 0;
@@ -1834,6 +1854,17 @@ static void collect_nearby_pickups(void) {
                 if (player_items < 999) player_items++;
                 enemy_dead[i] = 1;
                 redraw_minimap_thing_cell(i);
+                hide_enemies();
+            }
+        }
+    }
+    for (u8 i = 0; i < 8; i++) {
+        if (!dynamic_drop_active[i]) continue;
+        if (iabs16(px - dynamic_drop_x_q8[i]) <= WORLD_Q8(96) && iabs16(py - dynamic_drop_y_q8[i]) <= WORLD_Q8(96)) {
+            if (apply_pickup(dynamic_drop_type[i])) {
+                if (player_items < 999) player_items++;
+                dynamic_drop_active[i] = 0;
+                bg_scroll_key = 0xFFFFFFFFUL;
                 hide_enemies();
             }
         }
@@ -2480,6 +2511,10 @@ static u8 minimap_has_pickup(int vx, int vy) {
         if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
         if (minimap_view_x(thing_x_q8[i] >> 8) == vx && minimap_view_y(thing_y_q8[i] >> 8) == vy) return 1;
     }
+    for (u8 i = 0; i < 8; i++) {
+        if (!dynamic_drop_active[i]) continue;
+        if (minimap_view_x(dynamic_drop_x_q8[i] >> 8) == vx && minimap_view_y(dynamic_drop_y_q8[i] >> 8) == vy) return 1;
+    }
     return 0;
 }
 
@@ -3002,6 +3037,10 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
 
 typedef struct ThingCandidate {
     int thing_index;
+    signed char dynamic_index;
+    u16 thing_type;
+    short x_q8;
+    short y_q8;
     int sx;
     int h;
     int dist_q8;
@@ -3010,22 +3049,33 @@ typedef struct ThingCandidate {
 
 static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, short x, short y) {
     for (int slot = 0; slot < count; slot++) {
-        int thing = candidates[slot].thing_index;
-        if (thing >= 0 && thing_x_q8[thing] == x && thing_y_q8[thing] == y) return 1;
+        if (candidates[slot].x_q8 == x && candidates[slot].y_q8 == y) return 1;
     }
     return 0;
+}
+
+static void insert_thing_candidate(ThingCandidate *candidates, int *count, const ThingCandidate *candidate) {
+    int insert_at = *count;
+    while (insert_at > 0 && candidate->score < candidates[insert_at - 1].score) insert_at--;
+    if (insert_at >= ENEMY_VISIBLE_COUNT) return;
+    for (int j = ENEMY_VISIBLE_COUNT - 1; j > insert_at; j--) candidates[j] = candidates[j - 1];
+    candidates[insert_at] = *candidate;
+    if (*count < ENEMY_VISIBLE_COUNT) (*count)++;
 }
 
 static int select_visible_things(int found, u8 pass) {
     ThingCandidate candidates[ENEMY_VISIBLE_COUNT];
     int count = 0;
     if (found >= ENEMY_VISIBLE_COUNT) return found;
-    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) candidates[slot].thing_index = -1;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        candidates[slot].thing_index = -1;
+        candidates[slot].dynamic_index = -1;
+    }
 
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int sx, h, dist_q8;
         int score;
-        int insert_at;
+        ThingCandidate candidate;
         u16 thing_type = runtime_thing_type(i);
         u8 is_monster = thing_is_runtime_threat(thing_type);
         if (enemy_dead[i]) continue;
@@ -3041,20 +3091,53 @@ static int select_visible_things(int found, u8 pass) {
         if (sx < -48 || sx > SCRW + 48) continue;
 
         score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
-        insert_at = count;
-        while (insert_at > 0 && score < candidates[insert_at - 1].score) insert_at--;
-        if (insert_at >= ENEMY_VISIBLE_COUNT) continue;
-        for (int j = ENEMY_VISIBLE_COUNT - 1; j > insert_at; j--) candidates[j] = candidates[j - 1];
-        candidates[insert_at].thing_index = i;
-        candidates[insert_at].sx = sx;
-        candidates[insert_at].h = h;
-        candidates[insert_at].dist_q8 = dist_q8;
-        candidates[insert_at].score = score;
-        if (count < ENEMY_VISIBLE_COUNT) count++;
+        candidate.thing_index = i;
+        candidate.dynamic_index = -1;
+        candidate.thing_type = thing_type;
+        candidate.x_q8 = thing_x_q8[i];
+        candidate.y_q8 = thing_y_q8[i];
+        candidate.sx = sx;
+        candidate.h = h;
+        candidate.dist_q8 = dist_q8;
+        candidate.score = score;
+        insert_thing_candidate(candidates, &count, &candidate);
+    }
+
+    if (pass == 2 || pass == 4) {
+        for (u8 i = 0; i < 8; i++) {
+            int sx, h, dist_q8;
+            int score;
+            ThingCandidate candidate;
+            u16 thing_type = dynamic_drop_type[i];
+            if (!dynamic_drop_active[i]) continue;
+            if (pass == 2 && !pickup_is_collectible(thing_type)) continue;
+            if (pass == 4 && pickup_is_collectible(thing_type)) continue;
+            if (candidate_coord_selected(candidates, count, dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
+            if (!rc_project_point(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) {
+                if (!player_line_of_sight_to(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
+                if (!project_point_q8(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) continue;
+            }
+            if (sx < -48 || sx > SCRW + 48) continue;
+            score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
+            candidate.thing_index = -1;
+            candidate.dynamic_index = (signed char)i;
+            candidate.thing_type = thing_type;
+            candidate.x_q8 = dynamic_drop_x_q8[i];
+            candidate.y_q8 = dynamic_drop_y_q8[i];
+            candidate.sx = sx;
+            candidate.h = h;
+            candidate.dist_q8 = dist_q8;
+            candidate.score = score;
+            insert_thing_candidate(candidates, &count, &candidate);
+        }
     }
 
     for (int i = 0; i < count && found < ENEMY_VISIBLE_COUNT; i++) {
-        render_thing_slot((u16)found, candidates[i].thing_index, candidates[i].sx, candidates[i].h, candidates[i].dist_q8);
+        if (candidates[i].dynamic_index >= 0) {
+            render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, 0);
+        } else {
+            render_thing_slot((u16)found, candidates[i].thing_index, candidates[i].sx, candidates[i].h, candidates[i].dist_q8);
+        }
         found++;
     }
     return found;
@@ -3172,6 +3255,12 @@ static void restart_level(void) {
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
     for (u16 i = 0; i < MAP_SECRET_BYTES; i++) secret_found_bits[i] = 0;
+    for (u8 i = 0; i < 8; i++) {
+        dynamic_drop_active[i] = 0;
+        dynamic_drop_type[i] = 0;
+        dynamic_drop_x_q8[i] = 0;
+        dynamic_drop_y_q8[i] = 0;
+    }
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         enemy_dead[i] = 0;
         enemy_hp[i] = 0;
