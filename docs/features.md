@@ -162,6 +162,10 @@ readable.
   scanning every converted runtime thing. It still requires close world
   distance, projection, screen position, and line-of-sight before applying
   damage.
+- Player projectile hit tests and monster movement occupancy now use coarse
+  map-cell rejection before exact q8 distance and type checks. This preserves
+  the exact hit/separation thresholds while avoiding most all-thing work for
+  objects outside the local collision area.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.

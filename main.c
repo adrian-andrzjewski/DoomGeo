@@ -1852,13 +1852,22 @@ static void clear_projectile(void) {
 
 static int player_projectile_hit_shootable(void) {
     short hit_range_q8;
+    int projectile_cell_x;
+    int projectile_cell_y;
+    int coarse_cells;
     if (!projectile_from_player) return -1;
     if (projectile_type == 9006) hit_range_q8 = WORLD_Q8(112);
     else if (projectile_type == 9007) hit_range_q8 = WORLD_Q8(160);
     else if (projectile_type == 9008) hit_range_q8 = WORLD_Q8(144);
     else return -1;
+    projectile_cell_x = projectile_x_q8 >> 8;
+    projectile_cell_y = projectile_y_q8 >> 8;
+    coarse_cells = (hit_range_q8 + 255) >> 8;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-        u16 type = runtime_thing_type(i);
+        u16 type;
+        if (iabs16((thing_x_q8[i] >> 8) - projectile_cell_x) > coarse_cells) continue;
+        if (iabs16((thing_y_q8[i] >> 8) - projectile_cell_y) > coarse_cells) continue;
+        type = runtime_thing_type(i);
         if (enemy_dead[i] || !thing_is_shootable(type)) continue;
         if (iabs16(thing_x_q8[i] - projectile_x_q8) <= hit_range_q8
             && iabs16(thing_y_q8[i] - projectile_y_q8) <= hit_range_q8) {
@@ -2034,8 +2043,13 @@ static void update_monster_damage(void) {
 }
 
 static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
+    int cell_x = x_q8 >> 8;
+    int cell_y = y_q8 >> 8;
+    enum { MONSTER_SEPARATION_CELLS = (MONSTER_SEPARATION_Q8 + 255) >> 8 };
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (i == self) continue;
+        if (iabs16((thing_x_q8[i] >> 8) - cell_x) > MONSTER_SEPARATION_CELLS) continue;
+        if (iabs16((thing_y_q8[i] >> 8) - cell_y) > MONSTER_SEPARATION_CELLS) continue;
         if (enemy_dead[i] || (!thing_is_monster(runtime_thing_type(i)) && !thing_is_barrel(runtime_thing_type(i)))) continue;
         if (iabs16(x_q8 - thing_x_q8[i]) < MONSTER_SEPARATION_Q8 && iabs16(y_q8 - thing_y_q8[i]) < MONSTER_SEPARATION_Q8) return 1;
     }
