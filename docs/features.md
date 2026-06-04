@@ -75,8 +75,9 @@ readable.
   bake the real art through the same C-ROM path.
 - Pistol/chaingun use compact hitscan-style targeting.
 - Plasma rifle uses rapid cell-ammo visible-target damage.
-- Fist/chainsaw use close-range rendered-slot melee checks, so they only hit
-  visible nearby targets.
+- Fist/chainsaw use a close-range rendered-slot melee check matched to the
+  runtime monster distance scale, so they can hit visible nearby targets without
+  reaching through walls or off-screen things.
 - Shotgun uses readable rendered slots for spread damage and can hit multiple
   visible targets.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
@@ -116,6 +117,9 @@ readable.
   enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
   visible imp in front of the player, and equips the shotgun while leaving the
   normal cart path unchanged.
+- `make melee-test-rom` and `make melee-test-gngeo` build an isolated close-
+  combat verification ROM. It compiles with `DOOM_MELEE_TEST`, equips the
+  chainsaw, and places a visible imp inside the corrected player melee range.
 - `make monster-gallery-rom` and `make monster-gallery-gngeo` build an isolated
   E1M1 living-enemy gallery. It compiles with `DOOM_MONSTER_GALLERY_TEST` and
   places shareware former human, shotgun guy, imp, demon, Baron, and barrel

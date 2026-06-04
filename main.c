@@ -1418,6 +1418,7 @@ static void fire_single_target_damage(u8 damage) {
 }
 
 static void fire_melee_damage(u8 damage) {
+    enum { PLAYER_MELEE_RANGE_Q8 = WORLD_Q8(320) };
     int best_thing = -1;
     int best_score = 9999;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
@@ -1426,7 +1427,7 @@ static void fire_melee_damage(u8 damage) {
         int score;
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
-        if (enemies[slot].dist_q8 > WORLD_Q8(2)) continue;
+        if (enemies[slot].dist_q8 > PLAYER_MELEE_RANGE_Q8) continue;
         if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
         if (iabs16(center_x - SCRW / 2) > 80) continue;
@@ -2107,7 +2108,7 @@ static void update_monster_ai(void) {
     }
 }
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -2197,6 +2198,27 @@ static void configure_combat_test(void) {
     player_shells = 24;
     current_weapon = WEAPON_SHOTGUN;
     place_test_imp();
+}
+#endif
+
+#ifdef DOOM_MELEE_TEST
+static void configure_melee_test(void) {
+    player_has_chainsaw = 1;
+    current_weapon = WEAPON_CHAINSAW;
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+#if NG_RUNTIME_THING_COUNT > 0
+    {
+        int px, py;
+        if (place_test_thing(0, 3001, WORLD_Q8(300), 0)) {
+            rc_player_q8(&px, &py);
+            enemy_hp[0] = monster_start_hp(3001);
+            enemy_awake[0] = 1;
+            enemy_attack_cooldown[0] = 80;
+            set_monster_facing_from_delta(0, px - thing_x_q8[0], py - thing_y_q8[0]);
+        }
+    }
+#endif
 }
 #endif
 
@@ -4256,6 +4278,9 @@ static void restart_level(void) {
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
 #endif
+#ifdef DOOM_MELEE_TEST
+    configure_melee_test();
+#endif
 #ifdef DOOM_MONSTER_GALLERY_TEST
     configure_monster_gallery_test();
 #endif
@@ -4293,6 +4318,9 @@ int main(void) {
     init_runtime_things();
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
+#endif
+#ifdef DOOM_MELEE_TEST
+    configure_melee_test();
 #endif
 #ifdef DOOM_MONSTER_GALLERY_TEST
     configure_monster_gallery_test();

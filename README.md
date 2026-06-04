@@ -34,17 +34,17 @@ drawing pixels.
 | --- | --- |
 | ![Current HUD status bar with Doom face, weapon indicators, key slots, and counters](docs/screenshots/doomgeo-aes-current-hud.png) | ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
 
-| Combat test ROM | Monster gallery ROM |
+| Combat test ROM | Melee test ROM |
 | --- | --- |
-| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
+| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) |
 
-| Arsenal test ROM | Death/drop test ROM |
+| Monster gallery ROM | Arsenal test ROM |
 | --- | --- |
-| ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) |
+| ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) | ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) |
 
-| Powerup test ROM |
+| Death/drop test ROM | Powerup test ROM |
 | --- | --- |
-| ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-aes-powerup-test.png) |
+| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) | ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-aes-powerup-test.png) |
 
 | Native Doom comparison |
 | --- |
