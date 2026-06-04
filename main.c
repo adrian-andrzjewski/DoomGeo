@@ -2174,7 +2174,7 @@ static void update_monster_ai(void) {
     }
 }
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -2205,6 +2205,7 @@ static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
     enemy_attack_cooldown[thing] = 0;
     enemy_hit_flash[thing] = 0;
     enemy_attack_anim[thing] = 0;
+    enemy_ranged_readable_ticks[thing] = 0;
     return 1;
 #else
     (void)thing;
@@ -2256,6 +2257,37 @@ static void place_powerup_test_imp(void) {
 #endif
 }
 #endif
+#endif
+
+#ifdef DOOM_KEY_DOOR_TEST
+static void configure_key_door_test(void) {
+#if NG_RUNTIME_THING_COUNT > 0
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        enemy_dead[i] = 1;
+        enemy_hp[i] = 0;
+        enemy_awake[i] = 0;
+        enemy_attack_cooldown[i] = 0;
+        enemy_attack_anim[i] = 0;
+        enemy_ranged_readable_ticks[i] = 0;
+        thing_type_override[i] = 0;
+    }
+
+    /* E1M2 red locked-door group sits west of this open cell cluster. */
+    rc_set_pose_q8((short)((32 << 8) + 128), (short)((32 << 8) + 128), -256, 0);
+    thing_x_q8[0] = (short)((30 << 8) + 128);
+    thing_y_q8[0] = (short)((31 << 8) + 128);
+    thing_type_override[0] = 13; /* red keycard */
+    enemy_dead[0] = 0;
+
+    player_keys = 0;
+    shown_keys = 0xFF;
+    key_message_timer = 0;
+    missing_key_bits = 0;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+#endif
+}
 #endif
 
 #ifdef DOOM_COMBAT_TEST
@@ -4408,6 +4440,9 @@ static void restart_level(void) {
 #ifdef DOOM_POWERUP_TEST
     configure_powerup_test();
 #endif
+#ifdef DOOM_KEY_DOOR_TEST
+    configure_key_door_test();
+#endif
     init_background();
     init_walls();
     init_hud();
@@ -4448,6 +4483,9 @@ int main(void) {
 #endif
 #ifdef DOOM_POWERUP_TEST
     configure_powerup_test();
+#endif
+#ifdef DOOM_KEY_DOOR_TEST
+    configure_key_door_test();
 #endif
     compute_level_totals();
 

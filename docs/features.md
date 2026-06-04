@@ -124,6 +124,10 @@ readable.
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
   changing the default map.
+- `make key-door-test-rom` and `make key-door-test-gngeo` build a focused E1M2
+  key/door verification ROM. It starts beside the real red locked-door group,
+  faces the door, hides unrelated things, and places a real WAD red keycard in
+  front of the player so pickup and locked-door behavior can be tested quickly.
 - `make combat-test-rom` and `make combat-test-gngeo` build an isolated E1M1
   enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
   visible imp in front of the player, and equips the shotgun while leaving the

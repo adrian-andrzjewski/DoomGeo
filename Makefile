@@ -175,6 +175,14 @@ key-test-gngeo:
 	$(MAKE) key-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-test-rom $(GAMEROM)
 
+key-door-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-door-test ROM=build/key-door-test-rom GFX_ROM_DIR=build/key-door-test-assets CFLAGS="-Ibuild/key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
+	cp $(ROM)/neogeo.zip build/key-door-test-rom/neogeo.zip
+
+key-door-test-gngeo:
+	$(MAKE) key-door-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-door-test-rom $(GAMEROM)
+
 combat-test-rom:
 	$(MAKE) cart BUILDDIR=build/combat-test ROM=build/combat-test-rom GFX_ROM_DIR=build/combat-test-assets CFLAGS="-Ibuild/combat-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_COMBAT_TEST"
 	cp $(ROM)/neogeo.zip build/combat-test-rom/neogeo.zip
@@ -277,7 +285,7 @@ asm-gngeo: $(ASM_CART)
 smoke-screenshot:
 	tools/smoke_capture.sh
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo combat-test-rom combat-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
