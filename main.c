@@ -2293,12 +2293,16 @@ static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
     enum { MONSTER_SEPARATION_CELLS = (MONSTER_SEPARATION_Q8 + 255) >> 8 };
     for (u16 si = 0; si < thing_shootable_count; si++) {
         int i = thing_shootable_indices[si];
+        short thing_x;
+        short thing_y;
         if (i == self) continue;
-        if (iabs16((thing_x_q8[i] >> 8) - cell_x) > MONSTER_SEPARATION_CELLS) continue;
-        if (iabs16((thing_y_q8[i] >> 8) - cell_y) > MONSTER_SEPARATION_CELLS) continue;
+        thing_x = thing_x_q8[i];
+        thing_y = thing_y_q8[i];
+        if (iabs16((thing_x >> 8) - cell_x) > MONSTER_SEPARATION_CELLS) continue;
+        if (iabs16((thing_y >> 8) - cell_y) > MONSTER_SEPARATION_CELLS) continue;
         if (enemy_dead[i]) continue;
         if (!runtime_thing_is_shootable(i)) continue;
-        if (iabs16(x_q8 - thing_x_q8[i]) < MONSTER_SEPARATION_Q8 && iabs16(y_q8 - thing_y_q8[i]) < MONSTER_SEPARATION_Q8) return 1;
+        if (iabs16(x_q8 - thing_x) < MONSTER_SEPARATION_Q8 && iabs16(y_q8 - thing_y) < MONSTER_SEPARATION_Q8) return 1;
     }
     return 0;
 }
