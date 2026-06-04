@@ -82,7 +82,9 @@ readable.
   runtime monster distance scale, so they can hit visible nearby targets without
   reaching through walls or off-screen things.
 - Shotgun uses readable rendered slots for spread damage and can hit multiple
-  visible targets.
+  visible targets. Its pump/reload psprite frames are centered in the offline
+  Neo Geo weapon canvas so the WAD offsets do not push the hand/gun art into a
+  left-edge-only strip during the fire cycle.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
 - BFG spends 40 cells, launches a visible forward projectile using the current
   baked fireball sprite path, then detonates when it hits a wall, crosses a

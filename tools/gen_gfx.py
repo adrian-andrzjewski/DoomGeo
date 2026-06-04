@@ -120,6 +120,7 @@ WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
 DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
 WEAPON_BAKE_Y_ADJUST = 0
+WEAPON_CENTERED_FRAMES = {"SHTGB0", "SHTGC0", "SHTGD0"}
 
 
 def encode_tile(px):
@@ -841,7 +842,7 @@ def weapon_tiles(iwad, zip_member, patch_names):
     tiles = []
     max_w = max(len(patch[0]) for _frame_name, frame_patches in frames for _name, patch, _left, _top in frame_patches)
     max_h = max(len(patch) for _frame_name, frame_patches in frames for _name, patch, _left, _top in frame_patches)
-    for _frame_name, frame_patches in frames:
+    for frame_name, frame_patches in frames:
         canvas = [[-1] * dst_w for _ in range(dst_h)]
 
         for _name, patch, left, top in frame_patches:
@@ -852,6 +853,8 @@ def weapon_tiles(iwad, zip_member, patch_names):
             screen_y = DOOM_PSPR_SY - top
             x0 = screen_x - WEAPON_SCREEN_LEFT
             y0 = screen_y - WEAPON_SCREEN_TOP + WEAPON_BAKE_Y_ADJUST
+            if frame_name in WEAPON_CENTERED_FRAMES:
+                x0 = (dst_w - len(patch[0])) // 2
 
             for y, row in enumerate(patch):
                 dy = y0 + y
