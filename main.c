@@ -3701,11 +3701,12 @@ static int render_visible_projectile(int found) {
     return found;
 }
 
-static void render_visible_impact(u16 slot) {
+static int render_visible_impact(int found) {
     int sx, h, dist_q8;
-    if (!impact_active) return;
-    if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return;
-    render_type_slot(slot, -1, 9000, sx, h, dist_q8, 0, 0);
+    if (!impact_active || found >= ENEMY_VISIBLE_COUNT) return found;
+    if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return found;
+    if (render_type_slot((u16)found, -1, 9000, sx, h, dist_q8, 0, 0)) return found + 1;
+    return found;
 }
 
 static void update_enemy(void) {
@@ -3717,8 +3718,8 @@ static void update_enemy(void) {
     found = select_visible_things(found, 2);
     found = select_visible_things(found, 3);
     found = select_visible_things(found, 4);
+    found = render_visible_impact(found);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
-    render_visible_impact((u16)(ENEMY_VISIBLE_COUNT - 1));
 }
 
 static void restart_level(void) {

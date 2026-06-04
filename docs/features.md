@@ -186,6 +186,8 @@ readable.
   offscreen, or fully clipped sprites no longer consume one of the eight visible
   world-sprite slots, so the renderer keeps scanning for the next visible
   monster, pickup, projectile, corpse, or drop.
+- Impact bursts are rendered only when a free world-sprite slot remains, so shot
+  feedback cannot overwrite a selected monster, pickup, corpse, or drop slot.
 - Monster visibility tests now count readable on-screen slots, not merely
   projected-but-edge-clipped sprite metadata. Ranged attack gating is stricter
   than drawing, while close melee checks world distance plus line-of-sight so
