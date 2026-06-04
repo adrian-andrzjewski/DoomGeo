@@ -65,6 +65,11 @@ SMOKE_OUTPUT=.tools/screens/latest/combat-test.png \
 make smoke-screenshot
 ```
 
+For the broad playable-feature regression pass, run
+`tools/smoke_gameplay.sh`. It chains the verified enemy visibility, key-door,
+weapon shortcut, death/drop, and powerup smoke helpers into one command and
+refreshes the same screenshots under `.tools/screens/latest/`.
+
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
 death/corpse feedback frame. Override `COMBAT_DEATH_WAIT_SECS` if an emulator

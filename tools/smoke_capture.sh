@@ -27,11 +27,16 @@ require_cmd() {
 window_for_gngeo() {
     local wid=""
     for _ in $(seq 1 100); do
-        wid="$(DISPLAY="$DISPLAY_VALUE" xdotool search --class ngdevkit-gngeo 2>/dev/null | tail -n 1 || true)"
-        if [ -n "$wid" ] && DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" >/dev/null 2>&1; then
-            echo "$wid"
-            return 0
-        fi
+        for wid in $(DISPLAY="$DISPLAY_VALUE" xdotool search --class ngdevkit-gngeo 2>/dev/null || true) \
+                   $(DISPLAY="$DISPLAY_VALUE" xdotool search --name 'Gngeo' 2>/dev/null || true); do
+            if [ -z "$wid" ] || ! DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" >/dev/null 2>&1; then
+                continue
+            fi
+            if DISPLAY="$DISPLAY_VALUE" xdotool getwindowname "$wid" 2>/dev/null | grep -qi 'Gngeo'; then
+                echo "$wid"
+                return 0
+            fi
+        done
         sleep 0.1
     done
     echo "ngdevkit-gngeo window not found" >&2
@@ -98,8 +103,9 @@ wid="$(window_for_gngeo)"
 if [ -n "$WORKSPACE" ]; then
     DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
 fi
+DISPLAY="$DISPLAY_VALUE" xdotool windowraise "$wid" >/dev/null 2>&1 || true
 DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-sleep 0.2
+sleep 0.5
 
 xwd -silent -id "$wid" -out "$XWD_OUT"
 convert "$XWD_OUT" "$OUT"

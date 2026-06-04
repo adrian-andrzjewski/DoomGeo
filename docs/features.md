@@ -138,6 +138,13 @@ readable.
 - Runtime things include common E1M1 pickups, keys, bullet/shell/rocket/cell
   ammo, armor, health, backpack, standard Doom powerups, weapons, barrels,
   monsters, projectiles, corpses, and explosions.
+- Visible thing selection uses one priority-ranked projection pass for
+  monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
+  This preserves the previous Doom-like visibility priority while avoiding the
+  older five full scans of `NG_RUNTIME_THING_COUNT` every frame.
+- `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
+  weapon shortcut, death/drop, and powerup screenshot passes for a broad local
+  playable-feature regression check.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
