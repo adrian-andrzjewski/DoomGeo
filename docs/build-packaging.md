@@ -84,9 +84,10 @@ still show the same health value, proving hidden or offscreen monsters cannot
 damage the player without a readable world-sprite slot.
 
 For a combined enemy visibility pass, run `tools/smoke_enemy_visibility.sh`.
-It chains the combat interaction, real E1M1 encounter, and hidden-attack
-regressions into one command, refreshing the screenshots that prove visible
-targeting, real converted monster projection, and no hidden damage.
+It chains the combat interaction, real E1M1 encounter, hidden-attack, and
+monster-gallery regressions into one command, refreshing the screenshots that
+prove visible targeting, real converted monster projection, no hidden damage,
+and multi-sprite enemy coverage.
 
 For a corpse/drop rendering pass, run `tools/smoke_death_drop.sh`. It builds
 `make death-test-rom`, launches `make death-test-gngeo`, and captures the staged

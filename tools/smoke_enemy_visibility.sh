@@ -25,6 +25,13 @@ SMOKE_WORKSPACE="$WORKSPACE" \
 SMOKE_OUTPUT_DIR="$OUT_DIR" \
 tools/smoke_hidden_attack.sh
 
+SMOKE_BUILD_TARGET=monster-gallery-rom \
+SMOKE_RUN_TARGET=monster-gallery-gngeo \
+SMOKE_OUTPUT="$OUT_DIR/monster-gallery.png" \
+SMOKE_DISPLAY="$DISPLAY_VALUE" \
+SMOKE_WORKSPACE="$WORKSPACE" \
+make smoke-screenshot
+
 cat <<EOF
 enemy visibility smoke complete:
   $OUT_DIR/combat-initial.png
@@ -34,4 +41,5 @@ enemy visibility smoke complete:
   $OUT_DIR/e1m1-encounter-fired.png
   $OUT_DIR/hidden-attack-initial.png
   $OUT_DIR/hidden-attack-after.png
+  $OUT_DIR/monster-gallery.png
 EOF
