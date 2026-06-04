@@ -2241,13 +2241,13 @@ static void update_monster_ai(void) {
     visible_monsters = visible_monster_slots();
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, adx, ady;
-        if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
-        if (enemy_hit_flash[i]) continue;
         dx = px - thing_x_q8[i];
         dy = py - thing_y_q8[i];
         adx = iabs16(dx);
         ady = iabs16(dy);
         if (adx + ady > WORLD_Q8(4608)) continue;
+        if (enemy_dead[i] || enemy_hit_flash[i]) continue;
+        if (!thing_is_monster(runtime_thing_type(i))) continue;
         if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)
             && line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
         if (!enemy_awake[i]) {
@@ -3519,37 +3519,71 @@ static int minimap_src_y1(int view_y) {
 static void draw_minimap_source_cell(int map_x, int map_y);
 
 static u8 minimap_has_closed_door(int vx, int vy) {
+    int x0 = minimap_src_x0(vx);
+    int x1 = minimap_src_x1(vx);
+    int y0 = minimap_src_y0(vy);
+    int y1 = minimap_src_y1(vy);
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
+        int x;
+        int y;
         if (g_runtime_door_open[i]) continue;
-        if (minimap_view_x(g_runtime_doors[i].x) == vx && minimap_view_y(g_runtime_doors[i].y) == vy) return 1;
+        x = g_runtime_doors[i].x;
+        y = g_runtime_doors[i].y;
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) return 1;
     }
     return 0;
 }
 
 static u8 minimap_has_exit(int vx, int vy) {
+    int x0 = minimap_src_x0(vx);
+    int x1 = minimap_src_x1(vx);
+    int y0 = minimap_src_y0(vy);
+    int y1 = minimap_src_y1(vy);
     for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
-        if (minimap_view_x(g_runtime_exits[i].x_q8 >> 8) == vx && minimap_view_y(g_runtime_exits[i].y_q8 >> 8) == vy) return 1;
+        int x = g_runtime_exits[i].x_q8 >> 8;
+        int y = g_runtime_exits[i].y_q8 >> 8;
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) return 1;
     }
     return 0;
 }
 
 static u8 minimap_has_pickup(int vx, int vy) {
+    int x0 = minimap_src_x0(vx);
+    int x1 = minimap_src_x1(vx);
+    int y0 = minimap_src_y0(vy);
+    int y1 = minimap_src_y1(vy);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        int x;
+        int y;
         if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
-        if (minimap_view_x(thing_x_q8[i] >> 8) == vx && minimap_view_y(thing_y_q8[i] >> 8) == vy) return 1;
+        x = thing_x_q8[i] >> 8;
+        y = thing_y_q8[i] >> 8;
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) return 1;
     }
     for (u8 i = 0; i < 8; i++) {
+        int x;
+        int y;
         if (!dynamic_drop_active[i]) continue;
-        if (minimap_view_x(dynamic_drop_x_q8[i] >> 8) == vx && minimap_view_y(dynamic_drop_y_q8[i] >> 8) == vy) return 1;
+        x = dynamic_drop_x_q8[i] >> 8;
+        y = dynamic_drop_y_q8[i] >> 8;
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) return 1;
     }
     return 0;
 }
 
 static u8 minimap_has_threat(int vx, int vy) {
+    int x0 = minimap_src_x0(vx);
+    int x1 = minimap_src_x1(vx);
+    int y0 = minimap_src_y0(vy);
+    int y1 = minimap_src_y1(vy);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        int x;
+        int y;
         u16 type = runtime_thing_type(i);
         if (enemy_dead[i] || (!thing_is_monster(type) && !thing_is_barrel(type) && !thing_is_explosion(type))) continue;
-        if (minimap_view_x(thing_x_q8[i] >> 8) == vx && minimap_view_y(thing_y_q8[i] >> 8) == vy) return 1;
+        x = thing_x_q8[i] >> 8;
+        y = thing_y_q8[i] >> 8;
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) return 1;
     }
     return 0;
 }

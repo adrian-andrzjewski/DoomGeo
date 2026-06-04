@@ -177,6 +177,9 @@ readable.
   cheap distance or forward-cone bounds before resolving runtime thing types or
   doing line-of-sight work. The final damage and wake-up thresholds are
   unchanged.
+- Monster AI applies its active-range gate before resolving thing type, so
+  distant converted things do not spend CPU on monster classification during
+  movement ticks.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
@@ -405,6 +408,9 @@ readable.
   frame budgets while repainting the player marker, so the map appears without
   the old one-frame stall. Normal A+C close now clears that same fix-layer
   region incrementally, reducing the return-to-gameplay spike after map use.
+- Minimap overlay checks compare source-cell ranges for doors, exits, pickups,
+  and threats instead of repeatedly converting every thing back into minimap
+  coordinates for each drawn cell.
 - Moving monsters repaint their old and new minimap source cells while the map
   is open, so threat markers stay tied to real WAD/AI positions instead of
   leaving stale dots behind.
