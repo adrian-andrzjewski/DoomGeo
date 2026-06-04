@@ -1679,6 +1679,8 @@ static void alert_monsters_by_sound(void) {
 
 static void update_enemy_hit_flash(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        if (!(enemy_hit_flash[i] | enemy_attack_cooldown[i] | enemy_attack_anim[i]
+            | explosion_timer[i] | death_anim_timer[i] | death_drop_timer[i])) continue;
         if (enemy_hit_flash[i]) enemy_hit_flash[i]--;
         if (enemy_attack_cooldown[i]) enemy_attack_cooldown[i]--;
         if (enemy_attack_anim[i]) enemy_attack_anim[i]--;

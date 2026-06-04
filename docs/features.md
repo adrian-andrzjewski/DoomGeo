@@ -166,6 +166,9 @@ readable.
   map-cell rejection before exact q8 distance and type checks. This preserves
   the exact hit/separation thresholds while avoiding most all-thing work for
   objects outside the local collision area.
+- Per-frame thing timer maintenance skips entries with no active flash,
+  attack, explosion, death-animation, or delayed-drop timers before touching
+  the detailed state transitions.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
