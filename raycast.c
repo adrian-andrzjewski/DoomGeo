@@ -52,6 +52,9 @@ static fix dirX, dirY;           /* facing direction (unit)                 */
 static fix planeX, planeY;       /* camera plane (sets FOV; |plane|~0.66)   */
 static fix invDet;               /* inverse camera matrix determinant       */
 static fix cameraXbuf[NUM_COLS]; /* constant camera x in [-1,+1] per column */
+static fix rayXbuf[NUM_COLS];    /* cached ray directions for current view  */
+static fix rayYbuf[NUM_COLS];
+static u8  rays_dirty = 1;
 
 static u16 scb2buf[NUM_COLS];    /* (HSHRINK<<8)|vshrink                    */
 static u16 scb3buf[NUM_COLS];    /* Y/size word                             */
@@ -85,6 +88,17 @@ static void update_projection_cache(void) {
     fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
     if (det > -FMIN && det < FMIN) invDet = 0;
     else invDet = fdiv(FONE, det);
+    rays_dirty = 1;
+}
+
+static void update_ray_cache(void) {
+    if (!rays_dirty) return;
+    for (int c = 0; c < NUM_COLS; c++) {
+        fix cameraX = cameraXbuf[c];
+        rayXbuf[c] = dirX + fmul(planeX, cameraX);
+        rayYbuf[c] = dirY + fmul(planeY, cameraX);
+    }
+    rays_dirty = 0;
 }
 
 void rc_init(void) {
@@ -314,10 +328,10 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
 
 void rc_render(void) {
     if (!view_dirty) return;
+    update_ray_cache();
     for (int x = 0; x < NUM_COLS; x++) {
-        fix cameraX = cameraXbuf[x];
-        fix rayX = dirX + fmul(planeX, cameraX);
-        fix rayY = dirY + fmul(planeY, cameraX);
+        fix rayX = rayXbuf[x];
+        fix rayY = rayYbuf[x];
 
         int mapX = posX >> FBITS;
         int mapY = posY >> FBITS;
