@@ -222,7 +222,9 @@ readable.
   opened E1M1 routes are picked up immediately.
 - Visible thing selection rejects behind-camera and far-away things before
   resolving runtime type or render bucket, reducing per-frame sprite candidate
-  work while preserving the same final projection and priority rules.
+  work while preserving the same final projection and priority rules. The
+  precheck short-circuits behind-camera and range rejects before doing the
+  side-of-camera multiply used for far-offscreen rejection.
 - A conservative side-of-camera band now rejects far-offscreen world sprites
   before runtime type lookup and exact projection. The exact projector and
   screen bounds still decide everything near the view, so visible E1M1

@@ -4779,10 +4779,12 @@ static u8 thing_maybe_projectable(short x_q8, short y_q8, int px, int py, int di
     int dx = x_q8 - px;
     int dy = y_q8 - py;
     long front = ((long)dx * dir_x + (long)dy * dir_y) >> 8;
-    long side = ((long)dx * plane_x + (long)dy * plane_y) >> 8;
-    int range = iabs16(dx) + iabs16(dy);
+    int range;
+    long side;
     if (front < WORLD_Q8(16)) return 0;
+    range = iabs16(dx) + iabs16(dy);
     if (range > WORLD_Q8(8192)) return 0;
+    side = ((long)dx * plane_x + (long)dy * plane_y) >> 8;
     if (side < 0) side = -side;
     if (side > front + WORLD_Q8(1280)) return 0;
     return 1;
