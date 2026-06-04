@@ -670,6 +670,7 @@ static u8 thing_render_class(u16 thing_type);
 static u8 runtime_thing_is_monster(int thing_index);
 static u8 runtime_thing_is_pickup(int thing_index);
 static u8 runtime_thing_is_threat(int thing_index);
+static u8 runtime_thing_is_shootable(int thing_index);
 
 static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dx = bx - ax;
@@ -1488,7 +1489,7 @@ static int best_visible_enemy(void) {
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemy_dead[thing]) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
+        if (!runtime_thing_is_shootable(thing)) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
         if (iabs16(center_x - SCRW / 2) > 76 && enemies[slot].screen_h < 112) continue;
         score = iabs16(center_x - SCRW / 2) + (enemies[slot].dist_q8 >> 7) - (enemies[slot].screen_h >> 2);
@@ -1540,7 +1541,7 @@ static void fire_melee_damage(u8 damage) {
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemies[slot].dist_q8 > PLAYER_MELEE_RANGE_Q8) continue;
         if (enemy_dead[thing]) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
+        if (!runtime_thing_is_shootable(thing)) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
         if (iabs16(center_x - SCRW / 2) > 80) continue;
         score = iabs16(center_x - SCRW / 2) + enemies[slot].dist_q8;
@@ -1623,7 +1624,7 @@ static void damage_shotgun_spread(void) {
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemy_dead[thing]) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
+        if (!runtime_thing_is_shootable(thing)) continue;
         if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
 
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
@@ -1663,7 +1664,7 @@ static void damage_bfg_targets(void) {
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemy_dead[thing]) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
+        if (!runtime_thing_is_shootable(thing)) continue;
         damage_visible_enemy(thing, thing == primary ? 18 : 9);
     }
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
@@ -1673,7 +1674,7 @@ static void damage_bfg_targets(void) {
         front = ((dx * dir_x) + (dy * dir_y)) >> 8;
         if (front < WORLD_Q8(192) || front > WORLD_Q8(2816)) continue;
         if (enemy_dead[thing]) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
+        if (!runtime_thing_is_shootable(thing)) continue;
         if (thing_has_readable_slot(thing)) continue;
         side = ((dx * plane_x) + (dy * plane_y)) >> 8;
         abs_side = iabs16(side);
@@ -1908,11 +1909,9 @@ static int player_projectile_hit_shootable(void) {
     projectile_cell_y = projectile_y_q8 >> 8;
     coarse_cells = (hit_range_q8 + 255) >> 8;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-        u16 type;
         if (iabs16((thing_x_q8[i] >> 8) - projectile_cell_x) > coarse_cells) continue;
         if (iabs16((thing_y_q8[i] >> 8) - projectile_cell_y) > coarse_cells) continue;
-        type = runtime_thing_type(i);
-        if (enemy_dead[i] || !thing_is_shootable(type)) continue;
+        if (enemy_dead[i] || !runtime_thing_is_shootable(i)) continue;
         if (iabs16(thing_x_q8[i] - projectile_x_q8) <= hit_range_q8
             && iabs16(thing_y_q8[i] - projectile_y_q8) <= hit_range_q8) {
             return i;
@@ -4504,6 +4503,14 @@ static u8 runtime_thing_is_threat(int thing_index) {
     u8 thing_class;
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_runtime_threat(thing_type_override[thing_index]);
+    thing_class = thing_static_class[thing_index];
+    return thing_class == THING_CLASS_MONSTER || thing_class == THING_CLASS_THREAT;
+}
+
+static u8 runtime_thing_is_shootable(int thing_index) {
+    u8 thing_class;
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_type_override[thing_index]) return thing_is_shootable(thing_type_override[thing_index]);
     thing_class = thing_static_class[thing_index];
     return thing_class == THING_CLASS_MONSTER || thing_class == THING_CLASS_THREAT;
 }
