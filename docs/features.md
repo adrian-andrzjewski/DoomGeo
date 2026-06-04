@@ -158,8 +158,10 @@ readable.
   not fake encounter placement just to fill a visible sprite slot.
 - Hitscan, projectile, and melee monsters can damage the player only from
   readable on-screen world-sprite slots, so hidden/off-screen things do not
-  attack through the Neo Geo sprite fallback path. Player weapon hits also
-  target rendered enemies only, keeping combat feedback tied to visible sprites.
+  attack through the Neo Geo sprite fallback path. Close melee still checks
+  world distance and line-of-sight, but it now also requires the same readable
+  slot proof as ranged attacks. Player weapon hits also target rendered enemies
+  only, keeping combat feedback tied to visible sprites.
   Monsters drawn through the coarse line-of-sight projection fallback are
   allowed to remain visible, but their ranged attacks are held until the sprite
   is large enough to read clearly.
@@ -189,9 +191,9 @@ readable.
 - Impact bursts are rendered only when a free world-sprite slot remains, so shot
   feedback cannot overwrite a selected monster, pickup, corpse, or drop slot.
 - Monster visibility tests now count readable on-screen slots, not merely
-  projected-but-edge-clipped sprite metadata. Ranged attack gating is stricter
-  than drawing, while close melee checks world distance plus line-of-sight so
-  nearby enemies remain dangerous without depending on a cached draw slot.
+  projected-but-edge-clipped sprite metadata. Attack gating is stricter than
+  drawing so edge-clipped, metadata-only, or slot-starved monsters cannot hurt
+  the player invisibly.
 - Barrels explode and can apply radius damage.
 - Killed monsters show a short three-step Doom death sequence before settling
   into corpse frames or drops where implemented. Shareware former humans,
