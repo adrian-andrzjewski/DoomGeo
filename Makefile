@@ -183,6 +183,14 @@ combat-test-gngeo:
 	$(MAKE) combat-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/combat-test-rom $(GAMEROM)
 
+monster-gallery-rom:
+	$(MAKE) cart BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
+	cp $(ROM)/neogeo.zip build/monster-gallery-rom/neogeo.zip
+
+monster-gallery-gngeo:
+	$(MAKE) monster-gallery-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/monster-gallery-rom $(GAMEROM)
+
 arsenal-test-rom:
 	$(MAKE) cart BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
 	cp $(ROM)/neogeo.zip build/arsenal-test-rom/neogeo.zip

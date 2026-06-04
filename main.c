@@ -2066,7 +2066,7 @@ static void update_monster_ai(void) {
     }
 }
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -2156,6 +2156,33 @@ static void configure_combat_test(void) {
     player_shells = 24;
     current_weapon = WEAPON_SHOTGUN;
     place_test_imp();
+}
+#endif
+
+#ifdef DOOM_MONSTER_GALLERY_TEST
+static void configure_monster_gallery_test(void) {
+#if NG_RUNTIME_THING_COUNT > 5
+    static const u16 types[] = {3004, 9, 3001, 3002, 3003, 2035};
+    static const short laterals[] = {
+        -WORLD_Q8(520), -WORLD_Q8(312), -WORLD_Q8(104),
+         WORLD_Q8(104),  WORLD_Q8(312),  WORLD_Q8(520)
+    };
+    int px, py;
+    rc_player_q8(&px, &py);
+    player_has_shotgun = 1;
+    player_shells = 24;
+    current_weapon = WEAPON_PISTOL;
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+
+    for (u8 i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
+        if (!place_test_thing(i, types[i], WORLD_Q8(880), laterals[i])) continue;
+        enemy_hp[i] = monster_start_hp(types[i]);
+        enemy_awake[i] = thing_is_barrel(types[i]) ? 0 : 1;
+        enemy_attack_cooldown[i] = 96;
+        set_monster_facing_from_delta(i, px - thing_x_q8[i], py - thing_y_q8[i]);
+    }
+#endif
 }
 #endif
 
@@ -4110,6 +4137,9 @@ static void restart_level(void) {
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
 #endif
+#ifdef DOOM_MONSTER_GALLERY_TEST
+    configure_monster_gallery_test();
+#endif
 #ifdef DOOM_ARSENAL_TEST
     configure_arsenal_test();
 #endif
@@ -4144,6 +4174,9 @@ int main(void) {
     init_runtime_things();
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
+#endif
+#ifdef DOOM_MONSTER_GALLERY_TEST
+    configure_monster_gallery_test();
 #endif
 #ifdef DOOM_ARSENAL_TEST
     configure_arsenal_test();

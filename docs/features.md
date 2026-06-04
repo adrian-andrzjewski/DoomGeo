@@ -111,6 +111,11 @@ readable.
   enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
   visible imp in front of the player, and equips the shotgun while leaving the
   normal cart path unchanged.
+- `make monster-gallery-rom` and `make monster-gallery-gngeo` build an isolated
+  E1M1 living-enemy gallery. It compiles with `DOOM_MONSTER_GALLERY_TEST` and
+  places shareware former human, shotgun guy, imp, demon, Baron, and barrel
+  sprites into one view so sprite selection, palettes, orientation, and the
+  floor-baseline anchor can be checked together.
 - `make arsenal-test-rom` and `make arsenal-test-gngeo` build an isolated E1M1
   weapons/keycard HUD verification ROM. It compiles with `DOOM_ARSENAL_TEST`,
   grants all implemented weapons, backpack ammo caps, all three keycards, blue
