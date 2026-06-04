@@ -52,7 +52,8 @@ launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
 `.tools/screens/latest/smoke.png`. Override `SMOKE_BUILD_TARGET`,
 `SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, or `SMOKE_WAIT_SECS` when capturing variants
 such as the E1M2 key-test ROM, the focused red key/door ROM, the combat
-verification ROM, the focused real E1M1 encounter ROM, the close-combat
+verification ROM, the focused real E1M1 encounter ROM, the E1M1 scout-route
+ROM, the close-combat
 verification ROM, the living-monster gallery ROM, the weapons/keycard arsenal
 verification ROM, the death/drop verification ROM, or the powerup verification
 ROM:
@@ -76,6 +77,11 @@ For a real converted E1M1 monster visibility pass, run
 `tools/smoke_e1m1_encounter.sh`. It builds `make encounter-test-rom`, launches
 `make encounter-test-gngeo`, and captures both the initial focused encounter and
 one pistol-fire frame against an existing WAD-derived shotgun guy.
+
+For a first-contact route visibility pass, run `tools/smoke_e1m1_scout.sh`. It
+builds `make scout-test-rom`, launches `make scout-test-gngeo`, and captures a
+normal-route waypoint looking toward the first reachable WAD-position shotgun
+guys plus a pistol-fire frame.
 
 For an invisible-attacker regression pass, run `tools/smoke_hidden_attack.sh`.
 It builds `make hidden-attack-test-rom`, launches `make hidden-attack-test-gngeo`,

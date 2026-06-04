@@ -199,6 +199,14 @@ encounter-test-gngeo:
 	$(MAKE) encounter-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/encounter-test-rom $(GAMEROM)
 
+scout-test-rom:
+	$(MAKE) cart BUILDDIR=build/scout-test ROM=build/scout-test-rom GFX_ROM_DIR=build/scout-test-assets CFLAGS="-Ibuild/scout-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_SCOUT_TEST"
+	cp $(ROM)/neogeo.zip build/scout-test-rom/neogeo.zip
+
+scout-test-gngeo:
+	$(MAKE) scout-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/scout-test-rom $(GAMEROM)
+
 hidden-attack-test-rom:
 	$(MAKE) cart BUILDDIR=build/hidden-attack-test ROM=build/hidden-attack-test-rom GFX_ROM_DIR=build/hidden-attack-test-assets CFLAGS="-Ibuild/hidden-attack-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_HIDDEN_ATTACK_TEST"
 	cp $(ROM)/neogeo.zip build/hidden-attack-test-rom/neogeo.zip

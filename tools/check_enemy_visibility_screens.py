@@ -68,6 +68,7 @@ def main() -> int:
 
     root = Path(args.dir)
     playfield_center = (260, 220, 700, 560)
+    playfield_wide = (180, 140, 860, 560)
     full_playfield = (80, 120, 900, 560)
     hud = (0, 560, 960, 672)
     checks = [
@@ -76,6 +77,8 @@ def main() -> int:
         ("combat-death.png", full_playfield),
         ("e1m1-encounter-initial.png", playfield_center),
         ("e1m1-encounter-fired.png", playfield_center),
+        ("e1m1-scout-initial.png", playfield_wide),
+        ("e1m1-scout-fired.png", playfield_wide),
         ("hidden-attack-after.png", full_playfield),
         ("monster-gallery.png", full_playfield),
     ]

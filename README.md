@@ -50,6 +50,10 @@ drawing pixels.
 | --- | --- |
 | ![Focused E1M1 verification ROM with a real converted shotgun guy visible from its WAD placement](docs/screenshots/doomgeo-aes-e1m1-encounter.png) | ![Focused E1M1 verification ROM after one pistol shot against the real converted shotgun guy](docs/screenshots/doomgeo-aes-e1m1-encounter-fired.png) |
 
+| E1M1 scout route | E1M1 scout fired |
+| --- | --- |
+| ![E1M1 scout ROM from a normal-route waypoint with WAD-position shotgun guys and pickups visible](docs/screenshots/doomgeo-aes-e1m1-scout.png) | ![E1M1 scout ROM after one pistol shot from the route waypoint](docs/screenshots/doomgeo-aes-e1m1-scout-fired.png) |
+
 | Hidden-attack regression |
 | --- |
 | ![Hidden-attack regression ROM after a wait with unchanged health and no readable monster](docs/screenshots/doomgeo-aes-hidden-attack.png) |

@@ -161,6 +161,13 @@ readable.
 - `tools/smoke_e1m1_encounter.sh` captures the initial focused E1M1 encounter
   frame and a fired frame under `.tools/screens/latest`, giving a regression
   check for real converted monster visibility in the normal E1M1 data.
+- `make scout-test-rom` and `make scout-test-gngeo` build a first-contact E1M1
+  scout ROM. It keeps the first reachable shotgun guys and pickups at their
+  converted WAD positions, but starts from a normal-route waypoint looking into
+  that encounter space so early-route visibility can be checked without faking
+  monster placement.
+- `tools/smoke_e1m1_scout.sh` captures that scout viewpoint and a pistol-fire
+  frame, extending the real-map evidence beyond the closer encounter ROM.
 - `make hidden-attack-test-rom` and `make hidden-attack-test-gngeo` build a
   readable-slot regression ROM. It places an awake shotgun guy outside the
   readable view and freezes its movement, so the HUD health value must stay
@@ -168,10 +175,10 @@ readable.
 - `tools/smoke_hidden_attack.sh` captures that ROM at boot and again after a
   short wait. The delayed frame should show no readable monster and unchanged
   health, proving combat pressure is tied to visible world-sprite slots.
-- `tools/smoke_enemy_visibility.sh` runs the combat, real-map encounter, and
-  hidden-attack screenshot passes plus the monster gallery so renderer or AI
-  changes can refresh the full visible-enemy evidence set with one command. It
-  also runs a lightweight PNG sanity checker so blank/error captures fail fast.
+- `tools/smoke_enemy_visibility.sh` runs the combat, real-map encounter, scout,
+  hidden-attack, and monster-gallery screenshot passes so renderer or AI changes
+  can refresh the full visible-enemy evidence set with one command. It also
+  runs a lightweight PNG sanity checker so blank/error captures fail fast.
 - `make melee-test-rom` and `make melee-test-gngeo` build an isolated close-
   combat verification ROM. It compiles with `DOOM_MELEE_TEST`, equips the
   chainsaw, and places a visible imp inside the corrected player melee range.
