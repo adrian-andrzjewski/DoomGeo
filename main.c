@@ -667,6 +667,7 @@ static void player_take_damage(u16 amount);
 static void spawn_impact_effect(short x_q8, short y_q8, u8 timer);
 static u8 key_bit_for_thing(u16 thing_type);
 static u8 thing_render_class(u16 thing_type);
+static u8 runtime_thing_is_monster(int thing_index);
 
 static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dx = bx - ax;
@@ -1695,7 +1696,7 @@ static void alert_monsters_by_sound(void) {
         dy = iabs16(py - thing_y_q8[i]);
         range = dx + dy;
         if (range > WORLD_Q8(8192)) continue;
-        if (!thing_is_monster(runtime_thing_type(i))) continue;
+        if (!runtime_thing_is_monster(i)) continue;
         if (range <= WORLD_Q8(1024)) {
             audible = 1;
         } else if (monster_path_valid) {
@@ -2234,7 +2235,7 @@ static u8 visible_monster_slots(void) {
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
-        if (thing_is_monster(runtime_thing_type(thing))) count++;
+        if (runtime_thing_is_monster(thing)) count++;
     }
     return count;
 }
@@ -2295,7 +2296,7 @@ static void update_monster_ai(void) {
         adx = iabs16(dx);
         ady = iabs16(dy);
         if (adx + ady > WORLD_Q8(4608)) continue;
-        if (!thing_is_monster(runtime_thing_type(i))) continue;
+        if (!runtime_thing_is_monster(i)) continue;
         if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)
             && line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
         if (!enemy_awake[i]) {
@@ -4485,6 +4486,12 @@ static u8 thing_render_bucket_for_class(u8 thing_class, u16 thing_type) {
 
 static u8 thing_render_bucket(u16 thing_type) {
     return thing_render_bucket_for_class(thing_render_class(thing_type), thing_type);
+}
+
+static u8 runtime_thing_is_monster(int thing_index) {
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_type_override[thing_index]) return thing_is_monster(thing_type_override[thing_index]);
+    return thing_static_class[thing_index] == THING_CLASS_MONSTER;
 }
 
 static u8 runtime_thing_render_bucket(int thing_index, u16 *thing_type) {
