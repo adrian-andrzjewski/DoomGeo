@@ -205,6 +205,10 @@ readable.
   before runtime type lookup and exact projection. The exact projector and
   screen bounds still decide everything near the view, so visible E1M1
   monsters, drops, and pickups keep their normal priority path.
+- The world-sprite selector no longer clears its candidate buffer or visible
+  slot ids before immediately overwriting or hiding them. This removes redundant
+  per-frame writes from the normal E1M1 render path while preserving the same
+  slot cleanup at the end of the pass.
 - HUD status numbers, key slots, and ammo reserve counters now update only
   when their displayed values change. The animated face still updates every
   frame, but quiet E1M1 traversal no longer rewrites the static HUD sprites and

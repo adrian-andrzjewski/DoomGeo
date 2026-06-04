@@ -4452,10 +4452,6 @@ static int select_visible_things(int found) {
     if (found >= ENEMY_VISIBLE_COUNT) return found;
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
-    for (u16 slot = 0; slot < THING_CANDIDATE_COUNT; slot++) {
-        candidates[slot].thing_index = -1;
-        candidates[slot].dynamic_index = -1;
-    }
 
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int sx, h, dist_q8;
@@ -4589,7 +4585,6 @@ static void update_enemy_ranged_readiness(void) {
 
 static void update_enemy(void) {
     int found = 0;
-    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
 
     found = render_visible_projectile(found);
     found = select_visible_things(found);
