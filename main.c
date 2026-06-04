@@ -381,6 +381,7 @@ typedef struct EnemyDraw {
     int screen_w;
     int screen_h;
     int dist_q8;
+    u8 fallback_projection;
 } EnemyDraw;
 
 static void trigger_weapon_flash(void) {
@@ -1647,6 +1648,7 @@ static void update_monster_damage(void) {
         if (enemy_attack_cooldown[thing]) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
+        if (enemies[slot].fallback_projection && enemies[slot].screen_h < 48) continue;
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
             u16 projectile = monster_projectile_type(runtime_thing_type(thing));
@@ -3363,6 +3365,7 @@ static void hide_enemy_slot(u16 slot) {
     enemies[slot].thing_index = -1;
     enemies[slot].screen_w = 0;
     enemies[slot].screen_h = 0;
+    enemies[slot].fallback_projection = 0;
     enemy_tile_key[slot] = -1;
 }
 
@@ -3396,7 +3399,7 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
     }
 }
 
-static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash) {
+static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash, u8 fallback_projection) {
     int idx;
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
     const DoomEnemySpriteDef *def;
@@ -3416,6 +3419,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     enemies[slot].sprite_def = def_idx;
     enemies[slot].dist_q8 = dist_q8;
     enemies[slot].screen_h = h;
+    enemies[slot].fallback_projection = fallback_projection;
     if (flash || enemy_slot_flash[slot]) load_enemy_hit_palette(slot);
     else load_enemy_palette(slot, def_idx);
 
@@ -3469,15 +3473,11 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
             enemies[slot].thing_index = -1;
             enemies[slot].screen_w = 0;
             enemies[slot].screen_h = 0;
+            enemies[slot].fallback_projection = 0;
             return 0;
         }
     }
     return 1;
-}
-
-static u8 render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist_q8) {
-    u8 flash = (thing_index >= 0 && enemy_hit_flash[thing_index]) ? 1 : 0;
-    return render_type_slot(slot, thing_index, runtime_thing_type(thing_index), sx, h, dist_q8, flash);
 }
 
 typedef struct ThingCandidate {
@@ -3489,6 +3489,7 @@ typedef struct ThingCandidate {
     int sx;
     int h;
     int dist_q8;
+    u8 fallback_projection;
     int score;
 } ThingCandidate;
 
@@ -3529,9 +3530,11 @@ static int select_visible_things(int found, u8 pass) {
         if (pass == 3 && !thing_is_corpse(thing_type)) continue;
         if (pass == 4 && (!thing_is_pickup(thing_type) || pickup_is_collectible(thing_type))) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
+        u8 fallback_projection = 0;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
             if (!player_line_of_sight_to(thing_x_q8[i], thing_y_q8[i])) continue;
             if (!project_point_q8(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
+            fallback_projection = 1;
         }
         if (sx < -48 || sx > SCRW + 48) continue;
 
@@ -3544,6 +3547,7 @@ static int select_visible_things(int found, u8 pass) {
         candidate.sx = sx;
         candidate.h = h;
         candidate.dist_q8 = dist_q8;
+        candidate.fallback_projection = fallback_projection;
         candidate.score = score;
         insert_thing_candidate(candidates, &count, &candidate);
     }
@@ -3558,9 +3562,11 @@ static int select_visible_things(int found, u8 pass) {
             if (pass == 2 && !pickup_is_collectible(thing_type)) continue;
             if (pass == 4 && pickup_is_collectible(thing_type)) continue;
             if (candidate_coord_selected(candidates, count, dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
+            u8 fallback_projection = 0;
             if (!rc_project_point(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) {
                 if (!player_line_of_sight_to(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
                 if (!project_point_q8(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) continue;
+                fallback_projection = 1;
             }
             if (sx < -48 || sx > SCRW + 48) continue;
             score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
@@ -3572,6 +3578,7 @@ static int select_visible_things(int found, u8 pass) {
             candidate.sx = sx;
             candidate.h = h;
             candidate.dist_q8 = dist_q8;
+            candidate.fallback_projection = fallback_projection;
             candidate.score = score;
             insert_thing_candidate(candidates, &count, &candidate);
         }
@@ -3580,9 +3587,9 @@ static int select_visible_things(int found, u8 pass) {
     for (int i = 0; i < count && found < ENEMY_VISIBLE_COUNT; i++) {
         u8 rendered;
         if (candidates[i].dynamic_index >= 0) {
-            rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, 0);
+            rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, 0, candidates[i].fallback_projection);
         } else {
-            rendered = render_thing_slot((u16)found, candidates[i].thing_index, candidates[i].sx, candidates[i].h, candidates[i].dist_q8);
+            rendered = render_type_slot((u16)found, candidates[i].thing_index, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, (candidates[i].thing_index >= 0 && enemy_hit_flash[candidates[i].thing_index]) ? 1 : 0, candidates[i].fallback_projection);
         }
         if (rendered) found++;
     }
@@ -3593,7 +3600,7 @@ static int render_visible_projectile(int found) {
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
     if (!project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
-    if (render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0)) return found + 1;
+    if (render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0, 0)) return found + 1;
     return found;
 }
 
@@ -3601,7 +3608,7 @@ static void render_visible_impact(u16 slot) {
     int sx, h, dist_q8;
     if (!impact_active) return;
     if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return;
-    render_type_slot(slot, -1, 9000, sx, h, dist_q8, 0);
+    render_type_slot(slot, -1, 9000, sx, h, dist_q8, 0, 0);
 }
 
 static void update_enemy(void) {

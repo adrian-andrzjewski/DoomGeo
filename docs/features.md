@@ -150,6 +150,9 @@ readable.
   readable on-screen world-sprite slots, so hidden/off-screen things do not
   attack through the Neo Geo sprite fallback path. Player weapon hits also
   target rendered enemies only, keeping combat feedback tied to visible sprites.
+  Monsters drawn through the coarse line-of-sight projection fallback are
+  allowed to remain visible, but their ranged attacks are held until the sprite
+  is large enough to read clearly.
   Imps, Hell Knights, cacodemons, Barons, and placeholder Doom II projectile
   monsters can launch visible fireball sprites; those fireballs are dropped if
   their source monster leaves the readable rendered slot set before impact.
