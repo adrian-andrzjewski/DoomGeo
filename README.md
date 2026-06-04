@@ -38,9 +38,13 @@ drawing pixels.
 | --- | --- |
 | ![Focused E1M2 red keycard and locked-door verification ROM](docs/screenshots/doomgeo-aes-key-door-test.png) | ![E1M2 red door opened after collecting the red keycard](docs/screenshots/doomgeo-aes-key-door-opened.png) |
 
-| Combat test ROM | Combat kill smoke |
+| Combat test ROM | Shotgun fire frame |
 | --- | --- |
-| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Combat interaction smoke after killing the visible imp](docs/screenshots/doomgeo-aes-combat-kill.png) |
+| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Combat interaction smoke with restrained weapon muzzle flash preserving shotgun detail](docs/screenshots/doomgeo-aes-combat-fired.png) |
+
+| Combat kill smoke |
+| --- |
+| ![Combat interaction smoke after killing the visible imp](docs/screenshots/doomgeo-aes-combat-kill.png) |
 
 | Real E1M1 encounter | Real E1M1 encounter fired |
 | --- | --- |

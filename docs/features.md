@@ -110,7 +110,9 @@ readable.
   number in the center fix-layer message area, giving immediate feedback for C
   cycling and C+D-pad shortcuts without opening the minimap.
 - Muzzle, hurt, and impact feedback use palette flashes and projected explosion
-  sprites. Hurt feedback tints the active Doom playfield and weapon palettes
+  sprites. Weapon muzzle flash now uses a restrained warm additive palette so
+  shotgun and pistol frames brighten without flattening into a solid yellow
+  silhouette. Hurt feedback tints the active Doom playfield and weapon palettes
   instead of flashing the raw Neo Geo backdrop, avoiding full-height red edge
   leaks if sprite coverage drops out during busy scenes. Monster fireballs now
   spawn the same impact burst when they hit a wall or the player instead of

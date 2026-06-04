@@ -281,9 +281,9 @@ static void set_weapon_flash_palette(void) {
         u8 r = g_weapon_palette_rgb[i][0];
         u8 g = g_weapon_palette_rgb[i][1];
         u8 b = g_weapon_palette_rgb[i][2];
-        r = (u8)(r + ((31 - r) * 3) / 4);
-        g = (u8)(g + ((28 - g) * 2) / 3);
-        b = (u8)(b + ((12 - b) / 3));
+        r = clamp31(r + 7);
+        g = clamp31(g + 5);
+        b = clamp31(b + 2);
         pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
     }
 }

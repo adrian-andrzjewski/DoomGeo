@@ -11,9 +11,9 @@ after the current documentation pass.
   proven visually.
 - Recheck weapon vertical placement after the HUD number pass so the gun and
   status face do not visually fight each other.
-- Tighten shotgun pump/fire frame placement; the combat smoke currently proves
-  the kill path, but the pump frame can sit too far left during the delayed
-  death screenshot.
+- Keep checking shotgun fire and pump frames against combat smoke captures;
+  the weapon frame is centered, but palette and smoke timing changes can still
+  affect how readable the fired frame feels.
 - Update screenshots whenever the HUD or weapon placement changes.
 
 ## Gameplay And Assets
