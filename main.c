@@ -2349,6 +2349,29 @@ static void configure_combat_test(void) {
 }
 #endif
 
+#ifdef DOOM_E1M1_ENCOUNTER_TEST
+static void configure_e1m1_encounter_test(void) {
+#if NG_RUNTIME_THING_COUNT > 13
+    int px, py;
+    rc_set_pose_q8((short)((17 << 8) + 128), (short)((18 << 8) + 128), 0, 256);
+    rc_player_q8(&px, &py);
+    current_weapon = WEAPON_PISTOL;
+    player_ammo = 50;
+    enemy_hp[13] = monster_start_hp(runtime_thing_type(13));
+    enemy_awake[13] = 1;
+    enemy_attack_cooldown[13] = 56;
+    enemy_hit_flash[13] = 0;
+    enemy_attack_anim[13] = 0;
+    enemy_ranged_readable_ticks[13] = 0;
+    set_monster_facing_from_delta(13, px - thing_x_q8[13], py - thing_y_q8[13]);
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+#endif
+}
+#endif
+
 #ifdef DOOM_MELEE_TEST
 static void configure_melee_test(void) {
     player_has_chainsaw = 1;
@@ -4475,6 +4498,9 @@ static void restart_level(void) {
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
 #endif
+#ifdef DOOM_E1M1_ENCOUNTER_TEST
+    configure_e1m1_encounter_test();
+#endif
 #ifdef DOOM_MELEE_TEST
     configure_melee_test();
 #endif
@@ -4518,6 +4544,9 @@ int main(void) {
     init_runtime_things();
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
+#endif
+#ifdef DOOM_E1M1_ENCOUNTER_TEST
+    configure_e1m1_encounter_test();
 #endif
 #ifdef DOOM_MELEE_TEST
     configure_melee_test();

@@ -143,6 +143,14 @@ readable.
 - `tools/smoke_combat_interaction.sh` drives the combat ROM through a shotgun
   fire interaction and captures before/fire/death frames, proving that a visible
   enemy can be targeted, damaged, killed, and left as visible feedback.
+- `make encounter-test-rom` and `make encounter-test-gngeo` build a focused
+  real-map E1M1 encounter ROM. It starts near an existing converted shotgun guy
+  at its WAD-derived placement, wakes only that runtime thing, and verifies that
+  real-map monster projection and pistol interaction are readable without moving
+  or inventing the monster.
+- `tools/smoke_e1m1_encounter.sh` captures the initial focused E1M1 encounter
+  frame and a fired frame under `.tools/screens/latest`, giving a regression
+  check for real converted monster visibility in the normal E1M1 data.
 - `make melee-test-rom` and `make melee-test-gngeo` build an isolated close-
   combat verification ROM. It compiles with `DOOM_MELEE_TEST`, equips the
   chainsaw, and places a visible imp inside the corrected player melee range.

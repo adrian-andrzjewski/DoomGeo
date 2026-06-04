@@ -52,9 +52,9 @@ launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
 `.tools/screens/latest/smoke.png`. Override `SMOKE_BUILD_TARGET`,
 `SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, or `SMOKE_WAIT_SECS` when capturing variants
 such as the E1M2 key-test ROM, the focused red key/door ROM, the combat
-verification ROM, the close-combat verification ROM, the living-monster gallery
-ROM, the weapons/keycard arsenal verification ROM, or the powerup verification
-ROM:
+verification ROM, the focused real E1M1 encounter ROM, the close-combat
+verification ROM, the living-monster gallery ROM, the weapons/keycard arsenal
+verification ROM, or the powerup verification ROM:
 
 ```sh
 SMOKE_BUILD_TARGET=combat-test-rom \
@@ -66,6 +66,11 @@ make smoke-screenshot
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
 death/corpse feedback frame.
+
+For a real converted E1M1 monster visibility pass, run
+`tools/smoke_e1m1_encounter.sh`. It builds `make encounter-test-rom`, launches
+`make encounter-test-gngeo`, and captures both the initial focused encounter and
+one pistol-fire frame against an existing WAD-derived shotgun guy.
 
 ```sh
 SMOKE_BUILD_TARGET=melee-test-rom \

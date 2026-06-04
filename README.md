@@ -19,7 +19,7 @@ drawing pixels.
 | Rendering | Fallback 20-column wall raycaster, Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and eight visible world-thing slots kept under the Neo Geo scanline limit. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use placeholder psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the real art. |
-| Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
+| Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening and normal closing spread fix-layer work across frames instead of blocking on full one-frame redraws. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
 | Browser build | GitHub Pages package runs the ROM through EmulatorJS/FBNeo, plus a separate 68000 ASM demo build. |
@@ -41,6 +41,10 @@ drawing pixels.
 | Combat test ROM | Combat kill smoke |
 | --- | --- |
 | ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Combat interaction smoke after killing the visible imp](docs/screenshots/doomgeo-aes-combat-kill.png) |
+
+| Real E1M1 encounter | Real E1M1 encounter fired |
+| --- | --- |
+| ![Focused E1M1 verification ROM with a real converted shotgun guy visible from its WAD placement](docs/screenshots/doomgeo-aes-e1m1-encounter.png) | ![Focused E1M1 verification ROM after one pistol shot against the real converted shotgun guy](docs/screenshots/doomgeo-aes-e1m1-encounter-fired.png) |
 
 | Melee test ROM | Monster gallery ROM |
 | --- | --- |
@@ -103,6 +107,9 @@ tools/smoke_key_door.sh
 make combat-test-rom
 make combat-test-gngeo
 tools/smoke_combat_interaction.sh
+make encounter-test-rom
+make encounter-test-gngeo
+tools/smoke_e1m1_encounter.sh
 make monster-gallery-rom
 make monster-gallery-gngeo
 make arsenal-test-rom
