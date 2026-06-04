@@ -191,6 +191,14 @@ arsenal-test-gngeo:
 	$(MAKE) arsenal-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/arsenal-test-rom $(GAMEROM)
 
+death-test-rom:
+	$(MAKE) cart BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
+	cp $(ROM)/neogeo.zip build/death-test-rom/neogeo.zip
+
+death-test-gngeo:
+	$(MAKE) death-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
+
 ASM_ROM=$(BUILDDIR)/asm-rom
 ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
 ASM_GFX_STAMP=$(ASM_ASSET_ROM)/.generated-gfx

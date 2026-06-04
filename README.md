@@ -38,6 +38,10 @@ drawing pixels.
 | --- | --- |
 | ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) |
 
+| Death/drop test ROM |
+| --- |
+| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) |
+
 | Native Doom comparison |
 | --- |
 | ![Native Doom beside the Neo Geo prototype](docs/screenshots/doomgeo-aes-native-comparison.png) |

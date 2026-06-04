@@ -114,6 +114,10 @@ readable.
   grants all implemented weapons, backpack ammo caps, all three keycards, blue
   armor, and the same visible test imp while leaving the normal cart path
   unchanged.
+- `make death-test-rom` and `make death-test-gngeo` build an isolated E1M1
+  corpse/drop verification ROM. It compiles with `DOOM_DEATH_TEST`, places
+  shareware Doom corpse sprites and a dropped shotgun in front of the player,
+  and leaves the normal cart path unchanged.
 - The E1M2 key-test conversion currently includes one red keycard and a six-cell
   red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma

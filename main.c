@@ -1909,21 +1909,59 @@ static void update_monster_ai(void) {
     }
 }
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_ARSENAL_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST)
+static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
+    short x;
+    short y;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    x = (short)(px + ((dir_x * forward) >> 8) + ((plane_x * lateral) >> 8));
+    y = (short)(py + ((dir_y * forward) >> 8) + ((plane_y * lateral) >> 8));
+    if (map_at(x >> 8, y >> 8)) return 0;
+    *out_x = x;
+    *out_y = y;
+    return 1;
+}
+
+static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
+#if NG_RUNTIME_THING_COUNT > 0
+    short x;
+    short y;
+    if (thing >= NG_RUNTIME_THING_COUNT) return 0;
+    if (!test_position(&x, &y, forward, lateral)) return 0;
+    thing_x_q8[thing] = x;
+    thing_y_q8[thing] = y;
+    thing_type_override[thing] = type;
+    enemy_dead[thing] = 0;
+    enemy_hp[thing] = 0;
+    enemy_awake[thing] = 0;
+    enemy_attack_cooldown[thing] = 0;
+    enemy_hit_flash[thing] = 0;
+    enemy_attack_anim[thing] = 0;
+    return 1;
+#else
+    (void)thing;
+    (void)type;
+    (void)forward;
+    (void)lateral;
+    return 0;
+#endif
+}
+
 static void place_test_imp(void) {
 #if NG_RUNTIME_THING_COUNT > 0
     int px, py;
-    int dir_x, dir_y, plane_x, plane_y;
     static const short forward_steps[] = { WORLD_Q8(896), WORLD_Q8(1152), WORLD_Q8(640), WORLD_Q8(1408) };
     static const short lateral_steps[] = { 0, WORLD_Q8(192), -WORLD_Q8(192), WORLD_Q8(384), -WORLD_Q8(384) };
     rc_player_q8(&px, &py);
-    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
 
     for (u8 f = 0; f < sizeof(forward_steps) / sizeof(forward_steps[0]); f++) {
         for (u8 l = 0; l < sizeof(lateral_steps) / sizeof(lateral_steps[0]); l++) {
-            short x = (short)(px + ((dir_x * forward_steps[f]) >> 8) + ((plane_x * lateral_steps[l]) >> 8));
-            short y = (short)(py + ((dir_y * forward_steps[f]) >> 8) + ((plane_y * lateral_steps[l]) >> 8));
-            if (map_at(x >> 8, y >> 8)) continue;
+            short x;
+            short y;
+            if (!test_position(&x, &y, forward_steps[f], lateral_steps[l])) continue;
             thing_x_q8[0] = x;
             thing_y_q8[0] = y;
             thing_type_override[0] = 3001; /* imp: present in shareware and has full frame coverage */
@@ -1972,6 +2010,25 @@ static void configure_arsenal_test(void) {
     shown_keys = 0xFF;
     shown_weapon_status = 0xFFFF;
     place_test_imp();
+}
+#endif
+
+#ifdef DOOM_DEATH_TEST
+static void configure_death_test(void) {
+    player_has_shotgun = 1;
+    player_shells = 24;
+    current_weapon = WEAPON_SHOTGUN;
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+
+    place_test_thing(0, 9001, WORLD_Q8(760), -WORLD_Q8(360));  /* former human corpse */
+    place_test_thing(1, 9002, WORLD_Q8(760), -WORLD_Q8(120));  /* shotgun guy corpse */
+    place_test_thing(2, 9003, WORLD_Q8(760), WORLD_Q8(120));   /* imp corpse */
+    place_test_thing(3, 9004, WORLD_Q8(760), WORLD_Q8(360));   /* demon corpse */
+    if (test_position(&dynamic_drop_x_q8[0], &dynamic_drop_y_q8[0], WORLD_Q8(620), 0)) {
+        dynamic_drop_type[0] = 2001;
+        dynamic_drop_active[0] = 1;
+    }
 }
 #endif
 
@@ -3787,6 +3844,9 @@ static void restart_level(void) {
 #ifdef DOOM_ARSENAL_TEST
     configure_arsenal_test();
 #endif
+#ifdef DOOM_DEATH_TEST
+    configure_death_test();
+#endif
     init_background();
     init_walls();
     init_hud();
@@ -3815,6 +3875,9 @@ int main(void) {
 #endif
 #ifdef DOOM_ARSENAL_TEST
     configure_arsenal_test();
+#endif
+#ifdef DOOM_DEATH_TEST
+    configure_death_test();
 #endif
     compute_level_totals();
 
