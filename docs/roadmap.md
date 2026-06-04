@@ -48,9 +48,8 @@ after the current documentation pass.
 
 ## Map And Performance
 
-- Keep refining minimap responsiveness after the first incremental redraw pass:
-  reduce close-map HUD restore cost and redraw only changed cells where
-  possible.
+- Keep refining minimap responsiveness after the incremental open/close pass:
+  redraw only changed cells where possible.
 - Reduce runtime work in monster selection/projection.
 - Add a repeatable screenshot smoke test to CI for the Linux ROM build.
 - Convert more maps once E1M1 visual and gameplay fundamentals are stable.

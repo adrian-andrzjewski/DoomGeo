@@ -356,6 +356,8 @@ static int prev_px = -1, prev_py = -1;
 static u8  map_on = 0;              /* minimap visible?                       */
 static u8  minimap_redraw_active = 0;
 static u16 minimap_redraw_index = 0;
+static u8  minimap_clear_active = 0;
+static u16 minimap_clear_index = 0;
 static u8  weapon_frame = 0xFF;
 static u8  hud_face_frame = 0xFF;
 static u8  weapon_bob_phase = 0;
@@ -560,6 +562,8 @@ static void redraw_minimap_thing_cell(int thing_index);
 static void set_runtime_thing_position(int thing_index, short x_q8, short y_q8);
 static void close_minimap_for_terminal_message(void);
 static void start_minimap_redraw(void);
+static void start_minimap_clear(void);
+static void update_minimap_clear(void);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
@@ -3280,6 +3284,7 @@ static void draw_minimap(void) {
 static void start_minimap_redraw(void) {
     minimap_redraw_index = 0;
     minimap_redraw_active = 1;
+    minimap_clear_active = 0;
     prev_px = -1;
 }
 
@@ -3296,17 +3301,38 @@ static void update_minimap_redraw(void) {
 }
 
 /* blank just the minimap's fix region */
-static void clear_minimap(void) {
+static void clear_minimap_now(void) {
     minimap_redraw_active = 0;
+    minimap_clear_active = 0;
     for (int my = 0; my < MINIMAP_H; my++)
         for (int mx = 0; mx < MINIMAP_W; mx++)
             map_cell(mx, my, 0, FIX_BLANK);
 }
 
-static void close_minimap_for_terminal_message(void) {
-    if (!map_on && !minimap_redraw_active) return;
+static void start_minimap_clear(void) {
     map_on = 0;
-    clear_minimap();
+    minimap_redraw_active = 0;
+    minimap_clear_index = 0;
+    minimap_clear_active = 1;
+    prev_px = -1;
+}
+
+static void update_minimap_clear(void) {
+    enum { MINIMAP_CLEAR_CELLS_PER_FRAME = 96 };
+    u8 budget = MINIMAP_CLEAR_CELLS_PER_FRAME;
+    if (!minimap_clear_active) return;
+    while (budget && minimap_clear_index < (u16)(MINIMAP_W * MINIMAP_H)) {
+        u16 index = minimap_clear_index++;
+        map_cell(index % MINIMAP_W, index / MINIMAP_W, 0, FIX_BLANK);
+        budget--;
+    }
+    if (minimap_clear_index >= (u16)(MINIMAP_W * MINIMAP_H)) minimap_clear_active = 0;
+}
+
+static void close_minimap_for_terminal_message(void) {
+    if (!map_on && !minimap_redraw_active && !minimap_clear_active) return;
+    map_on = 0;
+    clear_minimap_now();
     prev_px = -1;
 }
 
@@ -4056,6 +4082,8 @@ static void restart_level(void) {
     prev_px = -1;
     prev_py = -1;
     map_on = 0;
+    minimap_redraw_active = 0;
+    minimap_clear_active = 0;
     weapon_frame = 0xFF;
     weapon_bob_phase = 0;
     weapon_bob_x = 0;
@@ -4284,9 +4312,11 @@ int main(void) {
             u8 c_now = pressed & C;
             if (c_now && !map_prev) {
                 if (pressed & A) {
-                    map_on = !map_on;
-                    if (map_on) start_minimap_redraw();
-                    else          clear_minimap();
+                    if (map_on) start_minimap_clear();
+                    else {
+                        map_on = 1;
+                        start_minimap_redraw();
+                    }
                     force_fix_hud_redraw();
                 } else if (pressed & dpad) {
                     select_weapon_group((u8)(pressed & dpad));
@@ -4298,6 +4328,7 @@ int main(void) {
         }
 
         update_minimap_redraw();
+        update_minimap_clear();
         update_marker();                /* 2 fix writes when the cell changes */
     }
     return 0;
