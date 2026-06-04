@@ -1524,12 +1524,19 @@ static u8 spawn_player_projectile(u16 type, u8 timer) {
     return 1;
 }
 
-static void detonate_player_projectile(void) {
-    spawn_impact_effect(projectile_x_q8, projectile_y_q8, 12);
-    if (projectile_type == 9007) damage_bfg_targets();
+static void clear_projectile(void) {
     projectile_active = 0;
     projectile_from_player = 0;
     projectile_source_thing = -1;
+    projectile_type = 0;
+    projectile_timer = 0;
+    projectile_damage = 0;
+}
+
+static void detonate_player_projectile(void) {
+    spawn_impact_effect(projectile_x_q8, projectile_y_q8, 12);
+    if (projectile_type == 9007) damage_bfg_targets();
+    clear_projectile();
     hide_enemies();
 }
 
@@ -1552,28 +1559,22 @@ static void update_impact_effect(void) {
 
 static void update_projectile(void) {
     int px, py;
-    int sx, h, dist_q8;
-    u8 visible;
     if (!projectile_active) return;
     if (!game_active()) {
-        projectile_active = 0;
-        projectile_from_player = 0;
-        projectile_source_thing = -1;
+        clear_projectile();
         return;
     }
     if (!projectile_from_player) {
         if (projectile_source_thing < 0 || enemy_dead[projectile_source_thing]
             || !thing_has_readable_slot(projectile_source_thing)) {
-            projectile_active = 0;
-            projectile_source_thing = -1;
+            clear_projectile();
             return;
         }
     }
     if (projectile_type == 9000 && projectile_damage == 0) {
         if (projectile_timer) projectile_timer--;
         if (!projectile_timer) {
-            projectile_active = 0;
-            projectile_source_thing = -1;
+            clear_projectile();
         }
         return;
     }
@@ -1585,25 +1586,22 @@ static void update_projectile(void) {
             return;
         }
         spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
-        projectile_active = 0;
-        projectile_source_thing = -1;
+        clear_projectile();
         return;
     }
-    visible = project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8);
     rc_player_q8(&px, &py);
     if (!projectile_from_player && iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
         spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
-        if (visible) player_take_damage(projectile_damage);
-        projectile_active = 0;
-        projectile_source_thing = -1;
+        player_take_damage(projectile_damage);
+        hurt_timer = 24;
+        clear_projectile();
         return;
     }
     if (projectile_timer) projectile_timer--;
     if (!projectile_timer) {
         if (projectile_from_player) detonate_player_projectile();
         else {
-            projectile_active = 0;
-            projectile_source_thing = -1;
+            clear_projectile();
         }
     }
 }

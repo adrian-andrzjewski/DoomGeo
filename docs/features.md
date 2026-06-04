@@ -146,6 +146,9 @@ readable.
   Imps, Hell Knights, cacodemons, Barons, and placeholder Doom II projectile
   monsters can launch visible fireball sprites; those fireballs are dropped if
   their source monster leaves the readable rendered slot set before impact.
+  Once a readable monster launches a fireball, a close player impact always
+  applies damage and hurt feedback instead of depending on whether the fireball
+  still projects cleanly on the exact collision frame.
 - Visible monsters are clamped to a minimum projected sprite size before
   drawing, which keeps distant shooters readable under the reduced 20-column
   wall pass instead of letting them collapse into near-invisible sprite strips.
