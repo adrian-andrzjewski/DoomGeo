@@ -1022,7 +1022,7 @@ static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
         }
     }
     if (first_angle >= 0) return first_angle;
-    return first >= 0 ? first : 0;
+    return first >= 0 ? first : -1;
 }
 
 static void load_enemy_palette(u16 slot, int def) {
@@ -3219,8 +3219,14 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
 static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash) {
     int idx;
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
-    const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
+    const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
+
+    if (def_idx < 0) {
+        hide_enemy_slot(slot);
+        return;
+    }
+    def = &g_enemy_sprite_defs[def_idx];
 
     if (thing_is_monster(thing_type) && h > 0 && h < 34) h = 34;
 

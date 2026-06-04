@@ -53,6 +53,17 @@ launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
 `SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, or `SMOKE_WAIT_SECS` when capturing variants
 such as the E1M2 key-test ROM.
 
+Sprite spec checks can be run without a full ROM build when adding optional
+registered, commercial, or Doom II monster art:
+
+```sh
+python3 tools/check_sprite_specs.py --iwad path/to/doom.wad \
+  --spec '3005:HEADA1,3006:SKULA1,9028:HEADL0'
+```
+
+The helper uses the same WAD patch loader as `tools/gen_gfx.py`, but only bakes
+one scale level for the requested frames.
+
 ## Local Windows Build
 
 ngdevkit's current Windows path is native MSYS2 UCRT64. Run the helper from an

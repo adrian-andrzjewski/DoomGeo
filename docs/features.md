@@ -129,6 +129,9 @@ readable.
 - Thing projection falls back to a q8 player/view-vector projection after a
   successful map line-of-sight check, which avoids false sprite culling from the
   coarse wall depth buffer.
+- Runtime sprite lookup now refuses to draw missing sprite definitions instead
+  of falling back to the first baked enemy, which prevents wrong-looking
+  monsters or corrupt placeholder sprites when a WAD lacks optional art.
 - Barrels explode and can apply radius damage.
 - Killed monsters show a short three-step Doom death sequence before settling
   into corpse frames or drops where implemented. Hell Knights and cacodemons now
