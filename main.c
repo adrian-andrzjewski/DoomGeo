@@ -433,7 +433,16 @@ static const char *intro_glyph_rows(char ch) {
     case 'M': return "101111111101101";
     case 'O': return "111101101101111";
     case 'S': return "111100111001111";
+    case '0': return "111101101101111";
     case '1': return "010110010010111";
+    case '2': return "111001111100111";
+    case '3': return "111001111001111";
+    case '4': return "101101111001001";
+    case '5': return "111100111001111";
+    case '6': return "111100111101111";
+    case '7': return "111001010010010";
+    case '8': return "111101111101111";
+    case '9': return "111101111001111";
     default: return "000000000000000";
     }
 }
@@ -460,12 +469,19 @@ static void intro_draw_rule(u16 col, u16 row, u16 width, u16 pal) {
     for (u16 x = 0; x < width; x++) fix_poke((u16)(col + x), row, pal, FIX_SOLID);
 }
 
+static void intro_draw_map_code(u16 col, u16 row, u16 pal) {
+    intro_draw_glyph(col, row, 'E', pal);
+    intro_draw_glyph((u16)(col + 4), row, (char)('0' + DOOM_MAP_EPISODE), pal);
+    intro_draw_glyph((u16)(col + 8), row, 'M', pal);
+    intro_draw_glyph((u16)(col + 12), row, (char)('0' + DOOM_MAP_MISSION), pal);
+}
+
 static void draw_intro_menu(u8 blink_on) {
     clear_fix();
     intro_draw_rule(6, 2, 28, PAL_MAP_WALL);
     intro_draw_word(4, 5, "DOOM GEO", PAL_MAP_PLAYER);
     intro_draw_rule(6, 11, 28, PAL_MAP_WALL);
-    intro_draw_word(12, 14, "E1M1", PAL_HUD);
+    intro_draw_map_code(12, 14, PAL_HUD);
     intro_draw_word(12, 21, "B D", PAL_MAP_PLAYER);
     if (blink_on) {
         intro_draw_glyph(7, 14, 'S', PAL_MAP_PLAYER);
@@ -3313,12 +3329,22 @@ static void draw_stat3(u16 col, u16 row, u16 label, u16 value) {
     fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + capped % 10));
 }
 
+static void draw_fix_map_code(u16 col, u16 row, u8 episode, u8 mission) {
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + episode));
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, FIX_AMMO_M);
+    fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + mission));
+}
+
 static void draw_exit_stats(void) {
     const u16 col = (SCRW / 16) - 2;
     draw_exit_message();
     draw_stat3(col, 12, FIX_KEY_MSG_K, completion_percent(player_kills, level_total_kills));
     draw_stat3(col, 13, (u16)(FIX_EXIT_BASE + 2), completion_percent(player_items, level_total_items));
     draw_stat3(col, 14, FIX_SECRET_S, completion_percent(player_secrets, level_total_secrets));
+    if (DOOM_NEXT_MAP_EPISODE && DOOM_NEXT_MAP_MISSION) {
+        draw_fix_map_code(col, 15, DOOM_NEXT_MAP_EPISODE, DOOM_NEXT_MAP_MISSION);
+    }
 }
 
 static void draw_pickup_message(void) {

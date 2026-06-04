@@ -17,6 +17,9 @@ readable.
   `DOOM_MAP_HEIGHT`, and `DOOM_SKILL_MASK` at build time. The default skill
   mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
   or `2` for medium placement.
+- The generated header exposes the current map code and Episode 1 next-map
+  metadata. The intro screen now shows the compiled map instead of a hard-coded
+  E1M1 label, and the completion overlay can show the next standalone map code.
 
 ## Rendering
 
@@ -282,6 +285,10 @@ readable.
   start-to-exit route. `make episode-route-check` runs the same pass in strict
   mode. The default grid now routes E1M1-E1M7 and E1M9, while E1M8 reports the
   supported boss-death exit because it has no linedef exit.
+- `make episode-map-rom EPISODE_MAP=E1M3` and `make episode-map-gngeo
+  EPISODE_MAP=E1M3` build or launch a standalone ROM for a specific Episode 1
+  map under `build/episode-roms/`. `make episode-roms` loops through E1M1-E1M9
+  and builds one standalone ROM output per map.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
@@ -510,7 +517,9 @@ readable.
   door edge or slightly off-center.
 - Exits freeze the level and show compact kill/item/secret completion
   percentage rows before restart, computed from the converted map's runtime
-  monsters, pickups, and secret cells.
+  monsters, pickups, and secret cells. When the generated metadata names a next
+  Episode 1 map, the overlay also draws that map code as the next standalone
+  ROM to run.
 - Damaging floor cells apply periodic damage through the same hurt/armor path as
   combat, unless the radiation-suit timer is active.
 - Secret cells can be discovered once and increment the secret count.

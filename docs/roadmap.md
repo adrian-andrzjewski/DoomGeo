@@ -72,4 +72,5 @@ after the current documentation pass.
 - Convert Doom sound lumps to Neo Geo-friendly sample data.
 - Decide whether music should be simplified YM2610 arrangements, sample-based
   approximations, or skipped until the visual/gameplay port is stronger.
-- Add menus, intermission flow, and more complete restart/progression behavior.
+- Replace the current standalone-map progression prompt with a true multi-map
+  episode/intermission flow once multiple generated maps can live in one cart.

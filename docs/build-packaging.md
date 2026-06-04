@@ -78,6 +78,18 @@ which maps currently have a generated start-to-exit route at the configured
 grid size. Run `make episode-route-check` for the strict gate: E1M1-E1M7 and
 E1M9 must route, and E1M8 must expose the supported boss-death completion path.
 
+To build a standalone ROM for a specific Episode 1 map, run:
+
+```sh
+make episode-map-rom EPISODE_MAP=E1M3
+```
+
+The output lands in `build/episode-roms/E1M3-rom/`. Use
+`make episode-map-gngeo EPISODE_MAP=E1M3` to launch that standalone map in
+GnGeo. `make episode-roms` loops through E1M1-E1M9 and produces one standalone
+ROM output per map; this is still map-by-map packaging, not a single multi-map
+episode cart.
+
 For the broad playable-feature regression pass, run `tools/smoke_gameplay.sh`.
 It starts with `make route-check`, then chains the verified enemy visibility,
 key-door, weapon shortcut, death/drop, and powerup smoke helpers into one command
