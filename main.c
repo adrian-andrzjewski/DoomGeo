@@ -373,6 +373,8 @@ static u8  floor_damage_timer = 0;
 static u8  armor_flash_timer = 0;
 static u8  level_complete = 0;
 static u32 bg_scroll_key = 0xFFFFFFFFUL;
+static u32 bg_pending_key = 0xFFFFFFFFUL;
+static u8  bg_update_col = 0;
 static u8  key_message_timer = 0;
 static u8  ammo_message_timer = 0;
 static u8  door_message_timer = 0;
@@ -1067,6 +1069,12 @@ static u8 monster_hp(int thing_index) {
     return enemy_hp[thing_index];
 }
 
+static void invalidate_background_cache(void) {
+    bg_scroll_key = 0xFFFFFFFFUL;
+    bg_pending_key = 0xFFFFFFFFUL;
+    bg_update_col = 0;
+}
+
 static void spawn_dynamic_drop(u16 thing_type, short x_q8, short y_q8) {
     u8 slot = 0;
     if (!thing_type) return;
@@ -1080,7 +1088,7 @@ static void spawn_dynamic_drop(u16 thing_type, short x_q8, short y_q8) {
     dynamic_drop_type[slot] = thing_type;
     dynamic_drop_x_q8[slot] = x_q8;
     dynamic_drop_y_q8[slot] = y_q8;
-    bg_scroll_key = 0xFFFFFFFFUL;
+    invalidate_background_cache();
     hide_enemies();
 }
 
@@ -2490,7 +2498,7 @@ static void collect_nearby_pickups(void) {
         if (iabs16(px - dynamic_drop_x_q8[i]) <= WORLD_Q8(96) && iabs16(py - dynamic_drop_y_q8[i]) <= WORLD_Q8(96)) {
             if (apply_pickup(dynamic_drop_type[i])) {
                 dynamic_drop_active[i] = 0;
-                bg_scroll_key = 0xFFFFFFFFUL;
+                invalidate_background_cache();
                 hide_enemies();
             }
         }
@@ -3336,10 +3344,9 @@ static void disable_sprites(void) {
 }
 
 /* ---- floor/ceiling backdrop: BG_COUNT full-width columns ---------------
- * Keep the current gameplay backdrop as flat shaded bands. The textured
- * perspective cache is still generated for experiments, but the live game uses
- * solid tiles here because the coarse floor/ceiling texture was reading noisier
- * than the original Doom-like wall pass.
+ * Use the offline perspective flat cache as a coarse Neo Geo substitute for
+ * Doom's software spans. Direction and coarse player position select tile
+ * columns so the planes move with the camera without runtime floor casting.
  */
 static u8 plane_direction_bucket(int dir_x, int dir_y) {
     static const short dirs[TILE_PLANE_PERSPECTIVE_DIRS][2] = {
@@ -3382,11 +3389,54 @@ static void init_background(void) {
         scb3(spr, 0, 0, BG_WIN);      /* top of screen                       */
         scb4(spr, i * 16);
     }
-    bg_scroll_key = 0xFFFFFFFFUL;
+    invalidate_background_cache();
 }
 
 static void update_background_scroll(void) {
-    bg_scroll_key = 0;
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
+    u8 direction;
+    u8 scroll_col;
+    u32 key;
+    u8 columns_this_frame = 4;
+
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    direction = plane_direction_bucket(dir_x, dir_y);
+    {
+        int scroll = (px >> 6) + (py >> 6);
+        while (scroll >= BG_COUNT) scroll -= BG_COUNT;
+        while (scroll < 0) scroll += BG_COUNT;
+        scroll_col = (u8)scroll;
+    }
+    key = (u32)direction | ((u32)scroll_col << 8);
+    if (key != bg_pending_key) {
+        bg_pending_key = key;
+        bg_update_col = 0;
+    }
+    if (bg_scroll_key == bg_pending_key) return;
+
+    while (columns_this_frame-- && bg_update_col < BG_COUNT) {
+        u16 col = bg_update_col++;
+        u16 spr = BG_BASE + col;
+        u16 plane_col = (u16)(col + scroll_col);
+        if (plane_col >= BG_COUNT) plane_col = (u16)(plane_col - BG_COUNT);
+        vram_addr(VRAM_SCB1 + spr * 64);
+        vram_mod(1);
+        for (u16 row = 0; row < BG_WIN; row++) {
+            u16 pal = (row < BG_SPLIT)
+                ? (u16)(PAL_CEILING_GRAD_BASE + row)
+                : (u16)(PAL_FLOOR_GRAD_BASE + (row - BG_SPLIT));
+            u16 tile = (row < BG_SPLIT)
+                ? perspective_plane_tile(TILE_CEILING_PERSPECTIVE_BASE, direction, 0, 0, row, plane_col)
+                : perspective_plane_tile(TILE_FLOOR_PERSPECTIVE_BASE, direction, 0, 0, (u16)(row - BG_SPLIT), plane_col);
+            vram_w(tile);
+            vram_w((u16)(pal << 8));
+        }
+    }
+    if (bg_update_col >= BG_COUNT) bg_scroll_key = bg_pending_key;
+    (void)plane_x;
+    (void)plane_y;
 }
 
 /* ---- wall-slice sprites: fixed X + brick tilemap set once; SCB2/SCB3
@@ -4027,7 +4077,7 @@ static void restart_level(void) {
     hurt_timer = 0;
     floor_damage_timer = 0;
     level_complete = 0;
-    bg_scroll_key = 0xFFFFFFFFUL;
+    invalidate_background_cache();
     key_message_timer = 0;
     missing_key_bits = 0;
     ammo_message_timer = 0;

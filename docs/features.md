@@ -30,9 +30,11 @@ readable.
   tile strips. The current preferred wall texture is `STARTAN3`, with alternate
   atlases for common E1M1 walls and `BIGDOOR2` doors.
 - Floor and ceiling use compact pre-baked perspective tile caches selected by
-  player direction. This is a compromise, not true Doom span rendering; the
-  cache is deliberately kept small so monster and pickup sprite tiles stay
-  inside the visible Neo Geo C-ROM tile range.
+  player direction and coarse position. The runtime wraps those tile columns
+  incrementally over several frames so movement reads less static without
+  spending one full vblank on plane uploads. This is a compromise, not true Doom
+  span rendering; the cache is deliberately kept small so monster and pickup
+  sprite tiles stay inside the visible Neo Geo C-ROM tile range.
 - Depth palettes and directional shading give walls/planes distance cues without
   runtime pixel drawing.
 

@@ -37,8 +37,9 @@ after the current documentation pass.
 
 ## Rendering Fidelity
 
-- Improve floor and ceiling rendering so movement reads more like Doom and less
-  like a static plane approximation.
+- Tune the first cached perspective floor/ceiling pass: reduce noise, improve
+  movement phase choices, and keep uploads inside the Neo Geo sprite/vblank
+  budget.
 - Investigate a higher-fidelity wall path using the generated seg/node data.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
