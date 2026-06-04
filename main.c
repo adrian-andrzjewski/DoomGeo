@@ -4397,12 +4397,13 @@ static int select_visible_things(int found) {
         int sx, h, dist_q8;
         u8 bucket;
         ThingCandidate candidate;
-        u16 thing_type = runtime_thing_type(i);
+        u16 thing_type;
         if (enemy_dead[i]) continue;
+        if (!thing_maybe_projectable(thing_x_q8[i], thing_y_q8[i], px, py, dir_x, dir_y)) continue;
+        thing_type = runtime_thing_type(i);
         bucket = thing_render_bucket(thing_type);
         if (!bucket) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
-        if (!thing_maybe_projectable(thing_x_q8[i], thing_y_q8[i], px, py, dir_x, dir_y)) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
             if (!project_point_q8(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;

@@ -180,6 +180,9 @@ readable.
 - Monster AI applies its active-range gate before resolving thing type, so
   distant converted things do not spend CPU on monster classification during
   movement ticks.
+- Visible thing selection rejects behind-camera and far-away things before
+  resolving runtime type or render bucket, reducing per-frame sprite candidate
+  work while preserving the same final projection and priority rules.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
