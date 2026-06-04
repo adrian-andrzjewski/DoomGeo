@@ -3947,12 +3947,13 @@ static int select_visible_things(int found, u8 pass) {
         int score;
         ThingCandidate candidate;
         u16 thing_type = runtime_thing_type(i);
-        u8 is_monster = thing_is_runtime_threat(thing_type);
         if (enemy_dead[i]) continue;
-        if (pass == 1 && !is_monster) continue;
-        if (pass == 2 && (!thing_is_pickup(thing_type) || !pickup_is_collectible(thing_type))) continue;
-        if (pass == 3 && !thing_is_corpse(thing_type)) continue;
-        if (pass == 4 && (!thing_is_pickup(thing_type) || pickup_is_collectible(thing_type))) continue;
+        if (pass == 1 && !thing_is_monster(thing_type)) continue;
+        if (pass == 2 && !thing_is_runtime_threat(thing_type)) continue;
+        if (pass == 2 && thing_is_monster(thing_type)) continue;
+        if (pass == 3 && (!thing_is_pickup(thing_type) || !pickup_is_collectible(thing_type))) continue;
+        if (pass == 4 && !thing_is_corpse(thing_type)) continue;
+        if (pass == 5 && (!thing_is_pickup(thing_type) || pickup_is_collectible(thing_type))) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
@@ -3977,15 +3978,15 @@ static int select_visible_things(int found, u8 pass) {
         insert_thing_candidate(candidates, &count, &candidate);
     }
 
-    if (pass == 2 || pass == 4) {
+    if (pass == 3 || pass == 5) {
         for (u8 i = 0; i < 8; i++) {
             int sx, h, dist_q8;
             int score;
             ThingCandidate candidate;
             u16 thing_type = dynamic_drop_type[i];
             if (!dynamic_drop_active[i]) continue;
-            if (pass == 2 && !pickup_is_collectible(thing_type)) continue;
-            if (pass == 4 && pickup_is_collectible(thing_type)) continue;
+            if (pass == 3 && !pickup_is_collectible(thing_type)) continue;
+            if (pass == 5 && pickup_is_collectible(thing_type)) continue;
             if (candidate_coord_selected(candidates, count, dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
             u8 fallback_projection = 0;
             if (!rc_project_point(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) {
@@ -4046,6 +4047,7 @@ static void update_enemy(void) {
     found = select_visible_things(found, 2);
     found = select_visible_things(found, 3);
     found = select_visible_things(found, 4);
+    found = select_visible_things(found, 5);
     found = render_visible_impact(found);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }

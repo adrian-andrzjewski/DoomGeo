@@ -223,9 +223,10 @@ readable.
   visible slots. Edge-clipped or missing-art candidates can fail without
   starving later visible monsters in the same pass, which makes combat scenes
   less likely to contain an attacking-but-invisible enemy.
-- The first threat pass still sorts by distance, center position, and projected
-  size, but live monsters receive a stronger score bias than barrels or transient
-  explosions so scarce slots favor enemies the player must react to.
+- Visible thing selection uses separate passes for projectiles, live monsters,
+  barrels/explosions, collectible pickups, corpses, and noncollectible pickups.
+  Live monsters therefore fill scarce world-sprite slots before shootable
+  barrels or transient explosion sprites can claim them.
 - Impact bursts are rendered only when a free world-sprite slot remains, so shot
   feedback cannot overwrite a selected monster, pickup, corpse, or drop slot.
 - Monster visibility tests now count readable on-screen slots, not merely
