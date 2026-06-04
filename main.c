@@ -382,6 +382,8 @@ static u8  ammo_message_timer = 0;
 static u8  door_message_timer = 0;
 static u8  secret_message_timer = 0;
 static u8  pickup_message_timer = 0;
+static u8  weapon_message_timer = 0;
+static u8  weapon_message_digit = 0;
 static u8  pickup_message_type = 0;
 static u8  pickup_message_key = 0;
 static u8  key_message_visible = 0;
@@ -885,6 +887,33 @@ static u8 switch_to_ready_weapon(void) {
         }
     }
     return 0;
+}
+
+static u8 weapon_slot_digit(u8 weapon) {
+    switch (weapon) {
+    case WEAPON_FIST:
+    case WEAPON_CHAINSAW:
+        return 1;
+    case WEAPON_PISTOL:
+        return 2;
+    case WEAPON_SHOTGUN:
+        return 3;
+    case WEAPON_CHAINGUN:
+        return 4;
+    case WEAPON_ROCKET:
+        return 5;
+    case WEAPON_PLASMA:
+        return 6;
+    case WEAPON_BFG:
+        return 7;
+    default:
+        return 0;
+    }
+}
+
+static void trigger_weapon_message(void) {
+    weapon_message_digit = weapon_slot_digit(current_weapon);
+    weapon_message_timer = 24;
 }
 
 static u8 key_bit_for_thing(u16 thing_type) {
@@ -2592,6 +2621,13 @@ static void draw_weapon_pickup_message(void) {
     fix_poke(col, row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + weapon));
 }
 
+static void draw_weapon_select_message(void) {
+    const u16 col = SCRW / 16;
+    const u16 row = (GAME_H / 16) - 2;
+    u8 weapon = weapon_message_digit ? weapon_message_digit : weapon_slot_digit(current_weapon);
+    fix_poke(col, row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + weapon));
+}
+
 static void draw_stat3(u16 col, u16 row, u16 label, u16 value) {
     u16 capped = value > 999 ? 999 : value;
     fix_poke(col, row, PAL_MAP_PLAYER, label);
@@ -2665,6 +2701,11 @@ static void update_center_message(void) {
         clear_center_message();
         draw_pickup_message();
         pickup_message_timer--;
+        key_message_visible = 1;
+    } else if (weapon_message_timer) {
+        clear_center_message();
+        draw_weapon_select_message();
+        weapon_message_timer--;
         key_message_visible = 1;
     } else if (key_message_visible) {
         clear_center_message();
@@ -3568,6 +3609,7 @@ static void toggle_weapon(void) {
             current_weapon = weapon;
             weapon_frame = 0xFF;
             shown_ammo = 0xFFFF;
+            trigger_weapon_message();
             return;
         }
     }
@@ -3580,6 +3622,7 @@ static void toggle_weapon(void) {
     }
     weapon_frame = 0xFF;
     shown_ammo = 0xFFFF;
+    trigger_weapon_message();
 }
 
 static u8 select_next_weapon_from_list(const u8 *weapons, u8 count, u8 require_ammo) {
@@ -3597,6 +3640,7 @@ static u8 select_next_weapon_from_list(const u8 *weapons, u8 count, u8 require_a
             current_weapon = weapon;
             weapon_frame = 0xFF;
             shown_ammo = 0xFFFF;
+            trigger_weapon_message();
             return 1;
         }
     }
@@ -4108,6 +4152,8 @@ static void restart_level(void) {
     door_message_timer = 0;
     secret_message_timer = 0;
     pickup_message_timer = 0;
+    weapon_message_timer = 0;
+    weapon_message_digit = 0;
     pickup_message_type = 0;
     pickup_message_key = 0;
     key_message_visible = 0;
