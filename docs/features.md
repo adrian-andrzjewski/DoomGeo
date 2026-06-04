@@ -92,6 +92,11 @@ readable.
   enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
   visible imp in front of the player, and equips the shotgun while leaving the
   normal cart path unchanged.
+- `make arsenal-test-rom` and `make arsenal-test-gngeo` build an isolated E1M1
+  weapons/keycard HUD verification ROM. It compiles with `DOOM_ARSENAL_TEST`,
+  grants all implemented weapons, backpack ammo caps, all three keycards, blue
+  armor, and the same visible test imp while leaving the normal cart path
+  unchanged.
 - The E1M2 key-test conversion currently includes one red keycard and a six-cell
   red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma

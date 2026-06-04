@@ -19,7 +19,7 @@ drawing pixels.
 | Rendering | Fallback 20-column wall raycaster, Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and eight visible world-thing slots kept under the Neo Geo scanline limit. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use placeholder psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the real art. |
-| Gameplay | Pickups, keys, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom` boots an isolated enemy-combat verification ROM. |
+| Gameplay | Pickups, keys, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom` and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening the map fills incrementally instead of blocking on a full fix-layer redraw. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
 | Browser build | GitHub Pages package runs the ROM through EmulatorJS/FBNeo, plus a separate 68000 ASM demo build. |
@@ -34,9 +34,9 @@ drawing pixels.
 | --- | --- |
 | ![Current HUD status bar and known number placement issue](docs/screenshots/doomgeo-aes-current-hud.png) | ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
 
-| Combat test ROM |
-| --- |
-| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) |
+| Combat test ROM | Arsenal test ROM |
+| --- | --- |
+| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) |
 
 | Native Doom comparison |
 | --- |
@@ -82,6 +82,8 @@ make key-test-rom
 make key-test-gngeo
 make combat-test-rom
 make combat-test-gngeo
+make arsenal-test-rom
+make arsenal-test-gngeo
 make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
