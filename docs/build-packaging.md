@@ -72,6 +72,13 @@ that the converted player start can reach the converted exit from the current
 `build/doom_map_generated.h` and reports whether the route depends on generated
 door cells.
 
+For a broader Episode 1 conversion baseline, run `make episode-route-report`.
+It converts `E1M1` through `E1M9` into `build/episode-route/` and reports
+which maps currently have a generated start-to-exit route at the configured
+grid size. The command is intentionally a report instead of a hard CI gate
+while the converter still needs more topology support for locked doors,
+switch/lift progression, and the `E1M8` boss-death exit.
+
 For the broad playable-feature regression pass, run `tools/smoke_gameplay.sh`.
 It starts with `make route-check`, then chains the verified enemy visibility,
 key-door, weapon shortcut, death/drop, and powerup smoke helpers into one command

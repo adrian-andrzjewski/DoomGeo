@@ -277,6 +277,11 @@ readable.
 - `make route-check` statically verifies the generated E1M1 start-to-exit
   route against `build/doom_map_generated.h`, including whether completion
   depends on generated door cells.
+- `make episode-route-report` converts shareware `E1M1` through `E1M9` into
+  isolated generated headers and reports whether each map has a coarse-grid
+  start-to-exit route. This is a progress baseline for real Episode 1 support:
+  the current default grid still exposes blocked routes on several maps and
+  marks `E1M8` as needing boss-death completion because it has no linedef exit.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
