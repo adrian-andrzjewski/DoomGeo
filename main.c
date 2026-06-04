@@ -338,6 +338,12 @@ static volatile u16 player_ammo = 50;
 static volatile u16 player_shells = 0;
 static volatile u16 player_rockets = 0;
 static volatile u16 player_cells = 0;
+static u16 power_invuln_timer = 0;
+static u16 power_invis_timer = 0;
+static u16 power_radsuit_timer = 0;
+static u16 power_lightamp_timer = 0;
+static u8 power_computer_map = 0;
+static u8 player_berserk = 0;
 static u16 player_max_bullets = 200;
 static u16 player_max_shells = 50;
 static u16 player_max_rockets = 50;
@@ -448,6 +454,7 @@ static void draw_minimap_source_cell(int map_x, int map_y);
 static void redraw_minimap_thing_cell(int thing_index);
 static void set_runtime_thing_position(int thing_index, short x_q8, short y_q8);
 static void close_minimap_for_terminal_message(void);
+static void start_minimap_redraw(void);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
@@ -577,6 +584,12 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2015:
     case 2018:
     case 2019:
+    case 2022:
+    case 2023:
+    case 2024:
+    case 2025:
+    case 2026:
+    case 2045:
     case 2046:
     case 2047:
     case 2048:
@@ -630,6 +643,18 @@ static u8 pickup_is_collectible(u16 thing_type) {
         return player_armor < 100 || player_armor_class == 0;
     case 2019: /* blue armor */
         return player_armor < 200 || player_armor_class < 2;
+    case 2022: /* invulnerability */
+        return power_invuln_timer < 1050;
+    case 2023: /* berserk */
+        return !player_berserk || player_health < 100;
+    case 2024: /* partial invisibility */
+        return power_invis_timer < 1050;
+    case 2025: /* radiation suit */
+        return power_radsuit_timer < 1050;
+    case 2026: /* computer area map */
+        return !power_computer_map;
+    case 2045: /* light amplification visor */
+        return power_lightamp_timer < 1050;
     default:
         return 0;
     }
@@ -982,6 +1007,16 @@ static u16 fallback_sprite_type_for_missing_pickup(u16 thing_type) {
         return 5;
     case 2049: /* box of shells */
         return 2008; /* shells */
+    case 2022: /* invulnerability */
+    case 2024: /* partial invisibility */
+    case 2045: /* light amplification visor */
+        return 2013; /* soulsphere */
+    case 2023: /* berserk */
+        return 2012; /* medikit */
+    case 2025: /* radiation suit */
+        return 2018; /* green armor */
+    case 2026: /* computer area map */
+        return 2048; /* ammo box */
     default:
         return 0;
     }
@@ -1457,6 +1492,10 @@ static void update_enemy_hit_flash(void) {
 
 static void player_take_damage(u16 amount) {
     u16 original_amount = amount;
+    if (amount && power_invuln_timer) {
+        hurt_flash = 2;
+        return;
+    }
     if (amount && player_armor && player_armor_class) {
         u16 saved = player_armor_class >= 2 ? (amount >> 1) : (amount / 3);
         if (saved > player_armor) saved = player_armor;
@@ -1692,6 +1731,10 @@ static void update_monster_damage(void) {
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
             u16 projectile = monster_projectile_type(runtime_thing_type(thing));
+            if (power_invis_timer && ((monster_ai_tick + thing) & 1)) {
+                enemy_attack_cooldown[thing] = 24;
+                continue;
+            }
             if (projectile) {
                 if (!spawn_monster_projectile(thing, projectile, ranged_damage)) continue;
                 enemy_attack_cooldown[thing] = 72;
@@ -2049,6 +2092,13 @@ static u8 add_capped_u16(volatile u16 *value, u16 amount, u16 cap) {
     return 1;
 }
 
+static void update_power_timers(void) {
+    if (power_invuln_timer) power_invuln_timer--;
+    if (power_invis_timer) power_invis_timer--;
+    if (power_radsuit_timer) power_radsuit_timer--;
+    if (power_lightamp_timer) power_lightamp_timer--;
+}
+
 static u8 apply_pickup(u16 thing_type) {
     u8 key = key_bit_for_thing(thing_type);
     if (key) {
@@ -2204,6 +2254,40 @@ static u8 apply_pickup(u16 thing_type) {
         if (player_armor >= 200 && player_armor_class >= 2) return 0;
         if (player_armor < 200) player_armor = 200;
         player_armor_class = 2;
+        pickup_message_type = 5;
+        break;
+    case 2022: /* invulnerability */
+        if (power_invuln_timer >= 1050) return 0;
+        power_invuln_timer = 1050;
+        face_evil_timer = 70;
+        pickup_message_type = 5;
+        break;
+    case 2023: /* berserk */
+        if (player_berserk && player_health >= 100) return 0;
+        player_berserk = 1;
+        if (player_health < 100) player_health = 100;
+        face_evil_timer = 70;
+        pickup_message_type = 4;
+        break;
+    case 2024: /* partial invisibility */
+        if (power_invis_timer >= 1050) return 0;
+        power_invis_timer = 1050;
+        pickup_message_type = 5;
+        break;
+    case 2025: /* radiation suit */
+        if (power_radsuit_timer >= 1050) return 0;
+        power_radsuit_timer = 1050;
+        pickup_message_type = 5;
+        break;
+    case 2026: /* computer area map */
+        if (power_computer_map) return 0;
+        power_computer_map = 1;
+        if (map_on) start_minimap_redraw();
+        pickup_message_type = 3;
+        break;
+    case 2045: /* light amplification visor */
+        if (power_lightamp_timer >= 1050) return 0;
+        power_lightamp_timer = 1050;
         pickup_message_type = 5;
         break;
     case 2046: /* box of rockets */
@@ -2442,6 +2526,7 @@ static void update_floor_damage(void) {
         floor_damage_timer--;
         return;
     }
+    if (power_radsuit_timer) return;
     rc_player_q8(&px, &py);
     damage = map_cell_damage(px >> 8, py >> 8);
     if (!damage) return;
@@ -3356,7 +3441,7 @@ static void update_weapon(u8 pressed) {
             fire_timer = 12;
             trigger_weapon_flash();
             alert_monsters_by_sound();
-            fire_melee_damage(2);
+            fire_melee_damage(player_berserk ? 12 : 2);
         } else if (current_weapon == WEAPON_CHAINGUN && player_has_chaingun) {
             if (player_ammo > 0) {
                 player_ammo--;
@@ -3801,6 +3886,12 @@ static void restart_level(void) {
     player_shells = 0;
     player_rockets = 0;
     player_cells = 0;
+    power_invuln_timer = 0;
+    power_invis_timer = 0;
+    power_radsuit_timer = 0;
+    power_lightamp_timer = 0;
+    power_computer_map = 0;
+    player_berserk = 0;
     player_max_bullets = PLAYER_MAX_BULLETS;
     player_max_shells = PLAYER_MAX_SHELLS;
     player_max_rockets = PLAYER_MAX_ROCKETS;
@@ -3939,6 +4030,7 @@ int main(void) {
         update_monster_damage();
         update_weapon(pressed);
         update_enemy_hit_flash();
+        update_power_timers();
         update_status_numbers(pressed);
         update_center_message();
 

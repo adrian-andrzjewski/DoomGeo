@@ -58,7 +58,9 @@ readable.
   keycard path can be verified visually instead of only through generated data.
 - Owned HUD keys use the baked Doom keycard patches from the WAD, shrunken into
   the status-bar key cells with the matching WAD-derived blue/red/yellow
-  palettes instead of coarse placeholder glyphs.
+  palettes instead of coarse placeholder glyphs. Transparent patch pixels stay
+  transparent in the generated Neo Geo tiles, so the cells do not fill with a
+  solid placeholder color.
 - The crosshair marker has been cleared from the current runtime path.
 
 ## Weapons And Combat
@@ -99,8 +101,8 @@ readable.
 ## Things, Pickups, And Enemies
 
 - Runtime things include common E1M1 pickups, keys, bullet/shell/rocket/cell
-  ammo, armor, health, backpack, weapons, barrels, monsters, projectiles,
-  corpses, and explosions.
+  ammo, armor, health, backpack, standard Doom powerups, weapons, barrels,
+  monsters, projectiles, corpses, and explosions.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
@@ -131,6 +133,14 @@ readable.
   armor can still be collected as a class upgrade when the player has weaker
   armor, matching the damage-reduction model instead of checking only the
   numeric armor value.
+- Core Doom powerups now survive conversion and have runtime effects:
+  invulnerability blocks player damage, berserk raises health to at least 100
+  and strengthens fist damage, partial invisibility makes readable ranged
+  monster attacks miss intermittently, radiation suits suppress damaging-floor
+  ticks, computer maps mark the automap pickup as collected, and light goggles
+  are accepted as a timed pickup. Shareware builds bake the powerup sprites
+  whose lumps are present and use safe fallback pickup sprites for missing
+  registered-only frames.
 - Former humans, shotgun guys, imps, demons/spectres, Hell Knights, Barons,
   cacodemons, lost souls, Doom II heavy weapon dudes, revenants, mancubi,
   arachnotrons, arch-viles, pain elementals, cyberdemons, spider masterminds,
@@ -224,7 +234,7 @@ readable.
   percentage rows before restart, computed from the converted map's runtime
   monsters, pickups, and secret cells.
 - Damaging floor cells apply periodic damage through the same hurt/armor path as
-  combat.
+  combat, unless the radiation-suit timer is active.
 - Secret cells can be discovered once and increment the secret count.
 - The minimap uses the Neo Geo fix layer and overlays walls, player, threats,
   pickups, closed doors, and exits.

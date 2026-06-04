@@ -876,7 +876,8 @@ def hud_keycard_tiles(iwad, zip_member):
         tile = [[0] * 16 for _ in range(16)]
         for y, row in enumerate(patch[:16]):
             for x, color in enumerate(row[:16]):
-                tile[y][x] = quantize_color(color, playpal, palette)
+                if color >= 0:
+                    tile[y][x] = quantize_color(color, playpal, palette)
         tiles.append(tile)
         sources.append(frame)
     return tiles, "+".join(sources)
@@ -1184,6 +1185,7 @@ def main():
         "5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0",
         "2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2004:PLASA0,2005:CSAWA0,2006:BFUGA0",
         "2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,17:CELPA0,2049:SBOXA0",
+        "2022:PINVA0,2023:PSTRA0,2024:PINSA0,2025:SUITA0,2026:PMAPA0,2045:PVISA0",
         "2035:BAR1A0,2046:BROKA0,2047:CELLA0,9000:BEXPC0,2048:AMMOA0",
         "9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9009:BOS2O0,9028:HEADL0",
         "9010:POSSH0,9011:SPOSH0,9012:TROOI0,9013:SARGI0,9014:BOSSI0",

@@ -535,6 +535,12 @@ PICKUP_TYPES = {
     2015,  # armor bonus
     2018,  # green armor
     2019,  # blue armor
+    2022,  # invulnerability
+    2023,  # berserk
+    2024,  # partial invisibility
+    2025,  # radiation suit
+    2026,  # computer area map
+    2045,  # light amplification visor
     2046,  # box of rockets
     2047,  # cell charge
     2048,  # ammo box
