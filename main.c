@@ -652,11 +652,14 @@ enum {
 typedef struct EnemyDraw {
     int thing_index;
     int sprite_def;
+    u16 thing_type;
     int screen_x;
     int screen_w;
     int screen_h;
     int dist_q8;
     u8 fallback_projection;
+    u8 is_monster;
+    u8 shootable;
     u8 readable;
     u8 attackable;
     u8 ranged_attackable;
@@ -738,6 +741,16 @@ static u8 enemy_slot_can_attack(u16 slot) {
 static u8 enemy_slot_can_ranged_attack(u16 slot) {
     if (slot >= ENEMY_VISIBLE_COUNT) return 0;
     return enemies[slot].ranged_attackable;
+}
+
+static u8 enemy_slot_is_monster(u16 slot) {
+    if (slot >= ENEMY_VISIBLE_COUNT) return 0;
+    return enemies[slot].is_monster;
+}
+
+static u8 enemy_slot_is_shootable(u16 slot) {
+    if (slot >= ENEMY_VISIBLE_COUNT) return 0;
+    return enemies[slot].shootable;
 }
 
 static u8 thing_has_readable_slot(int thing_index) {
@@ -1665,7 +1678,7 @@ static int best_visible_enemy(void) {
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemy_dead[thing]) continue;
-        if (!runtime_thing_is_shootable(thing)) continue;
+        if (!enemy_slot_is_shootable(slot)) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
         if (iabs16(center_x - SCRW / 2) > 76 && enemies[slot].screen_h < 112) continue;
         score = iabs16(center_x - SCRW / 2) + (enemies[slot].dist_q8 >> 7) - (enemies[slot].screen_h >> 2);
@@ -1717,7 +1730,7 @@ static void fire_melee_damage(u8 damage) {
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemies[slot].dist_q8 > PLAYER_MELEE_RANGE_Q8) continue;
         if (enemy_dead[thing]) continue;
-        if (!runtime_thing_is_shootable(thing)) continue;
+        if (!enemy_slot_is_shootable(slot)) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
         if (iabs16(center_x - SCRW / 2) > 80) continue;
         score = iabs16(center_x - SCRW / 2) + enemies[slot].dist_q8;
@@ -1801,7 +1814,7 @@ static void damage_shotgun_spread(void) {
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemy_dead[thing]) continue;
-        if (!runtime_thing_is_shootable(thing)) continue;
+        if (!enemy_slot_is_shootable(slot)) continue;
         if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
 
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
@@ -1841,7 +1854,7 @@ static void damage_bfg_targets(void) {
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemy_dead[thing]) continue;
-        if (!runtime_thing_is_shootable(thing)) continue;
+        if (!enemy_slot_is_shootable(slot)) continue;
         damage_visible_enemy(thing, thing == primary ? 18 : 9);
     }
     for (u16 si = 0; si < thing_shootable_count; si++) {
@@ -2201,11 +2214,9 @@ static void update_projectile(void) {
 
 static u8 update_close_monster_melee(int px, int py) {
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
-        u16 type;
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
-        type = runtime_thing_type(thing);
-        if (enemy_dead[thing] || !thing_is_monster(type)) continue;
+        if (enemy_dead[thing] || !enemy_slot_is_monster(slot)) continue;
         if (enemy_hit_flash[thing] || enemy_attack_cooldown[thing]) continue;
         if (!enemy_slot_can_attack(slot)) continue;
         if (iabs16(px - thing_x_q8[thing]) < WORLD_Q8(288) && iabs16(py - thing_y_q8[thing]) < WORLD_Q8(288)
@@ -2241,8 +2252,8 @@ static void update_monster_damage(void) {
         if (enemy_attack_cooldown[thing]) continue;
         if (!enemy_slot_can_ranged_attack(slot)) continue;
         if (enemy_ranged_readable_ticks[thing] < RANGED_READABLE_WARMUP) continue;
-        type = runtime_thing_type(thing);
-        if (!thing_is_monster(type)) continue;
+        if (!enemy_slot_is_monster(slot)) continue;
+        type = enemies[slot].thing_type;
         ranged_damage = monster_ranged_damage(type);
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && line_of_sight_q8((short)px, (short)py, thing_x_q8[thing], thing_y_q8[thing])) {
@@ -2423,7 +2434,7 @@ static u8 visible_monster_slots(void) {
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
-        if (runtime_thing_is_monster(thing)) count++;
+        if (enemy_slot_is_monster(slot)) count++;
     }
     return count;
 }
@@ -4496,9 +4507,12 @@ static void hide_enemy_slot(u16 slot) {
         scb4(spr, 0);
     }
     enemies[slot].thing_index = -1;
+    enemies[slot].thing_type = 0;
     enemies[slot].screen_w = 0;
     enemies[slot].screen_h = 0;
     enemies[slot].fallback_projection = 0;
+    enemies[slot].is_monster = 0;
+    enemies[slot].shootable = 0;
     enemies[slot].readable = 0;
     enemies[slot].attackable = 0;
     enemies[slot].ranged_attackable = 0;
@@ -4511,6 +4525,10 @@ static void reset_enemy_slot_cache(void) {
         enemy_tile_key[slot] = -1;
         enemy_slot_flash[slot] = 0;
         ranged_readable_prev[slot] = -1;
+        enemies[slot].thing_index = -1;
+        enemies[slot].thing_type = 0;
+        enemies[slot].is_monster = 0;
+        enemies[slot].shootable = 0;
         enemies[slot].readable = 0;
         enemies[slot].attackable = 0;
         enemies[slot].ranged_attackable = 0;
@@ -4571,6 +4589,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
                            u8 flash, u8 fallback_projection, int view_px, int view_py) {
     int idx;
     u8 is_monster = thing_is_monster(thing_type);
+    u8 is_shootable = thing_is_shootable(thing_type);
     u8 is_projectile = thing_is_projectile(thing_type);
     u8 is_explosion = thing_is_explosion(thing_type);
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index, view_px, view_py);
@@ -4592,9 +4611,12 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
 
     enemies[slot].thing_index = thing_index;
     enemies[slot].sprite_def = def_idx;
+    enemies[slot].thing_type = thing_type;
     enemies[slot].dist_q8 = dist_q8;
     enemies[slot].screen_h = h;
     enemies[slot].fallback_projection = fallback_projection;
+    enemies[slot].is_monster = is_monster;
+    enemies[slot].shootable = is_shootable;
     if (flash || enemy_slot_flash[slot]) load_enemy_hit_palette(slot);
     else load_enemy_palette(slot, def_idx);
 
@@ -4643,9 +4665,12 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
         }
         if (!rendered) {
             enemies[slot].thing_index = -1;
+            enemies[slot].thing_type = 0;
             enemies[slot].screen_w = 0;
             enemies[slot].screen_h = 0;
             enemies[slot].fallback_projection = 0;
+            enemies[slot].is_monster = 0;
+            enemies[slot].shootable = 0;
             enemies[slot].readable = 0;
             enemies[slot].attackable = 0;
             enemies[slot].ranged_attackable = 0;
@@ -4880,12 +4905,10 @@ static void update_enemy_ranged_readiness(void) {
 
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
-        u16 type;
         if (thing < 0) continue;
         if (enemy_dead[thing]) continue;
         if (!enemy_slot_can_ranged_attack(slot)) continue;
-        type = runtime_thing_type(thing);
-        if (!thing_is_monster(type)) continue;
+        if (!enemy_slot_is_monster(slot)) continue;
         current[current_count++] = (short)thing;
         if (enemy_ranged_readable_ticks[thing] < 255) enemy_ranged_readable_ticks[thing]++;
     }

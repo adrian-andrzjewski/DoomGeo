@@ -228,8 +228,9 @@ readable.
   point instead of querying the raycaster again per candidate.
 - Rendered monster angle-frame selection also reuses the candidate pass player
   point, avoiding another raycaster position query for each visible monster.
-  Slot rendering keeps monster/projectile/explosion classification local to the
-  slot instead of rechecking the same type several times.
+  Slot rendering caches the resolved type plus monster/shootable flags, so
+  bounded visible-slot targeting, melee, ranged-readiness, and ranged-damage
+  passes do not re-resolve the same type before the next render refresh.
 - Readable, attackable, and ranged-attackable world-sprite slot flags are
   cached when each slot is rendered. Targeting, melee, monster ranged attacks,
   projectile ownership, and AI visibility checks reuse those flags instead of
