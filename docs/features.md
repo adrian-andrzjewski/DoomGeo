@@ -201,6 +201,10 @@ readable.
 - Visible thing selection rejects behind-camera and far-away things before
   resolving runtime type or render bucket, reducing per-frame sprite candidate
   work while preserving the same final projection and priority rules.
+- A conservative side-of-camera band now rejects far-offscreen world sprites
+  before runtime type lookup and exact projection. The exact projector and
+  screen bounds still decide everything near the view, so visible E1M1
+  monsters, drops, and pickups keep their normal priority path.
 - HUD status numbers, key slots, and ammo reserve counters now update only
   when their displayed values change. The animated face still updates every
   frame, but quiet E1M1 traversal no longer rewrites the static HUD sprites and
