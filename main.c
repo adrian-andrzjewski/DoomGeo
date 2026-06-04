@@ -4277,7 +4277,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     else if (h > 46) idx = 2;
     else if (h > 24) idx = 3;
     else idx = 4;
-    if ((thing_is_monster(thing_type) || thing_is_pickup(thing_type) || thing_is_barrel(thing_type) || thing_is_corpse(thing_type) || thing_is_explosion(thing_type)) && idx > 2) idx = 2;
+    if (thing_is_monster(thing_type) && idx > 1) idx = 1;
     if (thing_is_projectile(thing_type) && idx > 3) idx = 3;
     if (idx >= def->scale_count) idx = def->scale_count - 1;
     meta = &g_enemy_scales[def->first_scale + idx];
