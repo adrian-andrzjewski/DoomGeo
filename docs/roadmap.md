@@ -59,9 +59,9 @@ after the current documentation pass.
 
 - Keep refining minimap responsiveness after the incremental open/close pass:
   redraw only changed cells where possible.
-- Use `make episode-route-report` as the Episode 1 conversion baseline. The
-  current default grid routes E1M1 and E1M9 and recognizes E1M8 as a boss-exit
-  map, while several later E1 maps still expose blocked generated routes.
+- Keep `make episode-route-check` green as the Episode 1 conversion baseline:
+  E1M1-E1M7 and E1M9 route through the generated grid, and E1M8 uses the
+  boss-death completion path.
 - Reduce runtime work in monster selection/projection.
 - Add a repeatable screenshot smoke test to CI for the Linux ROM build.
 - Convert more maps once E1M1 visual and gameplay fundamentals are stable.

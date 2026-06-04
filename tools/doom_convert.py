@@ -269,6 +269,21 @@ def is_solid_linedef(line: LineDef, sidedefs: list[SideDef], sectors: list[Secto
     return (open_top - open_bottom) < player_height
 
 
+def is_flat_bridge_linedef(line: LineDef, sidedefs: list[SideDef]) -> bool:
+    ml_blocking = 0x0001
+    ml_twosided = 0x0004
+
+    if line.side_back == 0xFFFF or (line.flags & ml_twosided) == 0:
+        return False
+    if (line.flags & ml_blocking) != 0:
+        return False
+    if line.side_front >= len(sidedefs) or line.side_back >= len(sidedefs):
+        return False
+    if line.special in DOOR_SPECIALS:
+        return False
+    return True
+
+
 def grid_coord(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int) -> tuple[float, float]:
     gx = margin + (x - min_x) / scale
     gy = margin + (max_y - y) / scale
@@ -289,6 +304,38 @@ def raster_line_value(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int,
     for x, y in line_cells(grid, x0, y0, x1, y1):
         if value or grid[y][x] == 0:
             grid[y][x] = value
+
+
+def carve_flat_bridges(
+    grid: list[list[int]],
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    vertices: list[Vertex],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> int:
+    # The Neo Geo runtime is a flat 2D raycaster. Doom lift/stair/ledge
+    # transitions are represented by sector heights, so reopen non-door
+    # two-sided line cells after wall rasterization instead of sealing routes.
+    carved = 0
+    width = len(grid[0])
+    height = len(grid)
+    for line in linedefs:
+        if not is_flat_bridge_linedef(line, sidedefs):
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        x0, y0 = grid_point(a.x, a.y, min_x, max_y, scale, margin)
+        x1, y1 = grid_point(b.x, b.y, min_x, max_y, scale, margin)
+        for cell_x, cell_y in line_cells(grid, x0, y0, x1, y1):
+            if cell_x <= 0 or cell_y <= 0 or cell_x >= width - 1 or cell_y >= height - 1:
+                continue
+            if grid[cell_y][cell_x] == 1:
+                grid[cell_y][cell_x] = 0
+                carved += 1
+    return carved
 
 
 def line_cells(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
@@ -859,6 +906,8 @@ def render_lines(
     for line in linedefs:
         if not is_solid_linedef(line, sidedefs, sectors):
             continue
+        if is_flat_bridge_linedef(line, sidedefs):
+            continue
         a = vertices[line.v1]
         b = vertices[line.v2]
         if math.hypot(b.x - a.x, b.y - a.y) < min_solid_len:
@@ -948,6 +997,7 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_LINEDEFS {stats['linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SOLID_LINEDEFS {stats['solid_linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_CULLED_LINEDEFS {stats['culled_linedefs']}\n")
+        f.write(f"#define DOOM_CONVERTED_FLAT_BRIDGE_CELLS {stats['flat_bridge_cells']}\n")
         f.write(f"#define DOOM_CONVERTED_SIDEDEFS {stats['sidedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SECTORS {stats['sectors']}\n")
         f.write(f"#define DOOM_CONVERTED_SEGS {stats['segs']}\n")
@@ -1303,6 +1353,8 @@ def convert(args: argparse.Namespace) -> None:
                 texture_phase_grid[cell_y][cell_x] = texture_phase_for_cell(texture_x, texture_width, step, cell_count)
                 texture_priority_grid[cell_y][cell_x] = texture_priority
 
+    flat_bridge_cells = carve_flat_bridges(grid, linedefs, sidedefs, vertices, min_x, max_y, scale, margin)
+
     player = next((thing for thing in things if thing.type == 1), None)
     if player is None:
         raise ValueError("map has no player 1 start thing")
@@ -1345,6 +1397,7 @@ def convert(args: argparse.Namespace) -> None:
             "linedefs": len(linedefs),
             "solid_linedefs": solid_count,
             "culled_linedefs": culled_count,
+            "flat_bridge_cells": flat_bridge_cells,
             "sidedefs": len(sidedefs),
             "sectors": len(sectors),
             "segs": len(segs),

@@ -2640,6 +2640,11 @@ static void place_powerup_test_imp(void) {
 #ifdef DOOM_KEY_DOOR_TEST
 static void configure_key_door_test(void) {
 #if NG_RUNTIME_THING_COUNT > 0
+    u8 door_found = 0;
+    u16 door_y_sum = 0;
+    u8 door_count = 0;
+    u8 door_x = 27;
+    u8 door_y = 32;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         enemy_dead[i] = 1;
         enemy_hp[i] = 0;
@@ -2650,10 +2655,21 @@ static void configure_key_door_test(void) {
         thing_type_override[i] = 0;
     }
 
-    /* E1M2 red locked-door group sits west of this open cell cluster. */
-    rc_set_pose_q8((short)((32 << 8) + 128), (short)((32 << 8) + 128), -256, 0);
-    thing_x_q8[0] = (short)((30 << 8) + 128);
-    thing_y_q8[0] = (short)(32 << 8);
+#if NG_RUNTIME_DOOR_COUNT > 0
+    for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
+        if (g_runtime_doors[i].special != 28) continue;
+        if (!door_found || g_runtime_doors[i].x < door_x) door_x = g_runtime_doors[i].x;
+        door_y_sum = (u16)(door_y_sum + g_runtime_doors[i].y);
+        door_count++;
+        door_found = 1;
+    }
+    if (door_count) door_y = (u8)((door_y_sum + door_count / 2) / door_count);
+#endif
+
+    /* Stage beside the generated E1M2 red locked-door group. */
+    rc_set_pose_q8((short)(((door_x + 3) << 8) + 128), (short)((door_y << 8) + 128), -256, 0);
+    thing_x_q8[0] = (short)(((door_x + 2) << 8) + 128);
+    thing_y_q8[0] = (short)((door_y << 8) + 128);
     thing_type_override[0] = 13; /* red keycard */
     enemy_dead[0] = 0;
     index_render_candidate(0);

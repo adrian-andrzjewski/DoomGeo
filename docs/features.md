@@ -279,9 +279,9 @@ readable.
   depends on generated door cells.
 - `make episode-route-report` converts shareware `E1M1` through `E1M9` into
   isolated generated headers and reports whether each map has a coarse-grid
-  start-to-exit route. This is a progress baseline for real Episode 1 support:
-  the current default grid still exposes blocked routes on several maps and
-  reports `E1M8` as a supported boss-death exit because it has no linedef exit.
+  start-to-exit route. `make episode-route-check` runs the same pass in strict
+  mode. The default grid now routes E1M1-E1M7 and E1M9, while E1M8 reports the
+  supported boss-death exit because it has no linedef exit.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
@@ -498,6 +498,10 @@ readable.
 ## Map And Level Flow
 
 - Movement uses fixed-point position/direction with a Doom-like body radius.
+- The converter flattens non-door two-sided sector transitions into narrow
+  bridge cells after wall rasterization. This keeps Doom lift, stair, and ledge
+  progression traversable in the Neo Geo port's 2D collision grid without
+  making one-sided walls or locked door cells passable by default.
 - Doors are converted from Doom linedefs, can require keys, and open in grouped
   cells.
 - Door use first checks cells touching the player's collision body, then falls

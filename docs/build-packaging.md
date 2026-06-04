@@ -75,9 +75,8 @@ door cells.
 For a broader Episode 1 conversion baseline, run `make episode-route-report`.
 It converts `E1M1` through `E1M9` into `build/episode-route/` and reports
 which maps currently have a generated start-to-exit route at the configured
-grid size. The command is intentionally a report instead of a hard CI gate
-while the converter still needs more topology support for locked doors,
-and switch/lift progression.
+grid size. Run `make episode-route-check` for the strict gate: E1M1-E1M7 and
+E1M9 must route, and E1M8 must expose the supported boss-death completion path.
 
 For the broad playable-feature regression pass, run `tools/smoke_gameplay.sh`.
 It starts with `make route-check`, then chains the verified enemy visibility,
