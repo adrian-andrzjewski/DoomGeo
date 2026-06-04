@@ -49,6 +49,9 @@ readable.
   `EXIT`, `DEAD`) use fix-layer glyphs.
 - Locked-door messages include the required key color glyph, so the E1M2 red
   keycard path can be verified visually instead of only through generated data.
+- Owned HUD keys use the baked Doom keycard patches from the WAD, shrunken into
+  the status-bar key cells with the matching WAD-derived blue/red/yellow
+  palettes instead of coarse placeholder glyphs.
 - The crosshair marker has been cleared from the current runtime path.
 
 ## Weapons And Combat
