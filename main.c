@@ -4014,11 +4014,11 @@ static u8 plane_direction_bucket(int dir_x, int dir_y) {
     return best;
 }
 
-static u16 perspective_plane_tile(u16 base, u8 direction, u8 phase_x, u8 phase_y, u16 row, u16 col) {
+static u16 perspective_plane_column_base(u16 base, u8 direction, u8 phase_x, u8 phase_y, u16 col) {
     u16 index = direction;
     index = (u16)(index * TILE_PLANE_PERSPECTIVE_PHASES + phase_y);
     index = (u16)(index * TILE_PLANE_PERSPECTIVE_PHASES + phase_x);
-    index = (u16)(index * TILE_PLANE_PERSPECTIVE_ROWS + row);
+    index = (u16)(index * TILE_PLANE_PERSPECTIVE_ROWS);
     index = (u16)(index * TILE_PLANE_PERSPECTIVE_COLS + col);
     return (u16)(base + index);
 }
@@ -4072,16 +4072,25 @@ static void update_background_scroll(void) {
         u16 col = bg_update_col++;
         u16 spr = BG_BASE + col;
         u16 plane_col = (u16)(col + scroll_col);
+        u16 ceiling_tile;
+        u16 floor_tile;
         if (plane_col >= BG_COUNT) plane_col = (u16)(plane_col - BG_COUNT);
+        ceiling_tile = perspective_plane_column_base(TILE_CEILING_PERSPECTIVE_BASE, direction, 0, 0, plane_col);
+        floor_tile = perspective_plane_column_base(TILE_FLOOR_PERSPECTIVE_BASE, direction, 0, 0, plane_col);
         vram_addr(VRAM_SCB1 + spr * 64);
         vram_mod(1);
         for (u16 row = 0; row < BG_WIN; row++) {
-            u16 pal = (row < BG_SPLIT)
-                ? (u16)(PAL_CEILING_GRAD_BASE + row)
-                : (u16)(PAL_FLOOR_GRAD_BASE + (row - BG_SPLIT));
-            u16 tile = (row < BG_SPLIT)
-                ? perspective_plane_tile(TILE_CEILING_PERSPECTIVE_BASE, direction, 0, 0, row, plane_col)
-                : perspective_plane_tile(TILE_FLOOR_PERSPECTIVE_BASE, direction, 0, 0, (u16)(row - BG_SPLIT), plane_col);
+            u16 pal;
+            u16 tile;
+            if (row < BG_SPLIT) {
+                pal = (u16)(PAL_CEILING_GRAD_BASE + row);
+                tile = ceiling_tile;
+                ceiling_tile = (u16)(ceiling_tile + TILE_PLANE_PERSPECTIVE_COLS);
+            } else {
+                pal = (u16)(PAL_FLOOR_GRAD_BASE + (row - BG_SPLIT));
+                tile = floor_tile;
+                floor_tile = (u16)(floor_tile + TILE_PLANE_PERSPECTIVE_COLS);
+            }
             vram_w(tile);
             vram_w((u16)(pal << 8));
         }

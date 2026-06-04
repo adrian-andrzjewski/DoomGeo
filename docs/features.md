@@ -48,9 +48,11 @@ readable.
   incrementally over several frames so movement reads less static without
   spending one full vblank on plane uploads. The direction bucket is cached and
   recalculated only when the view vector changes, so straight movement keeps the
-  cheaper scroll update path. This is a compromise, not true Doom span
-  rendering; the cache is deliberately kept small so monster and pickup sprite
-  tiles stay inside the visible Neo Geo C-ROM tile range.
+  cheaper scroll update path. Plane column uploads compute a direction/column
+  tile base once and step row addresses by the generated cache width instead of
+  rebuilding the full perspective index for every tile. This is a compromise,
+  not true Doom span rendering; the cache is deliberately kept small so monster
+  and pickup sprite tiles stay inside the visible Neo Geo C-ROM tile range.
 - Floor flats keep the WAD texture pattern but normalize green-dominant palette
   entries toward warm gray/brown before emitting Neo Geo tiles. This keeps E1M1
   closer to Doom's sober floor tone and avoids stray green speckles being read
