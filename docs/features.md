@@ -112,6 +112,10 @@ readable.
   missing shareware-only frames are skipped instead of breaking the build.
 - Pickups update live ammo/health/armor/key/weapon state and remain in the map
   if the player cannot use them yet.
+- Green and blue armor pickups update both armor value and armor class. Blue
+  armor can still be collected as a class upgrade when the player has weaker
+  armor, matching the damage-reduction model instead of checking only the
+  numeric armor value.
 - Former humans, shotgun guys, imps, demons/spectres, Hell Knights, Barons,
   cacodemons, lost souls, Doom II heavy weapon dudes, revenants, mancubi,
   arachnotrons, arch-viles, pain elementals, cyberdemons, spider masterminds,

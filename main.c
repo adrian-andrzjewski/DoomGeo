@@ -614,10 +614,11 @@ static u8 pickup_is_collectible(u16 thing_type) {
     case 2014: /* health bonus */
         return player_health < 200;
     case 2015: /* armor bonus */
-    case 2019: /* blue armor */
         return player_armor < 200;
     case 2018: /* green armor */
-        return player_armor < 100;
+        return player_armor < 100 || player_armor_class == 0;
+    case 2019: /* blue armor */
+        return player_armor < 200 || player_armor_class < 2;
     default:
         return 0;
     }
@@ -2076,13 +2077,13 @@ static u8 apply_pickup(u16 thing_type) {
         pickup_message_type = 5;
         break;
     case 2018: /* green armor */
-        if (player_armor >= 100) return 0;
+        if (player_armor >= 100 && player_armor_class) return 0;
         if (player_armor < 100) player_armor = 100;
         player_armor_class = 1;
         pickup_message_type = 5;
         break;
     case 2019: /* blue armor */
-        if (player_armor >= 200) return 0;
+        if (player_armor >= 200 && player_armor_class >= 2) return 0;
         if (player_armor < 200) player_armor = 200;
         player_armor_class = 2;
         pickup_message_type = 5;
