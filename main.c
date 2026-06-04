@@ -4116,7 +4116,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
     const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
-    enum { MONSTER_MIN_H = 49, MONSTER_FALLBACK_MIN_H = 64 };
+    enum { MONSTER_MIN_H = 78, MONSTER_FALLBACK_MIN_H = 78 };
 
     if (def_idx < 0) {
         hide_enemy_slot(slot);
