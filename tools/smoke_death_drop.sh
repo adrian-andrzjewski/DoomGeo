@@ -20,4 +20,6 @@ SMOKE_DISPLAY="$DISPLAY_VALUE" \
 SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null
 
+tools/check_death_drop_screens.py --dir "$OUT_DIR"
+
 echo "$OUT"

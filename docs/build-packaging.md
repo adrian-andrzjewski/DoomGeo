@@ -102,6 +102,9 @@ gallery regions.
 For a corpse/drop rendering pass, run `tools/smoke_death_drop.sh`. It builds
 `make death-test-rom`, launches `make death-test-gngeo`, and captures the staged
 shareware corpse sprites plus the dropped shotgun pickup above the status bar.
+The helper finishes with `tools/check_death_drop_screens.py`, which rejects
+frames without the expected corpse-colored pixels, dropped-weapon evidence, and
+status-bar evidence.
 
 ```sh
 SMOKE_BUILD_TARGET=melee-test-rom \
