@@ -3713,13 +3713,12 @@ static void render_hud_keys(void) {
     shown_keys = player_keys;
 }
 
-static void draw_weapon_status(void) {
+static void draw_weapon_status(u16 bits) {
     static const u8 arms_weapons[6] = {
         WEAPON_PISTOL, WEAPON_SHOTGUN, WEAPON_CHAINGUN,
         WEAPON_ROCKET, WEAPON_PLASMA, WEAPON_BFG
     };
     static const u8 arms_cols[3] = {11, 13, 15};
-    u16 bits = weapon_status_bits();
 
     for (u8 col = 11; col < 20; col++) {
         fix_poke(col, HUD_FIX_TOP_ROW, 0, FIX_BLANK);
@@ -3734,7 +3733,7 @@ static void draw_weapon_status(void) {
         if (weapon == current_weapon) pal = PAL_HUD;
         fix_poke(col, row, pal, (u16)(FIX_DIGIT_BASE + i + 2));
     }
-    shown_weapon_status = weapon_status_bits();
+    shown_weapon_status = bits;
 }
 
 static void update_status_numbers(u8 pressed) {
@@ -3742,6 +3741,7 @@ static void update_status_numbers(u8 pressed) {
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
     u16 frags = player_kills;
+    u16 weapon_bits = weapon_status_bits();
 
     if (health != shown_health) {
         render_hud_value((u16)(HUD_VALUE_BASE + 3), HUD_HEALTH_X, health, 3, PAL_HUD);
@@ -3766,7 +3766,7 @@ static void update_status_numbers(u8 pressed) {
     }
     if (player_keys != shown_keys) render_hud_keys();
     render_ammo_counters();
-    if (weapon_status_bits() != shown_weapon_status) draw_weapon_status();
+    if (weapon_bits != shown_weapon_status) draw_weapon_status(weapon_bits);
 }
 
 static void clear_crosshair(void) {

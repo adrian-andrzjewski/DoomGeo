@@ -253,7 +253,8 @@ readable.
 - HUD status numbers, key slots, and ammo reserve counters now update only
   when their displayed values change. The animated face still updates every
   frame, but quiet E1M1 traversal no longer rewrites the static HUD sprites and
-  small counter digits every vblank.
+  small counter digits every vblank. The arms/weapon status strip also reuses
+  the status bits already computed for the change check when it redraws.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
