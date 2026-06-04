@@ -2058,10 +2058,13 @@ static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
     int cell_y = y_q8 >> 8;
     enum { MONSTER_SEPARATION_CELLS = (MONSTER_SEPARATION_Q8 + 255) >> 8 };
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        u16 type;
         if (i == self) continue;
         if (iabs16((thing_x_q8[i] >> 8) - cell_x) > MONSTER_SEPARATION_CELLS) continue;
         if (iabs16((thing_y_q8[i] >> 8) - cell_y) > MONSTER_SEPARATION_CELLS) continue;
-        if (enemy_dead[i] || (!thing_is_monster(runtime_thing_type(i)) && !thing_is_barrel(runtime_thing_type(i)))) continue;
+        if (enemy_dead[i]) continue;
+        type = runtime_thing_type(i);
+        if (!thing_is_monster(type) && !thing_is_barrel(type)) continue;
         if (iabs16(x_q8 - thing_x_q8[i]) < MONSTER_SEPARATION_Q8 && iabs16(y_q8 - thing_y_q8[i]) < MONSTER_SEPARATION_Q8) return 1;
     }
     return 0;
@@ -2809,10 +2812,11 @@ static void collect_nearby_pickups(void) {
     pcy = py >> 8;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u16 type;
+        if (enemy_dead[i]) continue;
         if (iabs16((thing_x_q8[i] >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
         if (iabs16((thing_y_q8[i] >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
         type = runtime_thing_type(i);
-        if (enemy_dead[i] || !thing_is_pickup(type)) continue;
+        if (!thing_is_pickup(type)) continue;
         if (iabs16(px - thing_x_q8[i]) <= PICKUP_RANGE_Q8 && iabs16(py - thing_y_q8[i]) <= PICKUP_RANGE_Q8) {
             if (apply_pickup(type)) {
                 if (player_items < 999) player_items++;
