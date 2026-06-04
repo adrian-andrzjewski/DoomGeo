@@ -74,7 +74,10 @@ readable.
   psprite frames for plasma/BFG, while registered/commercial WAD builds can
   bake the real art through the same C-ROM path.
 - Pistol/chaingun use compact hitscan-style targeting.
-- Plasma rifle uses rapid cell-ammo visible-target damage.
+- Plasma rifle spends cells rapidly and launches the baked small fireball strip
+  as a visible forward projectile. A direct projectile hit applies compact
+  single-target damage with an impact burst; if the one-projectile runtime slot
+  is already busy, it falls back to the older visible-target damage path.
 - Fist/chainsaw use a close-range rendered-slot melee check matched to the
   runtime monster distance scale, so they can hit visible nearby targets without
   reaching through walls or off-screen things.

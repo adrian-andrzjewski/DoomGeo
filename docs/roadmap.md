@@ -20,8 +20,9 @@ after the current documentation pass.
   direct selection should replace the remaining cycle behavior.
 - Replace the current shareware plasma/BFG placeholder psprites with exact art
   by testing a registered/commercial WAD path.
-- Improve plasma/BFG fidelity: projectile visuals, BFG trace behavior, and
-  visible pickup sprites when the source WAD provides them.
+- Improve BFG/plasma fidelity: BFG trace behavior, better projectile art when a
+  registered/commercial WAD provides exact assets, and visible pickup sprites
+  when the source WAD provides them.
 - Complete enemy sprite coverage beyond the current A/B eight-way walk rotation
   groups plus partial rotated attack/pain coverage: full death rotations,
   registered/Doom II reaction rotations, and more faithful thing placement

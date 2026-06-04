@@ -1758,18 +1758,33 @@ static void clear_projectile(void) {
     projectile_damage = 0;
 }
 
-static u8 player_rocket_hit_shootable(void) {
-    enum { ROCKET_HIT_RANGE_Q8 = WORLD_Q8(144) };
-    if (!projectile_from_player || projectile_type != 9008) return 0;
+static int player_projectile_hit_shootable(void) {
+    short hit_range_q8;
+    if (!projectile_from_player) return -1;
+    if (projectile_type == 9006) hit_range_q8 = WORLD_Q8(112);
+    else if (projectile_type == 9008) hit_range_q8 = WORLD_Q8(144);
+    else return -1;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u16 type = runtime_thing_type(i);
         if (enemy_dead[i] || !thing_is_shootable(type)) continue;
-        if (iabs16(thing_x_q8[i] - projectile_x_q8) <= ROCKET_HIT_RANGE_Q8
-            && iabs16(thing_y_q8[i] - projectile_y_q8) <= ROCKET_HIT_RANGE_Q8) {
-            return 1;
+        if (iabs16(thing_x_q8[i] - projectile_x_q8) <= hit_range_q8
+            && iabs16(thing_y_q8[i] - projectile_y_q8) <= hit_range_q8) {
+            return i;
         }
     }
-    return 0;
+    return -1;
+}
+
+static void damage_plasma_projectile_target(int thing) {
+    spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
+    if (thing >= 0) {
+        if (damage_enemy_at(thing, 3)) hide_enemies();
+        else {
+            enemy_hit_flash[thing] = 18;
+            flash_visible_enemy(thing);
+        }
+    }
+    clear_projectile();
 }
 
 static void detonate_player_projectile(void) {
@@ -1803,6 +1818,7 @@ static void update_impact_effect(void) {
 
 static void update_projectile(void) {
     int px, py;
+    int hit_thing;
     if (!projectile_active) return;
     if (!game_active()) {
         clear_projectile();
@@ -1833,8 +1849,10 @@ static void update_projectile(void) {
         clear_projectile();
         return;
     }
-    if (player_rocket_hit_shootable()) {
-        detonate_player_projectile();
+    hit_thing = player_projectile_hit_shootable();
+    if (hit_thing >= 0) {
+        if (projectile_type == 9006) damage_plasma_projectile_target(hit_thing);
+        else detonate_player_projectile();
         return;
     }
     rc_player_q8(&px, &py);
@@ -3789,7 +3807,9 @@ static void update_weapon(u8 pressed) {
                 chaingun_flash ^= 1;
                 trigger_weapon_flash();
                 alert_monsters_by_sound();
-                fire_single_target_damage(3);
+                if (!spawn_player_projectile(9006, 16)) {
+                    fire_single_target_damage(3);
+                }
             } else if (!fire_prev) {
                 ammo_message_timer = 45;
             }
