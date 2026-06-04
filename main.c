@@ -580,6 +580,8 @@ static short thing_y_q8[NG_RUNTIME_THING_COUNT];
 static u8 thing_static_class[NG_RUNTIME_THING_COUNT];
 static u16 thing_monster_indices[NG_RUNTIME_THING_COUNT];
 static u16 thing_monster_count = 0;
+static u16 thing_shootable_indices[NG_RUNTIME_THING_COUNT];
+static u16 thing_shootable_count = 0;
 static u8  dynamic_drop_active[8];
 static u16 dynamic_drop_type[8];
 static short dynamic_drop_x_q8[8];
@@ -821,14 +823,38 @@ static u8 game_active(void) {
     return player_health != 0 && !level_complete;
 }
 
+static void index_monster_candidate(u16 thing_index) {
+    for (u16 i = 0; i < thing_monster_count; i++) {
+        if (thing_monster_indices[i] == thing_index) return;
+    }
+    if (thing_monster_count < NG_RUNTIME_THING_COUNT) {
+        thing_monster_indices[thing_monster_count++] = thing_index;
+    }
+}
+
+static void index_shootable_candidate(u16 thing_index) {
+    for (u16 i = 0; i < thing_shootable_count; i++) {
+        if (thing_shootable_indices[i] == thing_index) return;
+    }
+    if (thing_shootable_count < NG_RUNTIME_THING_COUNT) {
+        thing_shootable_indices[thing_shootable_count++] = thing_index;
+    }
+}
+
 static void init_runtime_things(void) {
     thing_monster_count = 0;
+    thing_shootable_count = 0;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        u8 thing_class;
         thing_x_q8[i] = g_runtime_things[i].x_q8;
         thing_y_q8[i] = g_runtime_things[i].y_q8;
-        thing_static_class[i] = thing_render_class(g_runtime_things[i].type);
-        if (thing_static_class[i] == THING_CLASS_MONSTER) {
-            thing_monster_indices[thing_monster_count++] = (u16)i;
+        thing_class = thing_render_class(g_runtime_things[i].type);
+        thing_static_class[i] = thing_class;
+        if (thing_class == THING_CLASS_MONSTER) {
+            index_monster_candidate((u16)i);
+            index_shootable_candidate((u16)i);
+        } else if (thing_class == THING_CLASS_THREAT) {
+            index_shootable_candidate((u16)i);
         }
     }
 }
@@ -1492,7 +1518,8 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         if (damage >= hp) hp = 0;
         else hp = (u8)(hp - damage);
 
-        for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        for (u16 mi = 0; mi < thing_monster_count; mi++) {
+            int i = thing_monster_indices[mi];
             u16 type;
             if (thing_x_q8[i] != x || thing_y_q8[i] != y) continue;
             type = runtime_thing_type(i);
@@ -1544,7 +1571,8 @@ static void explode_barrel_at(int thing_index, short x_q8, short y_q8) {
     int px, py;
     rc_player_q8(&px, &py);
     if (iabs16(px - x_q8) + iabs16(py - y_q8) < WORLD_Q8(520)) player_take_damage(12);
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        int i = thing_shootable_indices[si];
         int range = iabs16(thing_x_q8[i] - x_q8) + iabs16(thing_y_q8[i] - y_q8);
         u16 type;
         if (range >= WORLD_Q8(520)) continue;
@@ -1654,7 +1682,8 @@ static void damage_rocket_radius(short x, short y) {
     int px, py;
     rc_player_q8(&px, &py);
     if (iabs16(px - x) + iabs16(py - y) < WORLD_Q8(420)) player_take_damage(8);
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        int i = thing_shootable_indices[si];
         int range = iabs16(thing_x_q8[i] - x) + iabs16(thing_y_q8[i] - y);
         u16 type;
         if (range >= WORLD_Q8(560)) continue;
@@ -1759,7 +1788,8 @@ static void damage_bfg_targets(void) {
         if (!runtime_thing_is_shootable(thing)) continue;
         damage_visible_enemy(thing, thing == primary ? 18 : 9);
     }
-    for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        int thing = thing_shootable_indices[si];
         int dx, dy, front, side, abs_side;
         dx = thing_x_q8[thing] - px;
         dy = thing_y_q8[thing] - py;
@@ -1792,6 +1822,7 @@ static void alert_monsters_by_sound(void) {
         dy = iabs16(py - thing_y_q8[i]);
         range = dx + dy;
         if (range > WORLD_Q8(8192)) continue;
+        if (!runtime_thing_is_monster(i)) continue;
         if (range <= WORLD_Q8(1024)) {
             audible = 1;
         } else if (monster_path_valid) {
@@ -2000,7 +2031,8 @@ static int player_projectile_hit_shootable(void) {
     projectile_cell_x = projectile_x_q8 >> 8;
     projectile_cell_y = projectile_y_q8 >> 8;
     coarse_cells = (hit_range_q8 + 255) >> 8;
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        u16 i = thing_shootable_indices[si];
         if (iabs16((thing_x_q8[i] >> 8) - projectile_cell_x) > coarse_cells) continue;
         if (iabs16((thing_y_q8[i] >> 8) - projectile_cell_y) > coarse_cells) continue;
         if (enemy_dead[i] || !runtime_thing_is_shootable(i)) continue;
@@ -2183,7 +2215,8 @@ static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
     int cell_x = x_q8 >> 8;
     int cell_y = y_q8 >> 8;
     enum { MONSTER_SEPARATION_CELLS = (MONSTER_SEPARATION_Q8 + 255) >> 8 };
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        int i = thing_shootable_indices[si];
         u16 type;
         if (i == self) continue;
         if (iabs16((thing_x_q8[i] >> 8) - cell_x) > MONSTER_SEPARATION_CELLS) continue;
@@ -2390,6 +2423,7 @@ static void update_monster_ai(void) {
         adx = iabs16(dx);
         ady = iabs16(dy);
         if (adx + ady > WORLD_Q8(4608)) continue;
+        if (!runtime_thing_is_monster(i)) continue;
         if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)
             && line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
         if (!enemy_awake[i]) {
@@ -2443,6 +2477,8 @@ static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
     enemy_hit_flash[thing] = 0;
     enemy_attack_anim[thing] = 0;
     enemy_ranged_readable_ticks[thing] = 0;
+    if (thing_is_monster(type)) index_monster_candidate(thing);
+    if (thing_is_shootable(type)) index_shootable_candidate(thing);
     return 1;
 #else
     (void)thing;
@@ -2474,6 +2510,8 @@ static void place_test_imp(void) {
             enemy_attack_cooldown[0] = 56;
             enemy_hit_flash[0] = 0;
             enemy_attack_anim[0] = 0;
+            index_monster_candidate(0);
+            index_shootable_candidate(0);
             set_monster_facing_from_delta(0, px - x, py - y);
             return;
         }
