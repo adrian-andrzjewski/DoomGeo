@@ -1762,6 +1762,7 @@ static int player_projectile_hit_shootable(void) {
     short hit_range_q8;
     if (!projectile_from_player) return -1;
     if (projectile_type == 9006) hit_range_q8 = WORLD_Q8(112);
+    else if (projectile_type == 9007) hit_range_q8 = WORLD_Q8(160);
     else if (projectile_type == 9008) hit_range_q8 = WORLD_Q8(144);
     else return -1;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {

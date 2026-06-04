@@ -85,7 +85,8 @@ readable.
   visible targets.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
 - BFG spends 40 cells, launches a visible forward projectile using the current
-  baked fireball sprite path, then detonates into heavy damage on readable
+  baked fireball sprite path, then detonates when it hits a wall, crosses a
+  shootable thing, or times out. The detonation applies heavy damage to readable
   rendered targets plus lighter bounded tracer damage against line-of-sight
   monsters in the player's forward cone.
 - Hitscan and melee targeting use the same readable-slot test as monster
