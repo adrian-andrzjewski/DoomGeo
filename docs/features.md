@@ -28,7 +28,9 @@ readable.
 - The render-line broadphase is done offline by the converter. The E1M1 build
   currently emits 325 visual render lines and 857 cell references; the runtime
   checks at most 7 line candidates in a hit cell instead of scanning the whole
-  render-line table for every wall column.
+  render-line table for every wall column. Hit cells with no render-line refs
+  now return immediately to the base DDA result before doing q4 refinement
+  setup.
 - This renderer spends more sprite budget on wall fidelity than the older
   20-column pass while holding seven visible world-thing slots for monsters,
   pickups, projectiles, corpses, and weapon sprites under the Neo Geo scanline

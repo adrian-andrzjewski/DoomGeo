@@ -238,16 +238,19 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
 
 static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, fix *dist, u8 *kind, u8 *tex, int *side) {
 #if DOOM_RENDER_LINES
+    unsigned char cell_count = g_render_cell_count[cell_y][cell_x];
+    unsigned short cell_start;
+    if (!cell_count) return 0;
+
     int pos_x_q4 = (int)(posX >> (FBITS - 4));
     int pos_y_q4 = (int)(posY >> (FBITS - 4));
     int ray_x_q4 = (int)(rayX >> (FBITS - 4));
     int ray_y_q4 = (int)(rayY >> (FBITS - 4));
-    unsigned short cell_start = g_render_cell_start[cell_y][cell_x];
-    unsigned char cell_count = g_render_cell_count[cell_y][cell_x];
     int best_t_q8 = 0x7FFFFFFF;
     int best_u_q8 = 0;
     int best_line = -1;
 
+    cell_start = g_render_cell_start[cell_y][cell_x];
     for (unsigned char n = 0; n < cell_count; n++) {
         int i = g_render_cell_lines[cell_start + n];
         int x1 = g_render_lines[i].x1_q8 >> 4;
