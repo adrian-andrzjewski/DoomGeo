@@ -88,6 +88,10 @@ readable.
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
   changing the default map.
+- `make combat-test-rom` and `make combat-test-gngeo` build an isolated E1M1
+  enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
+  visible imp in front of the player, and equips the shotgun while leaving the
+  normal cart path unchanged.
 - The E1M2 key-test conversion currently includes one red keycard and a six-cell
   red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma

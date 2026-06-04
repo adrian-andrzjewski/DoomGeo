@@ -51,7 +51,14 @@ launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
 `SMOKE_WORKSPACE` (`2` by default), and writes
 `.tools/screens/latest/smoke.png`. Override `SMOKE_BUILD_TARGET`,
 `SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, or `SMOKE_WAIT_SECS` when capturing variants
-such as the E1M2 key-test ROM.
+such as the E1M2 key-test ROM or the combat verification ROM:
+
+```sh
+SMOKE_BUILD_TARGET=combat-test-rom \
+SMOKE_RUN_TARGET=combat-test-gngeo \
+SMOKE_OUTPUT=.tools/screens/latest/combat-test.png \
+make smoke-screenshot
+```
 
 Sprite spec checks can be run without a full ROM build when adding optional
 registered, commercial, or Doom II monster art:

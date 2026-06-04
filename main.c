@@ -1862,6 +1862,42 @@ static void update_monster_ai(void) {
     }
 }
 
+#ifdef DOOM_COMBAT_TEST
+static void configure_combat_test(void) {
+#if NG_RUNTIME_THING_COUNT > 0
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
+    static const short forward_steps[] = { WORLD_Q8(896), WORLD_Q8(1152), WORLD_Q8(640), WORLD_Q8(1408) };
+    static const short lateral_steps[] = { 0, WORLD_Q8(192), -WORLD_Q8(192), WORLD_Q8(384), -WORLD_Q8(384) };
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+
+    player_has_shotgun = 1;
+    player_shells = 24;
+    current_weapon = WEAPON_SHOTGUN;
+
+    for (u8 f = 0; f < sizeof(forward_steps) / sizeof(forward_steps[0]); f++) {
+        for (u8 l = 0; l < sizeof(lateral_steps) / sizeof(lateral_steps[0]); l++) {
+            short x = (short)(px + ((dir_x * forward_steps[f]) >> 8) + ((plane_x * lateral_steps[l]) >> 8));
+            short y = (short)(py + ((dir_y * forward_steps[f]) >> 8) + ((plane_y * lateral_steps[l]) >> 8));
+            if (map_at(x >> 8, y >> 8)) continue;
+            thing_x_q8[0] = x;
+            thing_y_q8[0] = y;
+            thing_type_override[0] = 3001; /* imp: present in shareware and has full frame coverage */
+            enemy_dead[0] = 0;
+            enemy_hp[0] = monster_start_hp(3001);
+            enemy_awake[0] = 1;
+            enemy_attack_cooldown[0] = 56;
+            enemy_hit_flash[0] = 0;
+            enemy_attack_anim[0] = 0;
+            set_monster_facing_from_delta(0, px - x, py - y);
+            return;
+        }
+    }
+#endif
+}
+#endif
+
 static u8 add_capped_u16(volatile u16 *value, u16 amount, u16 cap) {
     if (*value >= cap) return 0;
     *value = (u16)(*value + amount > cap ? cap : *value + amount);
@@ -3549,6 +3585,9 @@ static void restart_level(void) {
     disable_sprites();
     init_runtime_things();
     rc_init();
+#ifdef DOOM_COMBAT_TEST
+    configure_combat_test();
+#endif
     init_background();
     init_walls();
     init_hud();
@@ -3572,6 +3611,9 @@ int main(void) {
     force_fix_hud_redraw();
     rc_init();
     init_runtime_things();
+#ifdef DOOM_COMBAT_TEST
+    configure_combat_test();
+#endif
     compute_level_totals();
 
     for (;;) {
