@@ -51,11 +51,10 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 - Monster sprite definitions include a compact Doom angle bucket. The runtime
   stores one coarse facing vector per thing and picks from the baked rotation
   frames while keeping the same limited world-sprite slot count.
-- A reserved attack angle bucket carries front-facing attack frames. Runtime
-  attack timers briefly select that bucket for melee, hitscan, and projectile
-  attacks instead of allocating extra sprites.
-- A second reserved bucket carries front-facing pain frames. It is selected
-  during the hit-flash timer, sharing the existing palette flash and sprite slot.
+- Attack and pain frames use state-specific angle bucket ranges when the source
+  WAD provides rotated reaction art. Runtime timers prefer those buckets, then
+  fall back to the older front-facing attack/pain buckets and finally to walk
+  frames without allocating extra world-sprite slots.
 - Registered/commercial-only psprite lumps that are missing from shareware are
   replaced with pistol placeholder frames at build time, so the same runtime
   weapon table can be tested with shareware and then rebuilt with exact

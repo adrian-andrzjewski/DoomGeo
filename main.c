@@ -1007,22 +1007,43 @@ static u8 monster_view_angle_bucket(int thing_index) {
 
 static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
     int first = -1;
-    int first_angle = -1;
-    u8 wanted_angle = thing_is_monster(thing_type)
-        ? ((thing_index >= 0 && enemy_attack_anim[thing_index]) ? 9
-        : ((thing_index >= 0 && enemy_hit_flash[thing_index]) ? 10 : monster_view_angle_bucket(thing_index)))
-        : 0;
+    int first_walk_angle = -1;
+    u8 walk_angle = thing_is_monster(thing_type) ? monster_view_angle_bucket(thing_index) : 0;
+    u8 wanted_angle = walk_angle;
+    u8 fallback_angle = 0;
     u8 wanted_anim = thing_is_monster(thing_type) ? (u8)((monster_ai_tick >> 3) & 1) : 0;
-    u8 angle_hits = 0;
+    if (thing_is_monster(thing_type) && thing_index >= 0 && enemy_attack_anim[thing_index]) {
+        wanted_angle = (u8)(100 + walk_angle);
+        fallback_angle = 9;
+    } else if (thing_is_monster(thing_type) && thing_index >= 0 && enemy_hit_flash[thing_index]) {
+        wanted_angle = (u8)(200 + walk_angle);
+        fallback_angle = 10;
+    }
+
+    for (u8 pass = 0; pass < 3; pass++) {
+        u8 target_angle = (pass == 0) ? wanted_angle : (pass == 1 ? fallback_angle : walk_angle);
+        u8 angle_hits = 0;
+        int first_angle = -1;
+        if (pass == 1 && fallback_angle == 0) continue;
+        if (pass == 2 && !thing_is_monster(thing_type)) continue;
+        for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
+            if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
+            if (first < 0) first = i;
+            if (!thing_is_monster(thing_type)) return first;
+            if (g_enemy_sprite_defs[i].angle == target_angle || (target_angle == 0 && g_enemy_sprite_defs[i].angle == 0)) {
+                if (first_angle < 0) first_angle = i;
+                if (angle_hits == wanted_anim) return i;
+                angle_hits++;
+            }
+        }
+        if (first_angle >= 0) return first_angle;
+    }
+
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
         if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
         if (first < 0) first = i;
         if (!thing_is_monster(thing_type)) return first;
-        if (g_enemy_sprite_defs[i].angle == wanted_angle || g_enemy_sprite_defs[i].angle == 0) {
-            if (first_angle < 0) first_angle = i;
-            if (angle_hits == wanted_anim) return i;
-            angle_hits++;
-        }
+        if (g_enemy_sprite_defs[i].angle == walk_angle && first_walk_angle < 0) first_walk_angle = i;
     }
     if (thing_is_pickup(thing_type)) {
         u16 fallback_type = fallback_sprite_type_for_missing_pickup(thing_type);
@@ -1031,7 +1052,7 @@ static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
             if (fallback >= 0) return fallback;
         }
     }
-    if (first_angle >= 0) return first_angle;
+    if (first_walk_angle >= 0) return first_walk_angle;
     return first >= 0 ? first : -1;
 }
 

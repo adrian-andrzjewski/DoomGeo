@@ -135,12 +135,11 @@ readable.
   selection can choose all eight Doom rotation buckets from the coarse
   monster-facing vector instead of collapsing enemies onto the front/one-side
   frames.
-- The same monsters also bake front-facing attack frames where the WAD provides
-  them. A short runtime attack timer swaps the visible sprite to those frames
-  when a monster fires, throws a projectile, or bites.
-- Front-facing pain frames are baked for the supported monsters and selected
-  during the existing hit-flash window, so weapon impacts read as a sprite
-  reaction rather than only a palette flash.
+- The same monsters also bake rotated attack and pain frames where the WAD
+  provides them. Runtime prefers those state-specific rotation buckets during
+  attack and hit-flash windows, then falls back to the older front-facing
+  attack/pain buckets and finally to walking frames when a WAD has incomplete
+  reaction art.
 - Monsters keep health, awake state, pain flash/pause, attack cooldown, and a
   mutable position layer. Awakened monsters follow a coarse player distance
   field so they can move around converted E1M1 walls instead of getting stuck
