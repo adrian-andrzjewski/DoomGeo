@@ -25,6 +25,7 @@ LOCK_ACQUIRED=0
 XVFB_PID=""
 MAKE_ARGS=()
 MAKE_ROM_DIR=""
+MAKE_BUILD_DIR=""
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -117,6 +118,7 @@ if [ -n "$MAKE_ARGS_VALUE" ]; then
     for arg in "${MAKE_ARGS[@]}"; do
         case "$arg" in
             ROM=*) MAKE_ROM_DIR="${arg#ROM=}" ;;
+            BUILDDIR=*) MAKE_BUILD_DIR="${arg#BUILDDIR=}" ;;
         esac
     done
 fi
@@ -141,6 +143,9 @@ if [ "$LOCK_ACQUIRED" != 1 ]; then
 fi
 
 "$MAKE_BIN" "${MAKE_ARGS[@]}" "$BUILD_TARGET"
+if [ -z "$MAKE_ROM_DIR" ] && [ -n "$MAKE_BUILD_DIR" ]; then
+    MAKE_ROM_DIR="$MAKE_BUILD_DIR/rom"
+fi
 if [ -n "$MAKE_ROM_DIR" ] && [ ! -f "$MAKE_ROM_DIR/neogeo.zip" ] && [ -f build/rom/neogeo.zip ]; then
     cp build/rom/neogeo.zip "$MAKE_ROM_DIR/neogeo.zip"
 fi
