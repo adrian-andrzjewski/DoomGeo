@@ -19,6 +19,8 @@ from zipfile import ZipFile
 
 
 DEFAULT_WAD_IN_ZIP = "freedoom-0.13.0/freedoom1.wad"
+PLAYER_HEIGHT = 56
+PLAYER_MAX_STEP_HEIGHT = 24
 
 
 @dataclass(frozen=True)
@@ -245,28 +247,42 @@ def parse_blockmap_words(data: bytes) -> list[int]:
     return [struct.unpack_from("<h", data, i)[0] for i in range(0, len(data), 2)]
 
 
-def is_solid_linedef(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> bool:
+def line_opening(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> tuple[int, int, int] | None:
+    """Return (open_bottom, open_top, floor_delta) for a valid two-sided line."""
     ml_blocking = 0x0001
     ml_twosided = 0x0004
-    player_height = 56
 
     if line.side_back == 0xFFFF or (line.flags & ml_twosided) == 0:
-        return True
-    if (line.flags & ml_blocking) != 0:
-        return True
+        return None
     if line.side_front >= len(sidedefs) or line.side_back >= len(sidedefs):
-        return True
+        return None
 
     front_side = sidedefs[line.side_front]
     back_side = sidedefs[line.side_back]
     if front_side.sector >= len(sectors) or back_side.sector >= len(sectors):
-        return True
+        return None
 
     front = sectors[front_side.sector]
     back = sectors[back_side.sector]
-    open_bottom = max(front.floor_height, back.floor_height)
-    open_top = min(front.ceiling_height, back.ceiling_height)
-    return (open_top - open_bottom) < player_height
+    return (
+        max(front.floor_height, back.floor_height),
+        min(front.ceiling_height, back.ceiling_height),
+        abs(front.floor_height - back.floor_height),
+    )
+
+
+def is_solid_linedef(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> bool:
+    ml_blocking = 0x0001
+
+    opening = line_opening(line, sidedefs, sectors)
+    if opening is None:
+        return True
+    if (line.flags & ml_blocking) != 0:
+        return True
+    open_bottom, open_top, floor_delta = opening
+    if (open_top - open_bottom) < PLAYER_HEIGHT:
+        return True
+    return floor_delta > PLAYER_MAX_STEP_HEIGHT
 
 
 def is_flat_bridge_linedef(line: LineDef, sidedefs: list[SideDef]) -> bool:
@@ -284,18 +300,45 @@ def is_flat_bridge_linedef(line: LineDef, sidedefs: list[SideDef]) -> bool:
     return True
 
 
-def grid_coord(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int) -> tuple[float, float]:
-    gx = margin + (x - min_x) / scale
-    gy = margin + (max_y - y) / scale
+def is_passable_flat_bridge_linedef(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> bool:
+    if not is_flat_bridge_linedef(line, sidedefs):
+        return False
+    opening = line_opening(line, sidedefs, sectors)
+    if opening is None:
+        return False
+    open_bottom, open_top, floor_delta = opening
+    return (open_top - open_bottom) >= PLAYER_HEIGHT and floor_delta <= PLAYER_MAX_STEP_HEIGHT
+
+
+def _grid_offsets(margin: int | float | tuple[float, float]) -> tuple[float, float]:
+    if isinstance(margin, tuple):
+        return margin
+    return float(margin), float(margin)
+
+
+def grid_coord(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int | float | tuple[float, float]) -> tuple[float, float]:
+    offset_x, offset_y = _grid_offsets(margin)
+    gx = offset_x + (x - min_x) / scale
+    gy = offset_y + (max_y - y) / scale
     return gx, gy
 
 
-def grid_x_coord(x: int, min_x: int, scale: float, margin: int) -> float:
-    return margin + (x - min_x) / scale
+def grid_x_coord(x: int, min_x: int, scale: float, margin: int | float | tuple[float, float]) -> float:
+    offset_x, _offset_y = _grid_offsets(margin)
+    return offset_x + (x - min_x) / scale
 
 
-def grid_y_coord(y: int, max_y: int, scale: float, margin: int) -> float:
-    return margin + (max_y - y) / scale
+def grid_y_coord(y: int, max_y: int, scale: float, margin: int | float | tuple[float, float]) -> float:
+    _offset_x, offset_y = _grid_offsets(margin)
+    return offset_y + (max_y - y) / scale
+
+
+def doom_coord_from_grid_cell(gx: int, gy: int, min_x: int, max_y: int, scale: float, margin: int | float | tuple[float, float]) -> tuple[float, float]:
+    offset_x, offset_y = _grid_offsets(margin)
+    return (
+        min_x + ((gx + 0.5) - offset_x) * scale,
+        max_y - ((gy + 0.5) - offset_y) * scale,
+    )
 
 
 def grid_point(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int) -> tuple[int, int]:
@@ -340,20 +383,21 @@ def carve_flat_bridges(
     grid: list[list[int]],
     linedefs: list[LineDef],
     sidedefs: list[SideDef],
+    sectors: list[Sector],
     vertices: list[Vertex],
     min_x: int,
     max_y: int,
     scale: float,
-    margin: int,
+    margin: int | float | tuple[float, float],
 ) -> int:
-    # The Neo Geo runtime is a flat 2D raycaster. Doom lift/stair/ledge
-    # transitions are represented by sector heights, so reopen non-door
-    # two-sided line cells after wall rasterization instead of sealing routes.
+    # The Neo Geo runtime is a flat 2D raycaster. Reopen only two-sided lines
+    # Doom's player can actually step through, leaving high ledges/platforms
+    # closed instead of turning them into walk-through holes.
     carved = 0
     width = len(grid[0])
     height = len(grid)
     for line in linedefs:
-        if not is_flat_bridge_linedef(line, sidedefs):
+        if not is_passable_flat_bridge_linedef(line, sidedefs, sectors):
             continue
         a = vertices[line.v1]
         b = vertices[line.v2]
@@ -377,7 +421,7 @@ def cleanup_protected_cells(
     min_x: int,
     max_y: int,
     scale: float,
-    margin: int,
+    margin: int | float | tuple[float, float],
 ) -> set[tuple[int, int]]:
     width = len(grid[0])
     height = len(grid)
@@ -506,6 +550,20 @@ def solid_line_texture_x(line: LineDef, sidedefs: list[SideDef]) -> int:
     return sidedefs[line.side_front].texture_x
 
 
+def first_visible_texture(*sides: SideDef) -> str:
+    for side in sides:
+        for name in (side.mid_texture, side.bottom_texture, side.top_texture):
+            if name and name != "-":
+                return name
+    return "STARTAN3"
+
+
+def sidedef_texture_or_fallback(primary: str, *sides: SideDef) -> str:
+    if primary and primary != "-":
+        return primary
+    return first_visible_texture(*sides)
+
+
 def line_side_sectors(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> tuple[SideDef, SideDef, Sector, Sector] | None:
     if line.side_front == 0xFFFF or line.side_back == 0xFFFF:
         return None
@@ -530,15 +588,14 @@ def visual_line_span(line: LineDef, sidedefs: list[SideDef], sectors: list[Secto
 
     floor_delta = abs(front.floor_height - back.floor_height)
     ceiling_delta = abs(front.ceiling_height - back.ceiling_height)
-    span_cap = 72
-    if floor_delta and front_side.bottom_texture and front_side.bottom_texture != "-":
-        return 1, front_side.bottom_texture, front_side.texture_x, min(span_cap, max(8, floor_delta))
-    if floor_delta and back_side.bottom_texture and back_side.bottom_texture != "-":
-        return 1, back_side.bottom_texture, back_side.texture_x, min(span_cap, max(8, floor_delta))
-    if ceiling_delta and front_side.top_texture and front_side.top_texture != "-":
-        return 2, front_side.top_texture, front_side.texture_x, min(span_cap, max(8, ceiling_delta))
-    if ceiling_delta and back_side.top_texture and back_side.top_texture != "-":
-        return 2, back_side.top_texture, back_side.texture_x, min(span_cap, max(8, ceiling_delta))
+    if floor_delta:
+        if front.floor_height < back.floor_height:
+            return 1, sidedef_texture_or_fallback(front_side.bottom_texture, front_side, back_side), front_side.texture_x, min(128, max(4, floor_delta))
+        return 1, sidedef_texture_or_fallback(back_side.bottom_texture, back_side, front_side), back_side.texture_x, min(128, max(4, floor_delta))
+    if ceiling_delta:
+        if front.ceiling_height > back.ceiling_height:
+            return 2, sidedef_texture_or_fallback(front_side.top_texture, front_side, back_side), front_side.texture_x, min(128, max(4, ceiling_delta))
+        return 2, sidedef_texture_or_fallback(back_side.top_texture, back_side, front_side), back_side.texture_x, min(128, max(4, ceiling_delta))
     if front_side.mid_texture and front_side.mid_texture != "-":
         return 0, front_side.mid_texture, front_side.texture_x, 0
     if back_side.mid_texture and back_side.mid_texture != "-":
@@ -667,6 +724,34 @@ def carve_start_clearance(grid: list[list[int]], sx: float, sy: float, angle: in
     return sx, sy
 
 
+def carve_runtime_thing_cells(
+    grid: list[list[int]],
+    things: list[Thing],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int | float | tuple[float, float],
+    skill_mask: int,
+) -> int:
+    carved = 0
+    width = len(grid[0])
+    height = len(grid)
+    for thing in things:
+        if thing.type != 1 and thing.type not in RUNTIME_THING_TYPES:
+            continue
+        if thing.type != 1 and (thing.flags & skill_mask) == 0:
+            continue
+        gx, gy = grid_coord(thing.x, thing.y, min_x, max_y, scale, margin)
+        cell_x = int(math.floor(gx))
+        cell_y = int(math.floor(gy))
+        if cell_x <= 0 or cell_y <= 0 or cell_x >= width - 1 or cell_y >= height - 1:
+            continue
+        if grid[cell_y][cell_x]:
+            grid[cell_y][cell_x] = 0
+            carved += 1
+    return carved
+
+
 def forward_clearance(grid: list[list[int]], sx: float, sy: float, angle: int) -> float:
     width = len(grid[0])
     height = len(grid)
@@ -786,6 +871,8 @@ RUNTIME_THING_TYPES = MONSTER_TYPES | PICKUP_TYPES | BARREL_TYPES
 EXIT_SPECIALS = {11, 51, 52, 124, 197, 198, 243, 244}
 SECRET_EXIT_SPECIALS = {51, 124, 198, 244}
 DOOR_SPECIALS = {1, 26, 27, 28, 31, 32, 33, 34, 46, 61, 63, 76, 86, 90, 103, 117, 118}
+LIFT_SPECIALS = {62, 88, 89, 120, 121, 122, 123}
+LIFT_WALK_SPECIALS = {88, 89}
 
 
 def map_episode_mission(map_name: str) -> tuple[int, int]:
@@ -939,8 +1026,7 @@ def sector_damage_grid(
         for gx, cell in enumerate(row):
             if cell:
                 continue
-            doom_x = min_x + ((gx + 0.5) - margin) * scale
-            doom_y = max_y - ((gy + 0.5) - margin) * scale
+            doom_x, doom_y = doom_coord_from_grid_cell(gx, gy, min_x, max_y, scale, margin)
             for amount, segments in damaging:
                 if segments and point_in_sector(doom_x, doom_y, segments):
                     damage_grid[gy][gx] = amount
@@ -980,10 +1066,12 @@ def sector_visual_grids(
     min_x: int,
     max_y: int,
     scale: float,
-    margin: int,
-) -> tuple[list[list[int]], list[list[int]]]:
+    margin: int | float | tuple[float, float],
+) -> tuple[list[list[int]], list[list[int]], list[list[int]], list[list[int]]]:
     floor_grid = [[0 for _ in row] for row in grid]
     light_grid = [[2 for _ in row] for row in grid]
+    floor_height_grid = [[0 for _ in row] for row in grid]
+    ceiling_height_grid = [[128 for _ in row] for row in grid]
     sector_bounds: list[tuple[int, int, int, int]] = []
     sector_edges: list[list[tuple[Vertex, Vertex]]] = []
     for i in range(len(sectors)):
@@ -1000,8 +1088,7 @@ def sector_visual_grids(
         for gx, cell in enumerate(row):
             if cell:
                 continue
-            doom_x = min_x + ((gx + 0.5) - margin) * scale
-            doom_y = max_y - ((gy + 0.5) - margin) * scale
+            doom_x, doom_y = doom_coord_from_grid_cell(gx, gy, min_x, max_y, scale, margin)
             for i, sector in enumerate(sectors):
                 min_sx, min_sy, max_sx, max_sy = sector_bounds[i]
                 if doom_x < min_sx or doom_x > max_sx or doom_y < min_sy or doom_y > max_sy:
@@ -1010,8 +1097,10 @@ def sector_visual_grids(
                 if segments and point_in_sector(doom_x, doom_y, segments):
                     floor_grid[gy][gx] = sector_floor_visual_kind(sector)
                     light_grid[gy][gx] = sector_light_band(sector.light_level)
+                    floor_height_grid[gy][gx] = sector.floor_height
+                    ceiling_height_grid[gy][gx] = sector.ceiling_height
                     break
-    return floor_grid, light_grid
+    return floor_grid, light_grid, floor_height_grid, ceiling_height_grid
 
 
 def sector_secret_grid(
@@ -1040,8 +1129,7 @@ def sector_secret_grid(
             for gx, cell in enumerate(row):
                 if cell:
                     continue
-                doom_x = min_x + ((gx + 0.5) - margin) * scale
-                doom_y = max_y - ((gy + 0.5) - margin) * scale
+                doom_x, doom_y = doom_coord_from_grid_cell(gx, gy, min_x, max_y, scale, margin)
                 if segments and point_in_sector(doom_x, doom_y, segments):
                     secret_grid[gy][gx] = 1
                     marked = True
@@ -1184,6 +1272,82 @@ def runtime_doors(
     return doors
 
 
+def runtime_lifts(
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    sectors: list[Sector],
+    vertices: list[Vertex],
+    grid: list[list[int]],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> tuple[list[tuple[int, list[tuple[int, int]]]], list[tuple[int, int, int, int, int]], list[list[int]]]:
+    lift_tags = sorted({line.tag for line in linedefs if line.special in LIFT_SPECIALS and line.tag})
+    lift_grid = [[0 for _ in row] for row in grid]
+    if not lift_tags:
+        return [], [], lift_grid
+
+    sector_bounds: list[tuple[int, int, int, int]] = []
+    sector_edges: list[list[tuple[Vertex, Vertex]]] = []
+    for i in range(len(sectors)):
+        segments = sector_segments(i, linedefs, sidedefs, vertices)
+        sector_edges.append(segments)
+        if segments:
+            xs = [point.x for segment in segments for point in segment]
+            ys = [point.y for segment in segments for point in segment]
+            sector_bounds.append((min(xs), min(ys), max(xs), max(ys)))
+        else:
+            sector_bounds.append((0, 0, -1, -1))
+
+    lifts: list[tuple[int, list[tuple[int, int]]]] = []
+    tag_to_lift: dict[int, int] = {}
+    for tag in lift_tags:
+        cells: set[tuple[int, int]] = set()
+        for sector_index, sector in enumerate(sectors):
+            if sector.tag != tag:
+                continue
+            segments = sector_edges[sector_index]
+            if not segments:
+                continue
+            min_sx, min_sy, max_sx, max_sy = sector_bounds[sector_index]
+            for gy, row in enumerate(grid):
+                for gx, cell in enumerate(row):
+                    if cell:
+                        continue
+                    doom_x, doom_y = doom_coord_from_grid_cell(gx, gy, min_x, max_y, scale, margin)
+                    if doom_x < min_sx or doom_x > max_sx or doom_y < min_sy or doom_y > max_sy:
+                        continue
+                    if point_in_sector(doom_x, doom_y, segments):
+                        cells.add((gx, gy))
+        if not cells:
+            continue
+        tag_to_lift[tag] = len(lifts)
+        sorted_cells = sorted(cells, key=lambda xy: (xy[1], xy[0]))
+        for gx, gy in sorted_cells:
+            lift_grid[gy][gx] = len(lifts) + 1
+        lifts.append((tag, sorted_cells))
+
+    triggers: list[tuple[int, int, int, int, int]] = []
+    seen_triggers: set[tuple[int, int, int, int]] = set()
+    for line in linedefs:
+        if line.special not in LIFT_SPECIALS or line.tag not in tag_to_lift:
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        gx, gy = grid_coord((a.x + b.x) // 2, (a.y + b.y) // 2, min_x, max_y, scale, margin)
+        cell_x, cell_y = nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))
+        lift_index = tag_to_lift[line.tag]
+        key = (cell_x, cell_y, lift_index, line.special)
+        if key in seen_triggers:
+            continue
+        seen_triggers.add(key)
+        walk = 1 if line.special in LIFT_WALK_SPECIALS else 0
+        triggers.append((cell_x, cell_y, lift_index, line.special, walk))
+
+    return lifts, triggers, lift_grid
+
+
 def render_lines(
     linedefs: list[LineDef],
     sidedefs: list[SideDef],
@@ -1206,7 +1370,7 @@ def render_lines(
         if span is None:
             continue
         span_kind, texture_name, texture_x, span_height = span
-        if span_kind == 0 and is_flat_bridge_linedef(line, sidedefs):
+        if span_kind == 0 and is_passable_flat_bridge_linedef(line, sidedefs, sectors):
             continue
         a = vertices[line.v1]
         b = vertices[line.v2]
@@ -1249,14 +1413,243 @@ def render_lines(
     return rows, starts, counts, refs
 
 
-def emit_header(
-    out_path: str,
+def write_generated_map_arrays(
+    f,
+    storage: str,
     grid: list[list[int]],
     texture_grid: list[list[int]],
     texture_phase_grid: list[list[int]],
     damage_grid: list[list[int]],
     floor_visual_grid: list[list[int]],
     light_grid: list[list[int]],
+    floor_height_grid: list[list[int]],
+    ceiling_height_grid: list[list[int]],
+    secret_grid: list[list[int]],
+    lift_grid: list[list[int]],
+    things: list[tuple[int, int, int, int]],
+    exits: list[tuple[int, int, int, int, int]],
+    doors: list[tuple[int, int, int]],
+    lifts: list[tuple[int, list[tuple[int, int]]]],
+    lift_triggers: list[tuple[int, int, int, int, int]],
+    render_line_rows: list[tuple[int, int, int, int, int, int, int, int]],
+    render_cell_starts: list[list[int]],
+    render_cell_counts: list[list[int]],
+    render_cell_refs: list[int],
+) -> None:
+    door_cell_id = {(x, y): i + 2 for i, (x, y, _special) in enumerate(doors)}
+    lift_cell_refs = [y * len(grid[0]) + x for _tag, cells in lifts for x, y in cells]
+
+    f.write(f"{storage} NgRenderLine g_render_lines[NG_RENDER_LINE_COUNT] = {{\n")
+    for x1, y1, x2, y2, texture, phase, span, height in render_line_rows:
+        f.write(f"    {{{x1},{y1},{x2},{y2},{texture},{phase},{span},{height}}},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned short g_render_cell_start[MAP_H][MAP_W] = {{\n")
+    for row in render_cell_starts:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_render_cell_count[MAP_H][MAP_W] = {{\n")
+    for row in render_cell_counts:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned short g_render_cell_lines[NG_RENDER_CELL_REF_COUNT] = {{\n")
+    for i in range(0, len(render_cell_refs), 24):
+        f.write("    ")
+        f.write(",".join(str(cell) for cell in render_cell_refs[i : i + 24]))
+        f.write(",\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map[MAP_H][MAP_W] = {{\n")
+    for y, row in enumerate(grid):
+        f.write("    {")
+        f.write(",".join(str(door_cell_id.get((x, y), cell)) for x, cell in enumerate(row)))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map_tex[MAP_H][MAP_W] = {{\n")
+    for row in texture_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map_tex_phase[MAP_H][MAP_W] = {{\n")
+    for row in texture_phase_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map_damage[MAP_H][MAP_W] = {{\n")
+    for row in damage_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map_floor_visual[MAP_H][MAP_W] = {{\n")
+    for row in floor_visual_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map_light[MAP_H][MAP_W] = {{\n")
+    for row in light_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} short g_map_floor_height[MAP_H][MAP_W] = {{\n")
+    for row in floor_height_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} short g_map_ceiling_height[MAP_H][MAP_W] = {{\n")
+    for row in ceiling_height_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map_secret[MAP_H][MAP_W] = {{\n")
+    for row in secret_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_map_lift[MAP_H][MAP_W] = {{\n")
+    for row in lift_grid:
+        f.write("    {")
+        f.write(",".join(str(cell) for cell in row))
+        f.write("},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {{\n")
+    for x_q8, y_q8, typ, flags, _thing_class, _info in things:
+        f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_runtime_thing_class[NG_RUNTIME_THING_COUNT] = {{\n")
+    for i in range(0, len(things), 24):
+        f.write("    ")
+        f.write(",".join(str(thing_class) for *_rest, thing_class, _info in things[i : i + 24]))
+        f.write(",\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned char g_runtime_thing_info[NG_RUNTIME_THING_COUNT] = {{\n")
+    for i in range(0, len(things), 24):
+        f.write("    ")
+        f.write(",".join(f"0x{info:02x}" for *_rest, _thing_class, info in things[i : i + 24]))
+        f.write(",\n")
+    f.write("};\n\n")
+    f.write(f"{storage} NgRuntimeExit g_runtime_exits[NG_RUNTIME_EXIT_COUNT] = {{\n")
+    for x_q8, y_q8, special, next_episode, next_mission in exits:
+        f.write(f"    {{{x_q8},{y_q8},{special},{next_episode},{next_mission}}},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} NgRuntimeDoor g_runtime_doors[NG_RUNTIME_DOOR_COUNT] = {{\n")
+    for x, y, special in doors:
+        f.write(f"    {{{x},{y},{special}}},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} NgRuntimeLift g_runtime_lifts[NG_RUNTIME_LIFT_COUNT] = {{\n")
+    first_cell = 0
+    for tag, cells in lifts:
+        f.write(f"    {{{first_cell},{len(cells)},{tag}}},\n")
+        first_cell += len(cells)
+    f.write("};\n\n")
+    f.write(f"{storage} NgRuntimeLiftTrigger g_runtime_lift_triggers[NG_RUNTIME_LIFT_TRIGGER_COUNT] = {{\n")
+    for x, y, lift_index, special, walk in lift_triggers:
+        f.write(f"    {{{x},{y},{lift_index},{special},{walk}}},\n")
+    f.write("};\n\n")
+    f.write(f"{storage} unsigned short g_runtime_lift_cells[NG_RUNTIME_LIFT_CELL_REF_COUNT] = {{\n")
+    for i in range(0, len(lift_cell_refs), 24):
+        f.write("    ")
+        f.write(",".join(str(cell) for cell in lift_cell_refs[i : i + 24]))
+        f.write(",\n")
+    f.write("};\n\n")
+
+
+def write_generated_map_externs(f) -> None:
+    f.write("extern const NgRenderLine g_render_lines[NG_RENDER_LINE_COUNT];\n")
+    f.write("extern const unsigned short g_render_cell_start[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_render_cell_count[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned short g_render_cell_lines[NG_RENDER_CELL_REF_COUNT];\n")
+    f.write("extern const unsigned char g_map[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_map_tex[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_map_tex_phase[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_map_damage[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_map_floor_visual[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_map_light[MAP_H][MAP_W];\n")
+    f.write("extern const short g_map_floor_height[MAP_H][MAP_W];\n")
+    f.write("extern const short g_map_ceiling_height[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_map_secret[MAP_H][MAP_W];\n")
+    f.write("extern const unsigned char g_map_lift[MAP_H][MAP_W];\n")
+    f.write("extern const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT];\n")
+    f.write("extern const unsigned char g_runtime_thing_class[NG_RUNTIME_THING_COUNT];\n")
+    f.write("extern const unsigned char g_runtime_thing_info[NG_RUNTIME_THING_COUNT];\n")
+    f.write("extern const NgRuntimeExit g_runtime_exits[NG_RUNTIME_EXIT_COUNT];\n")
+    f.write("extern const NgRuntimeDoor g_runtime_doors[NG_RUNTIME_DOOR_COUNT];\n")
+    f.write("extern const NgRuntimeLift g_runtime_lifts[NG_RUNTIME_LIFT_COUNT];\n")
+    f.write("extern const NgRuntimeLiftTrigger g_runtime_lift_triggers[NG_RUNTIME_LIFT_TRIGGER_COUNT];\n")
+    f.write("extern const unsigned short g_runtime_lift_cells[NG_RUNTIME_LIFT_CELL_REF_COUNT];\n\n")
+
+
+def write_generated_map_inlines(f, has_doors: bool, has_lifts: bool) -> None:
+    f.write("static inline int map_at(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
+    f.write("    if (g_runtime_cell_open[((y * MAP_W) + x) >> 3] & (1 << (((y * MAP_W) + x) & 7))) return 0;\n")
+    if has_lifts:
+        f.write("    unsigned char lift = g_map_lift[y][x];\n")
+        f.write("    if (lift && !g_runtime_lift_open[lift - 1]) return 1;\n")
+    f.write("    unsigned char cell = g_map[y][x];\n")
+    f.write("    if (!cell) return 0;\n")
+    if has_doors:
+        f.write("    if (cell >= 2) return g_runtime_door_open[cell - 2] ? 0 : 1;\n")
+    f.write("    return 1;\n")
+    f.write("}\n\n")
+    f.write("static inline unsigned char map_cell_value(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
+    f.write("    return g_map[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline unsigned char map_cell_texture(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+    f.write("    return g_map_tex[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline unsigned char map_cell_texture_phase(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+    f.write("    return g_map_tex_phase[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline unsigned char map_cell_damage(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+    f.write("    return g_map_damage[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline unsigned char map_cell_floor_visual(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+    f.write("    return g_map_floor_visual[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline unsigned char map_cell_light(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 2;\n")
+    f.write("    return g_map_light[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline short map_cell_floor_height(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+    f.write("    return g_map_floor_height[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline short map_cell_ceiling_height(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 128;\n")
+    f.write("    return g_map_ceiling_height[y][x];\n")
+    f.write("}\n\n")
+    f.write("static inline unsigned char map_cell_secret(int x, int y) {\n")
+    f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+    f.write("    return g_map_secret[y][x];\n")
+    f.write("}\n\n")
+
+
+def emit_header(
+    out_path: str,
+    map_source_path: str | None,
+    grid: list[list[int]],
+    texture_grid: list[list[int]],
+    texture_phase_grid: list[list[int]],
+    damage_grid: list[list[int]],
+    floor_visual_grid: list[list[int]],
+    light_grid: list[list[int]],
+    floor_height_grid: list[list[int]],
+    ceiling_height_grid: list[list[int]],
     secret_grid: list[list[int]],
     start_x: float,
     start_y: float,
@@ -1267,12 +1660,17 @@ def emit_header(
     things: list[tuple[int, int, int, int]],
     exits: list[tuple[int, int, int, int, int]],
     doors: list[tuple[int, int, int]],
+    lifts: list[tuple[int, list[tuple[int, int]]]],
+    lift_triggers: list[tuple[int, int, int, int, int]],
+    lift_grid: list[list[int]],
     render_line_rows: list[tuple[int, int, int, int, int, int, int, int]],
     render_cell_starts: list[list[int]],
     render_cell_counts: list[list[int]],
     render_cell_refs: list[int],
 ) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    if map_source_path:
+        os.makedirs(os.path.dirname(map_source_path), exist_ok=True)
     angle_rad = math.radians(angle)
     dir_x = math.cos(angle_rad)
     dir_y = -math.sin(angle_rad)
@@ -1285,7 +1683,6 @@ def emit_header(
             ((exit_next_episode, exit_next_mission) for _x, _y, special, exit_next_episode, exit_next_mission in exits if special in SECRET_EXIT_SPECIALS),
             (0, 0),
         )
-        door_cell_id = {(x, y): i + 2 for i, (x, y, _special) in enumerate(doors)}
         f.write("/* Generated by tools/doom_convert.py; do not edit by hand. */\n")
         f.write("#ifndef DOOM_MAP_GENERATED_H\n#define DOOM_MAP_GENERATED_H\n\n")
         f.write(f"#define DOOM_MAP_SOURCE \"{source_name}\"\n")
@@ -1310,6 +1707,7 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_SOLID_LINEDEFS {stats['solid_linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_CULLED_LINEDEFS {stats['culled_linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_FLAT_BRIDGE_CELLS {stats['flat_bridge_cells']}\n")
+        f.write(f"#define DOOM_CONVERTED_THING_CLEARANCE_CELLS {stats['thing_clearance_cells']}\n")
         f.write(f"#define DOOM_CONVERTED_READABILITY_CELLS {stats['readability_cells']}\n")
         f.write(f"#define DOOM_CONVERTED_SIDEDEFS {stats['sidedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SECTORS {stats['sectors']}\n")
@@ -1322,9 +1720,15 @@ def emit_header(
         f.write(f"#define DOOM_RUNTIME_SKILL_MASK 0x{stats['skill_mask'] & 0xffff:04x}\n")
         f.write(f"#define DOOM_CONVERTED_EXITS {len(exits)}\n")
         f.write(f"#define DOOM_CONVERTED_DOORS {len(doors)}\n")
+        f.write(f"#define DOOM_CONVERTED_LIFTS {len(lifts)}\n")
+        f.write(f"#define DOOM_CONVERTED_LIFT_TRIGGERS {len(lift_triggers)}\n")
         f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
         f.write(f"#define NG_RUNTIME_EXIT_COUNT {len(exits)}\n\n")
         f.write(f"#define NG_RUNTIME_DOOR_COUNT {len(doors)}\n\n")
+        f.write(f"#define NG_RUNTIME_LIFT_COUNT {len(lifts)}\n\n")
+        f.write(f"#define NG_RUNTIME_LIFT_TRIGGER_COUNT {len(lift_triggers)}\n\n")
+        lift_cell_refs = [y * len(grid[0]) + x for _tag, cells in lifts for x, y in cells]
+        f.write(f"#define NG_RUNTIME_LIFT_CELL_REF_COUNT {len(lift_cell_refs)}\n\n")
         f.write(f"#define NG_RENDER_LINE_COUNT {len(render_line_rows)}\n\n")
         f.write(f"#define NG_RENDER_CELL_REF_COUNT {len(render_cell_refs)}\n\n")
         f.write("#define NG_RUNTIME_THING_INFO_GENERATED 1\n")
@@ -1339,135 +1743,69 @@ def emit_header(
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
         f.write("typedef struct NgRuntimeExit { short x_q8; short y_q8; unsigned short special; unsigned char next_episode; unsigned char next_mission; } NgRuntimeExit;\n\n")
         f.write("typedef struct NgRuntimeDoor { unsigned char x; unsigned char y; unsigned short special; } NgRuntimeDoor;\n\n")
+        f.write("typedef struct NgRuntimeLift { unsigned short first_cell; unsigned short cell_count; unsigned short tag; } NgRuntimeLift;\n\n")
+        f.write("typedef struct NgRuntimeLiftTrigger { unsigned char x; unsigned char y; unsigned char lift; unsigned short special; unsigned char walk; } NgRuntimeLiftTrigger;\n\n")
         f.write("typedef struct NgRenderLine { short x1_q8; short y1_q8; short x2_q8; short y2_q8; unsigned char texture; unsigned char phase; unsigned char span; unsigned char height; } NgRenderLine;\n\n")
         if doors:
             f.write("extern unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT];\n\n")
+        if lifts:
+            f.write("extern unsigned char g_runtime_lift_open[NG_RUNTIME_LIFT_COUNT];\n\n")
         f.write("extern unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES];\n\n")
-        f.write("static const NgRenderLine g_render_lines[NG_RENDER_LINE_COUNT] = {\n")
-        for x1, y1, x2, y2, texture, phase, span, height in render_line_rows:
-            f.write(f"    {{{x1},{y1},{x2},{y2},{texture},{phase},{span},{height}}},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned short g_render_cell_start[MAP_H][MAP_W] = {\n")
-        for row in render_cell_starts:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_render_cell_count[MAP_H][MAP_W] = {\n")
-        for row in render_cell_counts:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned short g_render_cell_lines[NG_RENDER_CELL_REF_COUNT] = {\n")
-        for i in range(0, len(render_cell_refs), 24):
-            f.write("    ")
-            f.write(",".join(str(cell) for cell in render_cell_refs[i : i + 24]))
-            f.write(",\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
-        for y, row in enumerate(grid):
-            f.write("    {")
-            f.write(",".join(str(door_cell_id.get((x, y), cell)) for x, cell in enumerate(row)))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_map_tex[MAP_H][MAP_W] = {\n")
-        for row in texture_grid:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_map_tex_phase[MAP_H][MAP_W] = {\n")
-        for row in texture_phase_grid:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_map_damage[MAP_H][MAP_W] = {\n")
-        for row in damage_grid:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_map_floor_visual[MAP_H][MAP_W] = {\n")
-        for row in floor_visual_grid:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_map_light[MAP_H][MAP_W] = {\n")
-        for row in light_grid:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_map_secret[MAP_H][MAP_W] = {\n")
-        for row in secret_grid:
-            f.write("    {")
-            f.write(",".join(str(cell) for cell in row))
-            f.write("},\n")
-        f.write("};\n\n")
-        f.write("static const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {\n")
-        for x_q8, y_q8, typ, flags, _thing_class, _info in things:
-            f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_runtime_thing_class[NG_RUNTIME_THING_COUNT] = {\n")
-        for i in range(0, len(things), 24):
-            f.write("    ")
-            f.write(",".join(str(thing_class) for *_rest, thing_class, _info in things[i : i + 24]))
-            f.write(",\n")
-        f.write("};\n\n")
-        f.write("static const unsigned char g_runtime_thing_info[NG_RUNTIME_THING_COUNT] = {\n")
-        for i in range(0, len(things), 24):
-            f.write("    ")
-            f.write(",".join(f"0x{info:02x}" for *_rest, _thing_class, info in things[i : i + 24]))
-            f.write(",\n")
-        f.write("};\n\n")
-        f.write("static const NgRuntimeExit g_runtime_exits[NG_RUNTIME_EXIT_COUNT] = {\n")
-        for x_q8, y_q8, special, next_episode, next_mission in exits:
-            f.write(f"    {{{x_q8},{y_q8},{special},{next_episode},{next_mission}}},\n")
-        f.write("};\n\n")
-        f.write("static const NgRuntimeDoor g_runtime_doors[NG_RUNTIME_DOOR_COUNT] = {\n")
-        for x, y, special in doors:
-            f.write(f"    {{{x},{y},{special}}},\n")
-        f.write("};\n\n")
-        f.write("static inline int map_at(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
-        f.write("    if (g_runtime_cell_open[((y * MAP_W) + x) >> 3] & (1 << (((y * MAP_W) + x) & 7))) return 0;\n")
-        f.write("    unsigned char cell = g_map[y][x];\n")
-        f.write("    if (!cell) return 0;\n")
-        if doors:
-            f.write("    if (cell >= 2) return g_runtime_door_open[cell - 2] ? 0 : 1;\n")
-        f.write("    return 1;\n")
-        f.write("}\n\n")
-        f.write("static inline unsigned char map_cell_value(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
-        f.write("    return g_map[y][x];\n")
-        f.write("}\n\n")
-        f.write("static inline unsigned char map_cell_texture(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
-        f.write("    return g_map_tex[y][x];\n")
-        f.write("}\n\n")
-        f.write("static inline unsigned char map_cell_texture_phase(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
-        f.write("    return g_map_tex_phase[y][x];\n")
-        f.write("}\n\n")
-        f.write("static inline unsigned char map_cell_damage(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
-        f.write("    return g_map_damage[y][x];\n")
-        f.write("}\n\n")
-        f.write("static inline unsigned char map_cell_floor_visual(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
-        f.write("    return g_map_floor_visual[y][x];\n")
-        f.write("}\n\n")
-        f.write("static inline unsigned char map_cell_light(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 2;\n")
-        f.write("    return g_map_light[y][x];\n")
-        f.write("}\n\n")
-        f.write("static inline unsigned char map_cell_secret(int x, int y) {\n")
-        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
-        f.write("    return g_map_secret[y][x];\n")
-        f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
+        if map_source_path:
+            write_generated_map_externs(f)
+        else:
+            write_generated_map_arrays(
+                f,
+                "static const",
+                grid,
+                texture_grid,
+                texture_phase_grid,
+                damage_grid,
+                floor_visual_grid,
+                light_grid,
+                floor_height_grid,
+                ceiling_height_grid,
+                secret_grid,
+                lift_grid,
+                things,
+                exits,
+                doors,
+                lifts,
+                lift_triggers,
+                render_line_rows,
+                render_cell_starts,
+                render_cell_counts,
+                render_cell_refs,
+            )
+        write_generated_map_inlines(f, bool(doors), bool(lifts))
+        f.write("#endif /* DOOM_MAP_GENERATED_H */\n")
+    if map_source_path:
+        with open(map_source_path, "w", encoding="ascii") as f:
+            f.write("/* Generated by tools/doom_convert.py; do not edit by hand. */\n")
+            f.write(f"#include \"{os.path.basename(out_path)}\"\n\n")
+            write_generated_map_arrays(
+                f,
+                "const",
+                grid,
+                texture_grid,
+                texture_phase_grid,
+                damage_grid,
+                floor_visual_grid,
+                light_grid,
+                floor_height_grid,
+                ceiling_height_grid,
+                secret_grid,
+                lift_grid,
+                things,
+                exits,
+                doors,
+                lifts,
+                lift_triggers,
+                render_line_rows,
+                render_cell_starts,
+                render_cell_counts,
+                render_cell_refs,
+            )
 
 
 def texture_ids(sidedefs: list[SideDef], sectors: list[Sector]) -> dict[str, int]:
@@ -1668,10 +2006,16 @@ def convert(args: argparse.Namespace) -> None:
     max_x = max(v.x for v in vertices)
     min_y = min(v.y for v in vertices)
     max_y = max(v.y for v in vertices)
-    margin = 1
-    usable_w = args.width - margin * 2 - 1
-    usable_h = args.height - margin * 2 - 1
+    base_margin = 1
+    usable_w = args.width - base_margin * 2 - 1
+    usable_h = args.height - base_margin * 2 - 1
     scale = max((max_x - min_x) / max(1, usable_w), (max_y - min_y) / max(1, usable_h), 1.0)
+    mapped_w = (max_x - min_x) / scale
+    mapped_h = (max_y - min_y) / scale
+    margin = (
+        base_margin + max(0.0, (usable_w - mapped_w) * 0.5),
+        base_margin + max(0.0, (usable_h - mapped_h) * 0.5),
+    )
 
     grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
     texture_grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
@@ -1718,7 +2062,7 @@ def convert(args: argparse.Namespace) -> None:
     if player is None:
         raise ValueError("map has no player 1 start thing")
 
-    flat_bridge_cells = carve_flat_bridges(grid, linedefs, sidedefs, vertices, min_x, max_y, scale, margin)
+    flat_bridge_cells = carve_flat_bridges(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
     readability_cells = 0
     if args.readability_cleanup:
         protected_cells = cleanup_protected_cells(grid, linedefs, vertices, things, player, min_x, max_y, scale, margin)
@@ -1732,10 +2076,22 @@ def convert(args: argparse.Namespace) -> None:
 
     sx, sy = grid_coord(player.x, player.y, min_x, max_y, scale, margin)
     sx, sy = carve_start_clearance(grid, sx, sy, player.angle)
+    thing_clearance_cells = carve_runtime_thing_cells(grid, things, min_x, max_y, scale, margin, args.skill_mask)
     sx, sy = choose_start_pose(grid, sx, sy, player.angle)
     converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle, args.skill_mask)
     converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin, args.map.upper())
     converted_doors = runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin)
+    converted_lifts, converted_lift_triggers, lift_grid = runtime_lifts(
+        linedefs,
+        sidedefs,
+        sectors,
+        vertices,
+        grid,
+        min_x,
+        max_y,
+        scale,
+        margin,
+    )
     converted_render_lines, render_cell_starts, render_cell_counts, render_cell_refs = render_lines(
         linedefs,
         sidedefs,
@@ -1750,17 +2106,22 @@ def convert(args: argparse.Namespace) -> None:
         args.detail_cull,
     )
     damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
-    floor_visual_grid, light_grid = sector_visual_grids(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
+    floor_visual_grid, light_grid, floor_height_grid, ceiling_height_grid = sector_visual_grids(
+        grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin
+    )
     secret_grid = sector_secret_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
 
     emit_header(
         args.out,
+        args.map_source,
         grid,
         texture_grid,
         texture_phase_grid,
         damage_grid,
         floor_visual_grid,
         light_grid,
+        floor_height_grid,
+        ceiling_height_grid,
         secret_grid,
         sx,
         sy,
@@ -1773,6 +2134,7 @@ def convert(args: argparse.Namespace) -> None:
             "solid_linedefs": solid_count,
             "culled_linedefs": culled_count,
             "flat_bridge_cells": flat_bridge_cells,
+            "thing_clearance_cells": thing_clearance_cells,
             "readability_cells": readability_cells,
             "sidedefs": len(sidedefs),
             "sectors": len(sectors),
@@ -1787,6 +2149,9 @@ def convert(args: argparse.Namespace) -> None:
         converted_things,
         converted_exits,
         converted_doors,
+        converted_lifts,
+        converted_lift_triggers,
+        lift_grid,
         converted_render_lines,
         render_cell_starts,
         render_cell_counts,
@@ -1814,7 +2179,9 @@ def convert(args: argparse.Namespace) -> None:
     print(
         f"{args.map.upper()}: {len(vertices)} vertices, {solid_count}/{len(linedefs)} solid lines "
         f"({culled_count} detail culled), "
+        f"{thing_clearance_cells} thing clearance cells, "
         f"{readability_cells} readability cells, "
+        f"{len(converted_lifts)} lifts/{len(converted_lift_triggers)} triggers, "
         f"{len(things)} things -> {args.width}x{args.height} grid at {args.out}"
     )
 
@@ -1826,10 +2193,11 @@ def main() -> int:
     parser.add_argument("--map", default="E1M1", help="Doom map marker to convert")
     parser.add_argument("--skill-mask", type=lambda value: int(value, 0), default=4, help="Doom THING skill bit mask to include: 1=easy, 2=medium, 4=hard")
     parser.add_argument("--out", required=True, help="Generated C header path")
+    parser.add_argument("--map-source", help="Generated C source path for large map tables; keeps the header declaration-only")
     parser.add_argument("--assets-header", help="Generated Neo Geo map asset declarations")
     parser.add_argument("--assets-source", help="Generated Neo Geo map asset data")
-    parser.add_argument("--width", type=int, default=38)
-    parser.add_argument("--height", type=int, default=27)
+    parser.add_argument("--width", type=int, default=96)
+    parser.add_argument("--height", type=int, default=72)
     parser.add_argument(
         "--detail-cull",
         type=float,

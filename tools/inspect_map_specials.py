@@ -16,6 +16,7 @@ import doom_convert as dc  # noqa: E402
 KNOWN_LINE_SPECIALS = {
     **{special: "door" for special in dc.DOOR_SPECIALS},
     **{special: "exit" for special in dc.EXIT_SPECIALS},
+    **{special: "platform/lift" for special in dc.LIFT_SPECIALS},
     5: "floor raise",
     15: "floor raise",
     18: "floor raise",
@@ -26,29 +27,22 @@ KNOWN_LINE_SPECIALS = {
     38: "floor lower",
     53: "floor lower",
     56: "floor raise",
-    62: "platform/lift",
     66: "floor raise",
     67: "floor raise",
     68: "floor raise",
     69: "floor raise",
     70: "floor lower",
     71: "floor lower",
-    88: "platform/lift",
-    89: "platform/lift",
     102: "floor lower",
     103: "door",
     112: "door",
     114: "door",
     119: "floor raise",
-    120: "platform/lift",
-    121: "platform/lift",
-    122: "platform/lift",
-    123: "platform/lift",
     127: "stairs",
     131: "floor raise",
 }
 
-SUPPORTED_LINE_KINDS = {"door", "exit"}
+SUPPORTED_LINE_KINDS = {"door", "exit", "platform/lift"}
 
 
 def load_map(iwad: str, map_name: str, zip_member: str | None):

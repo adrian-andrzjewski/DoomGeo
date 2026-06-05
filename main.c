@@ -27,6 +27,7 @@ enum {
 };
 
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
+unsigned char g_runtime_lift_open[NG_RUNTIME_LIFT_COUNT ? NG_RUNTIME_LIFT_COUNT : 1];
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
 static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
@@ -3106,7 +3107,11 @@ static void configure_e1m1_scout_test(void) {
 
 #ifdef DOOM_E1M1_EXIT_TEST
 static void configure_e1m1_exit_test(void) {
+#if NG_RUNTIME_EXIT_COUNT > 0
+    rc_set_pose_q8((short)(g_runtime_exits[0].x_q8 - (2 << 8)), g_runtime_exits[0].y_q8, 256, 0);
+#else
     rc_set_pose_q8((short)((57 << 8) + 128), (short)((44 << 8) + 128), 256, 0);
+#endif
     current_weapon = WEAPON_PISTOL;
     player_ammo = 50;
     player_health = 100;
@@ -3973,6 +3978,88 @@ static void carve_door_bridge_from_cell(int x, int y) {
             }
         }
     }
+}
+
+static void open_lift_index(u8 lift_index) {
+    const NgRuntimeLift *lift;
+    u8 opened = 0;
+    if (lift_index >= NG_RUNTIME_LIFT_COUNT) return;
+    if (g_runtime_lift_open[lift_index]) return;
+    g_runtime_lift_open[lift_index] = 1;
+    lift = &g_runtime_lifts[lift_index];
+    for (u16 i = 0; i < lift->cell_count; i++) {
+        u16 cell = g_runtime_lift_cells[lift->first_cell + i];
+        int x = cell % MAP_W;
+        int y = cell / MAP_W;
+        mark_runtime_cell_open(x, y);
+        opened = 1;
+    }
+    if (opened) {
+        door_message_timer = 35;
+        monster_path_valid = 0;
+        monster_path_player_cell_x = -1;
+        monster_path_player_cell_y = -1;
+        invalidate_background_cache();
+        rc_invalidate_view();
+    }
+}
+
+static u8 try_lift_trigger_cell(int cell_x, int cell_y, u8 require_walk) {
+    for (u16 i = 0; i < NG_RUNTIME_LIFT_TRIGGER_COUNT; i++) {
+        const NgRuntimeLiftTrigger *trigger = &g_runtime_lift_triggers[i];
+        if (require_walk && !trigger->walk) continue;
+        if (iabs16((int)trigger->x - cell_x) > 1 || iabs16((int)trigger->y - cell_y) > 1) continue;
+        if (trigger->lift >= NG_RUNTIME_LIFT_COUNT) continue;
+        if (g_runtime_lift_open[trigger->lift]) continue;
+        open_lift_index(trigger->lift);
+        return 1;
+    }
+    return 0;
+}
+
+static void check_lift_walk_triggers(void) {
+    int px, py;
+    rc_player_cell(&px, &py);
+    (void)try_lift_trigger_cell(px, py, 1);
+}
+
+static u8 open_nearby_lift(void) {
+    int px, py, dir_x, dir_y, plane_x, plane_y;
+    int best = -1;
+    int best_score = 0x7FFFFFFF;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    (void)plane_x;
+    (void)plane_y;
+
+    for (u16 i = 0; i < NG_RUNTIME_LIFT_TRIGGER_COUNT; i++) {
+        const NgRuntimeLiftTrigger *trigger = &g_runtime_lift_triggers[i];
+        int to_x;
+        int to_y;
+        int adx;
+        int ady;
+        int dist;
+        int dot;
+        int lateral;
+        if (trigger->lift >= NG_RUNTIME_LIFT_COUNT) continue;
+        if (g_runtime_lift_open[trigger->lift]) continue;
+        to_x = (int)trigger->x * 256 + 128 - px;
+        to_y = (int)trigger->y * 256 + 128 - py;
+        adx = iabs16(to_x);
+        ady = iabs16(to_y);
+        dist = adx + ady;
+        dot = to_x * dir_x + to_y * dir_y;
+        lateral = iabs16(to_x * dir_y - to_y * dir_x);
+        if (adx > WORLD_Q8(640) || ady > WORLD_Q8(640) || dist > WORLD_Q8(960)) continue;
+        if (dot <= -WORLD_Q8(128) || lateral > (dot > 0 ? dot * 3 : WORLD_Q8(384))) continue;
+        if (dist < best_score) {
+            best = i;
+            best_score = dist;
+        }
+    }
+    if (best < 0) return 0;
+    open_lift_index(g_runtime_lift_triggers[best].lift);
+    return 1;
 }
 
 static void open_door_index(u16 door_index) {
@@ -5119,7 +5206,18 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
     return origin_y;
 }
 
-static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8,
+static int projected_floor_screen_offset(short world_x_q8, short world_y_q8, int h, int player_x_q8, int player_y_q8) {
+    int player_floor = map_cell_floor_height(player_x_q8 >> 8, player_y_q8 >> 8);
+    int thing_floor = map_cell_floor_height(world_x_q8 >> 8, world_y_q8 >> 8);
+    int delta = thing_floor - player_floor;
+    int offset = (delta * h) / 128;
+    if (offset < -GAME_H) offset = -GAME_H;
+    if (offset > GAME_H) offset = GAME_H;
+    return offset;
+}
+
+static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short world_x_q8, short world_y_q8,
+                           int sx, int h, int dist_q8,
                            u8 flash, u8 fallback_projection, int view_px, int view_py) {
     int idx;
     u8 is_monster = thing_is_monster(thing_type);
@@ -5180,7 +5278,9 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
         if ((is_explosion && thing_index < 0) || is_projectile) {
             top = (GAME_H - meta->height) / 2;
         } else {
-            top = world_sprite_origin_y(thing_type, h) - meta->origin_y + ENEMY_GROUND_LIFT;
+            top = world_sprite_origin_y(thing_type, h)
+                - projected_floor_screen_offset(world_x_q8, world_y_q8, h, view_px, view_py)
+                - meta->origin_y + ENEMY_GROUND_LIFT;
         }
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
@@ -5410,11 +5510,13 @@ static int select_visible_things(int found) {
     for (int i = 0; i < count && found < ENEMY_VISIBLE_COUNT; i++) {
         u8 rendered;
         if (candidates[i].dynamic_index >= 0) {
-            rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h,
-                                        candidates[i].dist_q8, 0, candidates[i].fallback_projection, px, py);
+            rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].x_q8, candidates[i].y_q8,
+                                        candidates[i].sx, candidates[i].h, candidates[i].dist_q8,
+                                        0, candidates[i].fallback_projection, px, py);
         } else {
-            rendered = render_type_slot((u16)found, candidates[i].thing_index, candidates[i].thing_type, candidates[i].sx,
-                                        candidates[i].h, candidates[i].dist_q8,
+            rendered = render_type_slot((u16)found, candidates[i].thing_index, candidates[i].thing_type,
+                                        candidates[i].x_q8, candidates[i].y_q8,
+                                        candidates[i].sx, candidates[i].h, candidates[i].dist_q8,
                                         (candidates[i].thing_index >= 0 && enemy_hit_flash[candidates[i].thing_index]) ? 1 : 0,
                                         candidates[i].fallback_projection, px, py);
         }
@@ -5429,7 +5531,8 @@ static int render_visible_projectile(int found) {
     if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) {
         if (!project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
     }
-    if (render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
+    if (render_type_slot((u16)found, -1, projectile_type, projectile_x_q8, projectile_y_q8,
+                         sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
 }
 
@@ -5439,7 +5542,8 @@ static int render_visible_impact(int found) {
     if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) {
         if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return found;
     }
-    if (render_type_slot((u16)found, -1, 9000, sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
+    if (render_type_slot((u16)found, -1, 9000, impact_x_q8, impact_y_q8,
+                         sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
 }
 
@@ -5601,6 +5705,7 @@ static void restart_level(void) {
     sector_palette_dir_y = 0x7FFFFFFF;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
+    for (u16 i = 0; i < NG_RUNTIME_LIFT_COUNT; i++) g_runtime_lift_open[i] = 0;
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
     for (u16 i = 0; i < MAP_SECRET_BYTES; i++) secret_found_bits[i] = 0;
     for (u8 i = 0; i < 8; i++) {
@@ -5707,11 +5812,12 @@ int main(void) {
             }
             update_floor_damage();
             check_secret_reached();
+            check_lift_walk_triggers();
             update_monster_ai();
             collect_nearby_pickups();
             check_exit_reached();
             if (d_now && !door_prev) {
-                open_nearby_door();
+                if (!open_nearby_lift()) open_nearby_door();
             }
             door_prev = d_now;
         } else {

@@ -15,11 +15,11 @@ drawing pixels.
 
 | Area | Status |
 | --- | --- |
-| WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
-| Rendering | Default 40-column wall raycaster tuned for readable navigation, with WAD-derived portal/span hits, denser Doom wall/door atlases, throttled wall strip uploads, brighter depth palettes, and pre-baked moving floor/ceiling planes. `DOOM_DETAIL=balanced` and `DOOM_DETAIL=speed` remain lower-cost stress tiers, `DOOM_DETAIL=clarity` spends more sprites on walls, and `DOOM_FLAT_PLANES=1` switches back to static solid planes for debugging. Failed/missing sprite draws no longer consume visible thing slots. |
+| WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, sector heights, and runtime things into a centered `96x72` Neo Geo grid. Generated map arrays are split into `doom_map_generated.h` declarations and `doom_map_generated.c` table definitions. |
+| Rendering | Default 40-column wall raycaster tuned for readable navigation, with WAD-derived portal/span hits, denser Doom wall/door atlases, lower/upper sector-height span cues, throttled wall strip uploads, brighter depth palettes, and pre-baked moving floor/ceiling planes. `DOOM_DETAIL=balanced` and `DOOM_DETAIL=speed` remain lower-cost stress tiers, `DOOM_DETAIL=clarity` spends more sprites on walls, and `DOOM_FLAT_PLANES=1` switches back to static solid planes for debugging. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths when the selected IWAD supplies the matching psprite art. The default shareware build masks unavailable plasma/BFG psprites instead of drawing fake placeholders; explicit Freedoom builds exercise the full redistributable weapon-art path. |
-| Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
+| Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. Two-sided lines use Doom-like player-height and step-height checks, so small stairs stay passable while high ledges remain blocking. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening and normal closing spread fix-layer work across frames instead of blocking on full one-frame redraws. |
 | Flow | Normal ROMs boot to a fix-layer block-letter intro/menu and start E1M1 with B or D. Focused verification ROMs skip the intro so smoke captures still launch directly into their scenario. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
@@ -198,6 +198,7 @@ identity used so the arcade core accepts the generated homebrew ROM zip.
 - [Build and Packaging](docs/build-packaging.md)
 - [Release Plan](docs/release-plan.md)
 - [Video Reference Transcript](VIDEO-REF.md)
+- [Neo Geo Playability Patch Notes](NEO_GEO_PLAYABILITY_PATCH.md)
 
 ## Reference Ports
 

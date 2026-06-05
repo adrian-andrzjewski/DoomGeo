@@ -39,6 +39,9 @@ after the current documentation pass.
 
 ## Rendering Fidelity
 
+- Use the generated per-cell floor/ceiling heights for more than sprite
+  seating. The current renderer now knows the heights, but it still does not
+  draw true Doom floor/ceiling clipping or stacked multi-span sector geometry.
 - Continue tuning the cached perspective floor/ceiling pass. The stable default
   keeps one phase per direction because multi-phase floor banks exceeded the
   practical sprite tile index range; any future forward-motion cue needs a
@@ -52,6 +55,9 @@ after the current documentation pass.
   clipped spans for windows, ledges, and upper/lower sector transitions; these
   are still a main reason the native Doom E1M1 start view does not match exactly
   even though the same map and player start are loaded.
+- Keep checking native-vs-NeoGeo waypoints after converter changes. The centered
+  `96x72` map improves coordinate fidelity, but current E1M1/E1M2 start
+  comparisons still show large visual differences from native Doom.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
 - Profile wall, plane, thing, and HUD update costs before increasing sprite or

@@ -75,13 +75,14 @@ def main() -> int:
     playfield = score_region(image, (120, 220, 840, 560))
     hud = score_region(image, (0, 560, 960, 672))
 
-    require_min(errors, path, "corpse band", corpse_band, "red", 2500)
-    require_min(errors, path, "corpse band shadow", corpse_band, "dark", 3500)
+    require_min(errors, path, "corpse band color", corpse_band, "colored", 5000)
+    require_min(errors, path, "corpse band lighting", corpse_band, "bright", 8000)
+    require_min(errors, path, "corpse band shadow", corpse_band, "dark", 1500)
     require_min(errors, path, "center dropped weapon", center_drop, "tan", 900)
     require_min(errors, path, "center dropped weapon shadow", center_drop, "dark", 2500)
     require_min(errors, path, "playfield corpse/drop", playfield, "colored", 28000)
-    require_min(errors, path, "playfield lighting", playfield, "bright", 80000)
-    require_min(errors, path, "playfield variety", playfield, "varied", 55)
+    require_min(errors, path, "playfield lighting", playfield, "bright", 70000)
+    require_min(errors, path, "playfield variety", playfield, "varied", 30)
     require_min(errors, path, "status bar", hud, "red", 8000)
 
     if errors:

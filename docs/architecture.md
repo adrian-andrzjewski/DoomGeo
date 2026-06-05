@@ -34,8 +34,9 @@ and emits generated C headers/sources under `build/`:
   the generated Episode/map destination so normal and secret exits can diverge
   without runtime WAD parsing.
 - Damage and secret bit grids.
-- Per-cell sector floor visual class and light band, derived from sector flat
-  names, specials, and light levels for low-cost runtime palette cues.
+- Per-cell sector floor visual class, light band, floor height, and ceiling
+  height, derived from sector flat names, specials, light levels, and sector
+  heights for low-cost runtime palette cues and sprite floor seating.
 - Runtime thing list with supported Doom thing types.
 - Runtime thing class/info bytes for monster, threat, pickup, corpse,
   shootable, and render predicates, so the 68000 can test generated metadata
@@ -47,8 +48,19 @@ and emits generated C headers/sources under `build/`:
   WAD-to-grid coordinate conversion on the 68000. `make bsp-asset-check`
   verifies the generated counts, bounds, partition vectors, and child indices
   for the selected map.
+- Centered WAD-to-grid bounds. The default conversion is `96x72`, and generated
+  starts/things preserve sub-cell WAD positions where possible instead of
+  drifting to one anchored corner of the converted grid.
+- Doom-like two-sided opening tests. Small floor deltas stay passable, but
+  openings lower than player height or taller than the configured step height
+  remain blocking, which keeps high ledges/platform sides from becoming holes.
 
 The ROM does not load a WAD at runtime.
+
+Normal builds emit map declarations in `doom_map_generated.h` and the large
+tables in `doom_map_generated.c`. Focused tools can still emit inline arrays
+when no map source path is requested, but the Makefile path uses the split
+source so large arrays are not duplicated across translation units.
 
 The keycard verification ROM is built through recursive Make targets with
 `DOOM_MAP=E1M2`, `BUILDDIR=build/key-test`, and `ROM=build/key-test-rom`,

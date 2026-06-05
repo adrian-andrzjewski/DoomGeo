@@ -10,13 +10,17 @@ readable.
   `SIDEDEFS`, `VERTEXES`, `SECTORS`, `SEGS`, `SSECTORS`, `NODES`, `REJECT`, and
   `BLOCKMAP`.
 - Emits a compact runtime grid plus texture class, texture phase, damaging
-  sector, secret sector, door, exit, and thing data.
+  sector, secret sector, floor/ceiling height, door, exit, and thing data.
 - Keeps richer generated map arrays for future work, but the runtime path uses
   Neo Geo-friendly fixed-size structures instead of a generic WAD directory.
 - Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
   `DOOM_MAP_HEIGHT`, and `DOOM_SKILL_MASK` at build time. The default skill
   mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
-  or `2` for medium placement.
+  or `2` for medium placement. The default grid is now centered at `96x72`,
+  which gives the converter more room to preserve original WAD placement.
+- Generated map tables are split into `doom_map_generated.h` and
+  `doom_map_generated.c` for Makefile builds so large arrays are compiled once
+  instead of duplicated by every file that includes the generated header.
 - The generated header exposes the current map code and Episode 1 next-map
   metadata. Exit records also carry a compact destination derived from the Doom
   line special, so E1M3's secret exit can report E1M9 while the normal exit
@@ -28,6 +32,12 @@ readable.
   converter moves the pickup into the nearest open cell but clamps it toward
   the original point instead of snapping it to the cell center. This keeps E1M2
   key/weapon placements closer to native Doom while staying collectible.
+- Supported runtime things can also reopen their own coarse cell when the cell
+  was only closed by rasterization overlap. This preserves original player and
+  thing placement without punching general-purpose holes through high ledges.
+- Two-sided lines are passable only when their vertical opening fits Doom's
+  player height and their floor delta is within the configured step height.
+  Small stairs remain walkable; tall platforms and ledges stay blocking.
 
 ## Rendering
 
@@ -61,6 +71,9 @@ readable.
   Doom sector-height deltas do not become fake full-height walls in the
   one-span-per-column approximation; nearby larger spans still occlude as
   ledge/step cues.
+- Generated lower/upper span metadata uses WAD texture fallbacks when a sidedef
+  omits the explicit upper/lower texture, so sector-height transitions still
+  get a visible cue in the sprite-strip renderer.
 - The renderer caches each column's ray vector, DDA reciprocal deltas, and step
   signs for the current angle/FOV, rebuilding that cache only when the view
   direction changes. Movement-only frames reuse those values before running
@@ -223,6 +236,10 @@ readable.
 - Converted pickups keep sub-cell placement after coarse-grid correction, so
   keys and weapons no longer drift as far from their original WAD locations when
   a nearby wall line occupies the raw grid cell.
+- Visible world sprites are seated against the generated floor height for their
+  current cell instead of always assuming the player's floor. Pickups, monsters,
+  corpses, drops, projectiles, and impacts therefore align better in sectors
+  with raised/lowered floors.
 - Visible thing selection uses one priority-ranked projection pass for
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the

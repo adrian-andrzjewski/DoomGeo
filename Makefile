@@ -39,8 +39,8 @@ DOOM_SHAREWARE_ZIP=.tools/assets/doom1.wad.zip
 DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
 DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
 DOOM_MAP?=E1M1
-DOOM_MAP_WIDTH?=76
-DOOM_MAP_HEIGHT?=54
+DOOM_MAP_WIDTH?=96
+DOOM_MAP_HEIGHT?=72
 DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_DETAIL?=quality
@@ -50,6 +50,8 @@ DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
 EPISODE_MAPS?=E1M1 E1M2 E1M3 E1M4 E1M5 E1M6 E1M7 E1M8 E1M9
 EPISODE_MAP?=E1M1
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
+DOOM_MAP_SOURCE=$(BUILDDIR)/doom_map_generated.c
+DOOM_MAP_OBJECT=$(BUILDDIR)/doom_map_generated.o
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
@@ -117,11 +119,13 @@ include emu.mk
 # 
 # Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
 ELF=$(BUILDDIR)/rom.elf
-$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_ASSETS_OBJECT)
+$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
 
 $(BUILDDIR)/main.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
 $(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
+$(DOOM_MAP_OBJECT): $(DOOM_MAP_SOURCE) $(DOOM_MAP_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_MAP_SOURCE) -o $@
 $(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
 
@@ -382,8 +386,8 @@ asm-gngeo: $(ASM_CART)
 smoke-screenshot:
 	tools/smoke_capture.sh
 
-route-check: $(DOOM_MAP_HEADER)
-	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER)
+route-check: $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE)
+	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER) --source $(DOOM_MAP_SOURCE)
 
 episode-route-report: $(DOOM_IWAD)
 	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK)
@@ -404,12 +408,12 @@ $(DOOM_SHAREWARE_ZIP):
 	mkdir -p $(dir $@)
 	curl -L --fail --output $@ $(DOOM_SHAREWARE_URL)
 
-$(DOOM_MAP_HEADER): Makefile tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
-	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+$(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE): Makefile tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $(DOOM_MAP_HEADER) --map-source $(DOOM_MAP_SOURCE) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
 $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
 
-doom-assets: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE)
+doom-assets: $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE) $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE)
 
 
 
