@@ -83,6 +83,7 @@ static u8  wall_upload_dirty = 1;
 static u8  wall_upload_scan = 0;
 static u8  wall_first_upload = 1;
 static u8  wall_frame_overrun = 0;
+static u8  render_motion_active = 0;
 
 static inline int projected_height_from_inv(fix inv_dist) {
     int h = (int)((((s32)WALLH * MAP_RENDER_SCALE) * inv_dist) >> FBITS);
@@ -220,6 +221,7 @@ void rc_input(u8 pressed) {
     } else {
         turn = input_axis(pressed, LEFT, RIGHT);
     }
+    render_motion_active = (u8)((forward || side || turn) ? 1 : 0);
     if (forward || side) {
         fix dx = 0;
         fix dy = 0;
@@ -388,6 +390,16 @@ void rc_render(void) {
     update_ray_cache();
     int baseMapX = posX >> FBITS;
     int baseMapY = posY >> FBITS;
+    u8 allow_span_refinement = 1;
+    u8 near_refinement_cells = DOOM_NEAR_LINE_REFINEMENT_CELLS;
+#if DOOM_ADAPTIVE_LINE_REFINEMENT
+    if (wall_frame_overrun) {
+        allow_span_refinement = 0;
+        near_refinement_cells = DOOM_OVERRUN_LINE_REFINEMENT_CELLS;
+    } else if (render_motion_active) {
+        near_refinement_cells = DOOM_MOVING_LINE_REFINEMENT_CELLS;
+    }
+#endif
     for (int x = 0; x < NUM_COLS; x++) {
         fix rayX = rayXbuf[x];
         fix rayY = rayYbuf[x];
@@ -424,7 +436,7 @@ void rc_render(void) {
                 int line_side = side;
                 u8 line_span = 0;
                 u8 line_height = 0;
-                if (g_render_cell_count[mapY][mapX] &&
+                if (allow_span_refinement && g_render_cell_count[mapY][mapX] &&
                     rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 1, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
                     line_span && projected_span_height(line_perp, line_height) >= PORTAL_SPAN_OCCLUDE_MIN_H) {
                     kindbuf[x] = line_kind;
@@ -458,7 +470,7 @@ void rc_render(void) {
 #if DOOM_SOLID_LINE_REFINEMENT
             rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
 #else
-            if (perp <= ((fix)DOOM_NEAR_LINE_REFINEMENT_CELLS << FBITS)) {
+            if (near_refinement_cells && perp <= ((fix)near_refinement_cells << FBITS)) {
                 rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
             }
 #endif

@@ -593,6 +593,16 @@ readable.
   but refines nearby solid hits against the converted WAD line metadata. This
   improves close wall texture phase/orientation readability without returning
   the default ROM to the full-column refinement cost of the comparison tiers.
+- Balanced mode tightens that near-line refinement radius while the player is
+  actively moving, and after a late frame it uses an even smaller recovery
+  radius while skipping portal-span refinement for one frame. Windows, lower
+  walls, upper walls, and doors still use span refinement on normal frames. The
+  quality/clarity tiers keep solid-line refinement for closer native-Doom still
+  comparisons.
+- `DOOM_ADAPTIVE_LINE_REFINEMENT`,
+  `DOOM_MOVING_LINE_REFINEMENT_CELLS`, and
+  `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` can be passed through `SMOKE_MAKE_ARGS`
+  when movement benches need to test a different CPU/fidelity balance.
 - The converter flattens non-door two-sided sector transitions into narrow
   bridge cells after wall rasterization. This keeps Doom lift, stair, and ledge
   progression traversable in the Neo Geo port's 2D collision grid without

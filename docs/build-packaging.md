@@ -135,8 +135,10 @@ ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`. When a
 movement run needs renderer-budget experiments, the same variable can carry
 `DOOM_WALL_UPLOAD_COLUMNS`, `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`,
 `DOOM_BG_SCROLL_COLUMNS`, or `DOOM_BG_SCROLL_OVERRUN_COLUMNS` without editing
-source.
-custom `ROM=...` directory is used, the smoke helper copies the local
+source. For CPU-side wall intersection tuning, pass
+`DOOM_ADAPTIVE_LINE_REFINEMENT`, `DOOM_MOVING_LINE_REFINEMENT_CELLS`, or
+`DOOM_OVERRUN_LINE_REFINEMENT_CELLS` through the same path. When a custom
+`ROM=...` directory is used, the smoke helper copies the local
 `neogeo.zip` BIOS package there before launching GnGeo.
 
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.

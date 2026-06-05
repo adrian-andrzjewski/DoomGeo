@@ -143,6 +143,12 @@ current runtime accepts several compromises:
   16 of its 32 wall columns per frame during normal movement, so texture changes
   settle in roughly two frames; the overrun path clamps the budget back down
   when `wait_vblank_status()` reports late frames.
+- Balanced mode also adapts WAD line refinement by motion state. Standing or
+  non-overrun frames keep the normal portal-span pass and near solid-line
+  correction, while moving frames use a tighter near-hit radius and late-frame
+  recovery skips span refinement for one frame. This keeps the runtime in the
+  sprite-strip model while spending less 68000 time on line intersection scans
+  exactly when input response matters most.
 - The cached floor/ceiling backdrop has a separate `BG_SCROLL_COLUMNS_PER_FRAME`
   budget. Balanced defaults update four of 20 backdrop columns per normal frame
   and two after a late frame, keeping plane catch-up bounded without turning the

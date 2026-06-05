@@ -85,6 +85,15 @@ endif
 ifneq ($(strip $(DOOM_BG_SCROLL_OVERRUN_COLUMNS)),)
 override CFLAGS += -DBG_SCROLL_COLUMNS_OVERRUN=$(DOOM_BG_SCROLL_OVERRUN_COLUMNS)
 endif
+ifneq ($(strip $(DOOM_ADAPTIVE_LINE_REFINEMENT)),)
+override CFLAGS += -DDOOM_ADAPTIVE_LINE_REFINEMENT=$(DOOM_ADAPTIVE_LINE_REFINEMENT)
+endif
+ifneq ($(strip $(DOOM_MOVING_LINE_REFINEMENT_CELLS)),)
+override CFLAGS += -DDOOM_MOVING_LINE_REFINEMENT_CELLS=$(DOOM_MOVING_LINE_REFINEMENT_CELLS)
+endif
+ifneq ($(strip $(DOOM_OVERRUN_LINE_REFINEMENT_CELLS)),)
+override CFLAGS += -DDOOM_OVERRUN_LINE_REFINEMENT_CELLS=$(DOOM_OVERRUN_LINE_REFINEMENT_CELLS)
+endif
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)
