@@ -796,6 +796,7 @@ static u8  door_prev = 0;
 static u8  map_prev = 0;
 static u8  shortcut_prev = 0;
 static u8  restart_prev = 0;
+static u8  input_catchup_pending = 0;
 static u8  hurt_timer = 0;
 static u8  floor_damage_timer = 0;
 static u8  armor_flash_timer = 0;
@@ -889,6 +890,7 @@ static short monster_path_player_cell_y = -1;
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
+static u8 enemy_slot_hidden[ENEMY_VISIBLE_COUNT];
 static short ranged_readable_prev[ENEMY_VISIBLE_COUNT];
 static u8 ranged_readable_prev_count = 0;
 static volatile u16 player_health = 100;
@@ -4954,11 +4956,16 @@ static void init_weapon(void) {
 }
 
 static void hide_enemy_slot(u16 slot) {
-    for (u16 i = 0; i < ENEMY_STRIPS; i++) {
-        u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + i;
-        scb2(spr, 0x0F, 0x00);
-        scb3(spr, SCRH + 32, 0, 1);
-        scb4(spr, 0);
+    u8 already_hidden;
+    if (slot >= ENEMY_VISIBLE_COUNT) return;
+    already_hidden = enemy_slot_hidden[slot];
+    if (!already_hidden) {
+        for (u16 i = 0; i < ENEMY_STRIPS; i++) {
+            u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + i;
+            scb2(spr, 0x0F, 0x00);
+            scb3(spr, SCRH + 32, 0, 1);
+            scb4(spr, 0);
+        }
     }
     enemies[slot].thing_index = -1;
     enemies[slot].thing_type = 0;
@@ -4971,6 +4978,7 @@ static void hide_enemy_slot(u16 slot) {
     enemies[slot].attackable = 0;
     enemies[slot].ranged_attackable = 0;
     enemy_tile_key[slot] = -1;
+    enemy_slot_hidden[slot] = 1;
 }
 
 static void reset_enemy_slot_cache(void) {
@@ -4978,6 +4986,7 @@ static void reset_enemy_slot_cache(void) {
         enemy_palette_def[slot] = -1;
         enemy_tile_key[slot] = -1;
         enemy_slot_flash[slot] = 0;
+        enemy_slot_hidden[slot] = 0;
         ranged_readable_prev[slot] = -1;
         enemies[slot].thing_index = -1;
         enemies[slot].thing_type = 0;
@@ -5118,18 +5127,10 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
             }
         }
         if (!rendered) {
-            enemies[slot].thing_index = -1;
-            enemies[slot].thing_type = 0;
-            enemies[slot].screen_w = 0;
-            enemies[slot].screen_h = 0;
-            enemies[slot].fallback_projection = 0;
-            enemies[slot].is_monster = 0;
-            enemies[slot].shootable = 0;
-            enemies[slot].readable = 0;
-            enemies[slot].attackable = 0;
-            enemies[slot].ranged_attackable = 0;
+            hide_enemy_slot(slot);
             return 0;
         }
+        enemy_slot_hidden[slot] = 0;
     }
     return 1;
 }
@@ -5433,6 +5434,7 @@ static void restart_level(void) {
     restart_prev = 0;
     hurt_timer = 0;
     floor_damage_timer = 0;
+    input_catchup_pending = 0;
     level_complete = 0;
     level_next_episode = DOOM_NEXT_MAP_EPISODE;
     level_next_mission = DOOM_NEXT_MAP_MISSION;
@@ -5609,6 +5611,8 @@ int main(void) {
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
+        u8 catchup_input = input_catchup_pending;
+        input_catchup_pending = 0;
         if (game_active()) {
             enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08, A = 0x10, C = 0x40, D = 0x80 };
             const u8 dpad = UP | DOWN | LEFT | RIGHT;
@@ -5618,6 +5622,9 @@ int main(void) {
                 move_pressed = (u8)(move_pressed & ~dpad);
             }
             rc_input(move_pressed);
+            if (catchup_input && (move_pressed & dpad)) {
+                rc_input(move_pressed);
+            }
             update_floor_damage();
             check_secret_reached();
             update_monster_ai();
@@ -5632,12 +5639,14 @@ int main(void) {
             u8 restart_now = pressed & D;
             if (restart_now && !restart_prev) restart_level();
             restart_prev = restart_now;
+            input_catchup_pending = 0;
             pressed = 0;
         }
         rc_render();                    /* DDA during active display          */
         {
             u8 frame_overrun = wait_vblank_status();
             rc_set_frame_overrun(frame_overrun);
+            input_catchup_pending = frame_overrun;
             watchdog_kick();
             update_sector_flat_palette();
             update_hurt_flash();

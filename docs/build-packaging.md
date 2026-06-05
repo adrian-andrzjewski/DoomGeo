@@ -90,6 +90,9 @@ map spawn on both sides. Non-start native captures are approximate scripted
 movement from the native spawn; the Neo Geo side uses the matching focused ROM
 target when available, so these captures are useful visual registers but not
 pixel-exact camera matching.
+Focused Neo Geo captures wait briefly before grabbing the window and reject
+all-black frames, so startup/transient captures do not silently become the
+side-by-side evidence.
 
 For a broader Episode 1 conversion baseline, run `make episode-route-report`.
 It converts `E1M1` through `E1M9` into `build/episode-route/` and reports
@@ -122,6 +125,11 @@ GnGeo's `--showfps` overlay enabled and longer held inputs; outputs land under
 `.tools/logs/movement-bench-gngeo.log`. The bench finishes with
 `tools/check_movement_screens.py`, which rejects missing, blank, static, or
 obviously wrong movement captures before treating the run as useful evidence.
+Set `SMOKE_MAKE_ARGS` to pass isolated build variables through the same path,
+for example `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
+ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`. When a
+custom `ROM=...` directory is used, the smoke helper copies the local
+`neogeo.zip` BIOS package there before launching GnGeo.
 
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting

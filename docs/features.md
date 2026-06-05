@@ -205,6 +205,10 @@ readable.
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
   older five full scans of `NG_RUNTIME_THING_COUNT` every frame.
+- Empty world-sprite slots remember that they are already hidden, so normal
+  gameplay no longer rewrites every unused enemy/pickup sprite control block on
+  every frame. The logical slot state is still cleared when a candidate fails to
+  render, but repeated hidden slots stop spending VRAM writes.
 - The converter emits compact runtime class/info bytes for every supported
   thing, so monster, threat, pickup, corpse, shootable, and render eligibility
   tests can use generated metadata instead of repeated type-switch scans.
@@ -561,6 +565,11 @@ readable.
   overlay enabled and longer holds. This gives a quick frame-pacing visual
   register under `.tools/screens/latest/movement-bench/` before and after
   renderer-cost changes.
+- Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
+  to both the build and GnGeo run targets. This lets the same stress path test
+  isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
+  ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`; custom
+  ROM directories receive the local `neogeo.zip` BIOS package automatically.
 - Balanced rendering keeps the cheaper coarse wall path for distant solid walls
   but refines nearby solid hits against the converted WAD line metadata. This
   improves close wall texture phase/orientation readability without returning

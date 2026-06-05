@@ -24,6 +24,7 @@ make_pid=""
 neo_make_target="gngeo"
 neo_make_args=()
 neo_press_start="1"
+neo_settle_secs="${COMPARE_NEO_SETTLE_SECS:-}"
 waypoint_note=""
 
 mkdir -p "$SCREENDIR" "$LOGDIR" "$(dirname "$LOCKDIR")"
@@ -142,6 +143,7 @@ capture_window() {
     local out="$3"
     local wid=""
     local xwd_out="${out%.png}.xwd"
+    local mean=""
     for _ in $(seq 1 10); do
         wid="$(window_for_pid_or_name "$pid" "$name" || true)"
         if [ -n "$wid" ] && xwininfo -id "$wid" >/dev/null 2>&1; then
@@ -150,7 +152,10 @@ capture_window() {
             rm -f "$xwd_out"
             if xwd -silent -id "$wid" -out "$xwd_out" >/dev/null 2>&1 && [ -s "$xwd_out" ]; then
                 convert "$xwd_out" "$out"
-                return 0
+                mean="$(convert "$out" -colorspace RGB -format "%[fx:mean]" info: 2>/dev/null || echo 0)"
+                if awk -v mean="$mean" 'BEGIN { exit (mean > 0.01) ? 0 : 1 }'; then
+                    return 0
+                fi
             fi
         fi
         sleep 0.3
@@ -234,16 +239,19 @@ configure_waypoint() {
             MAP="E1M1"
             neo_make_target="encounter-test-gngeo"
             neo_press_start="0"
+            neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
         e1m1-scout)
             MAP="E1M1"
             neo_make_target="scout-test-gngeo"
             neo_press_start="0"
+            neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
         e1m2-keydoor)
             MAP="E1M2"
             neo_make_target="key-door-test-gngeo"
             neo_press_start="0"
+            neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
         *)
             echo "unknown COMPARE_WAYPOINT=${WAYPOINT}" >&2
@@ -267,6 +275,7 @@ require_cmd xwininfo
 require_cmd xwd
 require_cmd convert
 require_cmd unzip
+require_cmd awk
 
 acquire_capture_lock
 
@@ -329,6 +338,9 @@ if [ -n "$neo_wid" ]; then
         hold_key "$neo_wid" s 0.25
         sleep 2.0
     fi
+fi
+if [ -n "$neo_settle_secs" ]; then
+    sleep "$neo_settle_secs"
 fi
 capture_window "$neo_pid" "" "$neogeo_png"
 
