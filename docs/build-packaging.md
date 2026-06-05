@@ -74,8 +74,9 @@ door cells.
 
 For native Doom visual comparisons, run `tools/capture_compare.sh`. By default
 it captures the compiled map start view and writes native, Neo Geo, and
-side-by-side PNGs under `.tools/screens/`. Set `COMPARE_WAYPOINT` to capture a
-named view:
+side-by-side PNGs under `.tools/screens/`. The helper uses the same capture lock
+as smoke screenshots, so native and GnGeo windows cannot be cross-captured by a
+parallel comparison run. Set `COMPARE_WAYPOINT` to capture a named view:
 
 ```sh
 DOOM_MAP=E1M1 tools/capture_compare.sh
@@ -216,10 +217,11 @@ visible pickup/imp setup, then runs `tools/check_powerup_screens.py` to reject
 frames without powerup-colored pickups, the visible imp, and status-bar
 evidence.
 
-`tools/smoke_capture.sh` serializes emulator launches with an owner-tracked lock
-under `.tools/locks/` so parallel screenshot refreshes do not capture the wrong
-GnGeo window. If a previous aborted run left a directory-only or dead-PID lock,
-the helper clears it automatically before starting the next capture.
+`tools/smoke_capture.sh` and `tools/capture_compare.sh` serialize emulator
+launches with an owner-tracked lock under `.tools/locks/` so parallel screenshot
+refreshes do not capture the wrong native or GnGeo window. If a previous aborted
+run left a directory-only or dead-PID lock, the helpers clear it automatically
+before starting the next capture.
 
 Fast weapon shortcut input can be smoke-checked with:
 

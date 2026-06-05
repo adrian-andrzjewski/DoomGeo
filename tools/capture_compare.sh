@@ -11,6 +11,9 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 SCREENDIR=".tools/screens"
 LOGDIR=".tools/logs"
 COMPARISON_WORKSPACE="${COMPARISON_WORKSPACE:-}"
+LOCKDIR="${COMPARE_LOCKDIR:-${SMOKE_LOCKDIR:-.tools/locks/smoke-capture.lock}}"
+LOCK_OWNER="$LOCKDIR/pid"
+LOCK_ACQUIRED=0
 FREEDOOM_VERSION="${FREEDOOM_VERSION:-0.13.0}"
 FREEDOOM_ZIP=".tools/assets/freedoom-${FREEDOOM_VERSION}.zip"
 FREEDOOM_DIR=".tools/assets/freedoom-${FREEDOOM_VERSION}"
@@ -23,7 +26,7 @@ neo_make_args=()
 neo_press_start="1"
 waypoint_note=""
 
-mkdir -p "$SCREENDIR" "$LOGDIR"
+mkdir -p "$SCREENDIR" "$LOGDIR" "$(dirname "$LOCKDIR")"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -87,6 +90,44 @@ cleanup_spawned() {
         kill -- "-${make_pid}" >/dev/null 2>&1 || true
     fi
     kill_old_runners
+    if [ "$LOCK_ACQUIRED" = 1 ]; then
+        rm -rf "$LOCKDIR"
+    fi
+}
+
+capture_lock_is_stale() {
+    local owner_pid=""
+    if [ -f "$LOCK_OWNER" ]; then
+        owner_pid="$(cat "$LOCK_OWNER" 2>/dev/null || true)"
+        if [ -n "$owner_pid" ] && kill -0 "$owner_pid" 2>/dev/null; then
+            return 1
+        fi
+        return 0
+    fi
+
+    if pgrep -af 'tools/(smoke_capture|capture_compare)\.sh' | awk -v self="$$" '$1 != self && $0 !~ /pgrep/ {found=1} END {exit found ? 0 : 1}'; then
+        return 1
+    fi
+    return 0
+}
+
+acquire_capture_lock() {
+    for _ in $(seq 1 300); do
+        if mkdir "$LOCKDIR" 2>/dev/null; then
+            LOCK_ACQUIRED=1
+            echo "$$" > "$LOCK_OWNER"
+            trap cleanup_spawned EXIT INT TERM
+            return 0
+        fi
+        if capture_lock_is_stale; then
+            rm -rf "$LOCKDIR"
+            continue
+        fi
+        sleep 0.2
+    done
+
+    echo "could not acquire capture lock: $LOCKDIR" >&2
+    exit 1
 }
 
 switch_workspace() {
@@ -227,6 +268,8 @@ require_cmd xwd
 require_cmd convert
 require_cmd unzip
 
+acquire_capture_lock
+
 native_iwad="$DOOM_IWAD"
 if [[ "$native_iwad" == *.zip ]]; then
     native_member="$(unzip -Z1 "$native_iwad" | grep -Ei '\.wad$' | head -n1 || true)"
@@ -251,7 +294,6 @@ side_png="${SCREENDIR}/compare-${MAP}-${WAYPOINT}-${STAMP}-side-by-side.png"
 kill_old_runners
 sleep 0.3
 switch_workspace
-trap cleanup_spawned EXIT
 
 setsid env SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy \
     "$native_bin" -iwad "$native_iwad" -warp "$episode" "$level" -skill "$DOOM_SKILL" -nomusic -nosound -window \
