@@ -155,8 +155,8 @@ current runtime accepts several compromises:
   in the sprite-strip model while spending less 68000 time on line intersection
   scans exactly when input response matters most.
 - The cached floor/ceiling backdrop has a separate `BG_SCROLL_COLUMNS_PER_FRAME`
-  budget. Balanced defaults update four of 20 backdrop columns per normal frame
-  and two after a late frame, keeping plane catch-up bounded without turning the
+  budget. Balanced defaults update 10 of 20 backdrop columns per normal frame
+  and four after a late frame, keeping plane catch-up short without turning the
   planes into a runtime span renderer.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says

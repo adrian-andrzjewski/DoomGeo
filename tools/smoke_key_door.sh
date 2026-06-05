@@ -46,7 +46,7 @@ capture_window() {
 press_d() {
     DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
     DISPLAY="$DISPLAY_VALUE" xdotool keydown s
-    sleep "${KEY_DOOR_USE_SECS:-0.3}"
+    sleep "${KEY_DOOR_USE_SECS:-0.45}"
     DISPLAY="$DISPLAY_VALUE" xdotool keyup s
 }
 
@@ -97,7 +97,7 @@ press_d
 sleep 0.25
 capture_window "$wid" "$OPENED_OUT"
 
-hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-2.4}"
+hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-3.0}"
 sleep 0.4
 capture_window "$wid" "$THROUGH_OUT"
 

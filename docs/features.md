@@ -594,9 +594,9 @@ readable.
   refinement to a smaller radius, so held input spends less CPU time on
   WAD-line intersection scans. Standing frames keep the richer portal-span pass
   for visual recovery.
-- The cached floor/ceiling updater refreshes four of its 20 backdrop columns per
-  normal frame and two after a late frame, so turn/strafe plane changes settle in
-  about half the old time. `DOOM_BG_SCROLL_COLUMNS` and
+- The cached floor/ceiling updater refreshes 10 of its 20 backdrop columns per
+  normal frame and four after a late frame, so turn/strafe plane changes settle
+  quickly without runtime floor casting. `DOOM_BG_SCROLL_COLUMNS` and
   `DOOM_BG_SCROLL_OVERRUN_COLUMNS` expose that budget to the same movement bench
   path.
 - Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
@@ -613,6 +613,9 @@ readable.
   Standing frames restore the portal-span pass, and after a late frame the same
   reduced work is kept for one recovery frame. The quality/clarity tiers keep
   solid-line refinement for closer native-Doom still comparisons.
+- Portal-span refinement now filters candidates to generated lower/upper span
+  lines only, so a nearer solid render line in the same cell cannot hide a
+  farther two-sided floor or ceiling transition.
 - `DOOM_ADAPTIVE_LINE_REFINEMENT`,
   `DOOM_MOVING_LINE_REFINEMENT_CELLS`, `DOOM_MOVING_SPAN_REFINEMENT`, and
   `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` can be passed through `SMOKE_MAKE_ARGS`

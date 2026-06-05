@@ -320,7 +320,12 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     cell_start = g_render_cell_start[cell_y][cell_x];
     for (unsigned char n = 0; n < cell_count; n++) {
         int i = g_render_cell_lines[cell_start + n];
-        if (!accept_spans && g_render_lines[i].span) continue;
+        u8 line_span = g_render_lines[i].span;
+        if (accept_spans) {
+            if (!line_span) continue;
+        } else if (line_span) {
+            continue;
+        }
         int x1 = g_render_lines[i].x1_q8 >> 4;
         int y1 = g_render_lines[i].y1_q8 >> 4;
         int x2 = g_render_lines[i].x2_q8 >> 4;
