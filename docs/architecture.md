@@ -62,7 +62,7 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   instead of flattening it to one repeated texel column.
 - The graphics converter follows the same `DOOM_DETAIL` tier as the C build:
   clarity mode emits 32-phase wall/door atlases and a four-direction plane
-  cache, while quality/balanced/speed keep the 16-phase wall atlases and
+  cache, while balanced/quality/speed keep the 16-phase wall atlases and
   16-direction plane cache. The runtime defaults to the cached perspective plane
   upload path; `DOOM_FLAT_PLANES=1` enables static solid planes for debugging.
 - Doom flats are sampled into tile banks and perspective plane caches at build
@@ -113,11 +113,16 @@ current runtime accepts several compromises:
   cannot draw a near lower/upper span and a far wall in the same column.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The default quality runtime uses a 40-column wall pass with seven visible
+  The default balanced runtime uses a 32-column wall pass with nine visible
   world things so walls, backdrop, weapon, and HUD stay inside the practical
-  96-sprites-per-scanline limit. `DOOM_DETAIL=clarity` keeps the heavier
-  64-column visual comparison path, while `balanced` and `speed` progressively
-  spend fewer sprites on walls and more on visible world things.
+  96-sprites-per-scanline limit. `DOOM_DETAIL=quality` and `DOOM_DETAIL=clarity`
+  keep heavier visual comparison paths, while `speed` spends fewer sprites on
+  walls and more on visible world things.
+- Runtime wall projection still uses one sprite strip per wall column. In the
+  balanced/speed tiers, solid grid-cell hits use the rasterized map wall
+  directly and skip solid-line refinement; open-cell WAD render-line spans stay
+  enabled for windows, lower walls, upper walls, and doors. The quality/clarity
+  tiers keep solid-line refinement for closer native-Doom still comparisons.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as

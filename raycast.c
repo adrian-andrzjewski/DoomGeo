@@ -298,7 +298,7 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     return 1;
 }
 
-static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, fix *dist, u8 *kind, u8 *tex, int *side, u8 *span, u8 *span_height) {
+static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, u8 accept_spans, fix *dist, u8 *kind, u8 *tex, int *side, u8 *span, u8 *span_height) {
 #if DOOM_RENDER_LINES
     unsigned char cell_count = g_render_cell_count[cell_y][cell_x];
     unsigned short cell_start;
@@ -315,6 +315,7 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     cell_start = g_render_cell_start[cell_y][cell_x];
     for (unsigned char n = 0; n < cell_count; n++) {
         int i = g_render_cell_lines[cell_start + n];
+        if (!accept_spans && g_render_lines[i].span) continue;
         int x1 = g_render_lines[i].x1_q8 >> 4;
         int y1 = g_render_lines[i].y1_q8 >> 4;
         int x2 = g_render_lines[i].x2_q8 >> 4;
@@ -368,6 +369,7 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     (void)rayY;
     (void)cell_x;
     (void)cell_y;
+    (void)accept_spans;
 #endif
     (void)dist;
     (void)kind;
@@ -420,7 +422,7 @@ void rc_render(void) {
                 u8 line_span = 0;
                 u8 line_height = 0;
                 if (g_render_cell_count[mapY][mapX] &&
-                    rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
+                    rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 1, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
                     line_span && projected_span_height(line_perp, line_height) >= PORTAL_SPAN_OCCLUDE_MIN_H) {
                     kindbuf[x] = line_kind;
                     texbuf[x] = line_tex;
@@ -448,7 +450,9 @@ void rc_render(void) {
             tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
             texbuf[x] = (u8)tex_x;
         }
-        if (!span) rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+#if DOOM_SOLID_LINE_REFINEMENT
+        if (!span && g_render_cell_count[mapY][mapX]) rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+#endif
         distbuf[x] = perp;
 
         fix inv_perp = recip(perp);

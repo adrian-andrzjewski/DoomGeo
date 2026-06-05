@@ -44,9 +44,18 @@ capture_window() {
 }
 
 press_d() {
+    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
     DISPLAY="$DISPLAY_VALUE" xdotool keydown s
-    sleep 0.3
+    sleep "${KEY_DOOR_USE_SECS:-0.3}"
     DISPLAY="$DISPLAY_VALUE" xdotool keyup s
+}
+
+hold_up() {
+    local seconds="$1"
+    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
+    sleep "$seconds"
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
 }
 
 require_cmd xdotool
@@ -78,19 +87,17 @@ press_d
 sleep 0.4
 capture_window "$wid" "$MISSING_OUT"
 
-DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
-sleep 1.1
-DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
+hold_up "${KEY_DOOR_KEY_WALK_SECS:-1.25}"
 sleep 0.5
 capture_window "$wid" "$PICKED_OUT"
 
 press_d
+sleep 0.2
+press_d
 sleep 0.25
 capture_window "$wid" "$OPENED_OUT"
 
-DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
-sleep 1.2
-DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
+hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-2.4}"
 sleep 0.4
 capture_window "$wid" "$THROUGH_OUT"
 

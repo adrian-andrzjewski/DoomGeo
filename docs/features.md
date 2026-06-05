@@ -26,10 +26,11 @@ readable.
 
 ## Rendering
 
-- The default `DOOM_DETAIL=quality` renderer uses 40 wall-column sprites over
-  the 320-pixel playfield, giving 8-pixel logical columns backed by 16-pixel
-  Neo Geo strips. This is the playable-response mode for normal builds; the
-  heavier 64-column `clarity` tier remains available for visual comparison.
+- The default `DOOM_DETAIL=balanced` renderer uses 32 wall-column sprites over
+  the 320-pixel playfield, giving 10-pixel logical columns backed by 16-pixel
+  Neo Geo strips. This is the playable-response mode for normal builds;
+  `DOOM_DETAIL=quality` and the heavier 64-column `clarity` tier remain
+  available for visual comparison.
 - Each frame casts fixed-point DDA rays, computes projected wall height, refines
   visual hits against compact WAD-derived render lines indexed by the hit cell,
   and writes Neo Geo sprite shrink/position data.
@@ -37,6 +38,10 @@ readable.
   currently emits 456 visual render lines and 1310 cell references; the runtime
   checks only the compact line candidates indexed by the traversed/hit cell
   instead of scanning the whole render-line table for every wall column.
+- In balanced/speed tiers, solid grid-cell hits skip the extra solid-line
+  refinement pass. Open-cell portal/lower/upper span hits still run, so visible
+  sector transitions keep their Doom-like cues without paying the full
+  per-column line-intersection cost on every solid wall.
 - In addition to solid linedefs, the converter now emits selected two-sided
   lower, upper, and mid-texture visual lines. The runtime can draw one
   top- or bottom-aligned partial wall span per column when that span projects
@@ -50,7 +55,7 @@ readable.
   DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
   column.
 - The default renderer now leaves more active playfield sprite headroom for
-  world things: 20 backdrop strips, 40 wall columns, seven 4-strip world things,
+  world things: 20 backdrop strips, 32 wall columns, nine 4-strip world things,
   and seven weapon strips fit inside the first 95 active sprites. Alternate
   build tiers are available for different tradeoffs: `DOOM_DETAIL=clarity` uses
   64 wall columns and one world thing, `balanced` uses 32 columns and nine

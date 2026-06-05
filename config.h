@@ -17,7 +17,7 @@
  * budget on walls first because navigation readability is the main bottleneck.
  */
 #if !defined(DOOM_DETAIL_CLARITY) && !defined(DOOM_DETAIL_QUALITY) && !defined(DOOM_DETAIL_BALANCED) && !defined(DOOM_DETAIL_SPEED)
-#define DOOM_DETAIL_QUALITY 1
+#define DOOM_DETAIL_BALANCED 1
 #endif
 
 #if defined(DOOM_DETAIL_CLARITY) && (defined(DOOM_DETAIL_QUALITY) || defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
@@ -53,6 +53,13 @@
 #define WALLH    GAME_H             /* projection scale: wall height @ dist 1 */
 #define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
 #define DOOM_RENDER_LINES 1         /* visual ray hits use WAD-derived lines  */
+#ifndef DOOM_SOLID_LINE_REFINEMENT
+#if defined(DOOM_DETAIL_CLARITY) || defined(DOOM_DETAIL_QUALITY)
+#define DOOM_SOLID_LINE_REFINEMENT 1
+#else
+#define DOOM_SOLID_LINE_REFINEMENT 0
+#endif
+#endif
 
 /* ---- sprite slot assignment -----------------------------------------
  * Priority: lower index = back on Neo Geo sprite evaluation. One world thing
