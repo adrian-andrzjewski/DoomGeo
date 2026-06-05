@@ -52,6 +52,12 @@ static inline fix recip(fix b) {
 #ifndef PORTAL_SPAN_OCCLUDE_MIN_H
 #define PORTAL_SPAN_OCCLUDE_MIN_H 5
 #endif
+#ifndef PORTAL_SPAN_REPLACE_MIN_H
+#define PORTAL_SPAN_REPLACE_MIN_H 18
+#endif
+#ifndef PORTAL_SPAN_REPLACE_FAR_DIV
+#define PORTAL_SPAN_REPLACE_FAR_DIV 2
+#endif
  
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
@@ -428,6 +434,9 @@ void rc_render(void) {
         fix span_perp = FBIG;
         u8 span = 0;
         u8 span_height = 0;
+        u8 span_kind = 0;
+        u8 span_tex = 0;
+        int span_side = 0;
         if (stepX < 0) sideX = fmul(posX - (mapX << FBITS), ddX);
         else           sideX = fmul(((mapX + 1) << FBITS) - posX, ddX);
         if (stepY < 0) sideY = fmul(posY - (mapY << FBITS), ddY);
@@ -451,48 +460,62 @@ void rc_render(void) {
                 if (allow_span_refinement && g_render_cell_count[mapY][mapX] &&
                     rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 1, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
                     line_span && projected_span_height(line_perp, line_height) >= PORTAL_SPAN_OCCLUDE_MIN_H) {
-                    kindbuf[x] = line_kind;
-                    texbuf[x] = line_tex;
-                    side = line_side;
-                    span_perp = line_perp;
-                    span = line_span;
-                    span_height = line_height;
-                    hit_cell = 0;
-                    break;
+                    if (line_perp < span_perp) {
+                        span_kind = line_kind;
+                        span_tex = line_tex;
+                        span_side = line_side;
+                        span_perp = line_perp;
+                        span = line_span;
+                        span_height = line_height;
+                    }
                 }
                 continue;
             }
         }
-        if (!span) kindbuf[x] = (hit_cell >= 2) ? (TILE_WALL_ALT_COUNT + 1) : map_cell_texture(mapX, mapY);
+        kindbuf[x] = (hit_cell >= 2) ? (TILE_WALL_ALT_COUNT + 1) : map_cell_texture(mapX, mapY);
 
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
-        if (span) perp = span_perp;
         if (perp < FMIN) perp = FMIN;
 
-        if (!span) {
-            fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
-            int tex_x = (int)(((wall & (FONE - 1)) * TILE_WALL_ATLAS_COLS) >> FBITS);
-            if (tex_x < 0) tex_x = 0;
-            if (tex_x >= TILE_WALL_ATLAS_COLS) tex_x = TILE_WALL_ATLAS_COLS - 1;
-            tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
-            texbuf[x] = (u8)tex_x;
-        }
+        fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
+        int tex_x = (int)(((wall & (FONE - 1)) * TILE_WALL_ATLAS_COLS) >> FBITS);
+        if (tex_x < 0) tex_x = 0;
+        if (tex_x >= TILE_WALL_ATLAS_COLS) tex_x = TILE_WALL_ATLAS_COLS - 1;
+        tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
+        texbuf[x] = (u8)tex_x;
 #if DOOM_SOLID_LINE_REFINEMENT || DOOM_NEAR_LINE_REFINEMENT
-        if (!span && g_render_cell_count[mapY][mapX]) {
+        if (g_render_cell_count[mapY][mapX]) {
+            u8 solid_span = 0;
+            u8 solid_span_height = 0;
 #if DOOM_SOLID_LINE_REFINEMENT
-            rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+            rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &solid_span, &solid_span_height);
 #else
             if (near_refinement_cells && perp <= ((fix)near_refinement_cells << FBITS)) {
-                rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+                rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &solid_span, &solid_span_height);
             }
 #endif
         }
 #endif
-        distbuf[x] = perp;
-
         fix inv_perp = recip(perp);
         int full_h = projected_height_from_inv(inv_perp);
         int h = full_h;                                  /* slice height px */
+        if (span && span_height && span_perp < perp) {
+            int candidate_h = projected_span_height(span_perp, span_height);
+            int far_floor = full_h / PORTAL_SPAN_REPLACE_FAR_DIV;
+            if (candidate_h >= PORTAL_SPAN_REPLACE_MIN_H && candidate_h >= far_floor) {
+                kindbuf[x] = span_kind;
+                texbuf[x] = span_tex;
+                side = span_side;
+                perp = span_perp;
+                inv_perp = recip(perp);
+                full_h = projected_height_from_inv(inv_perp);
+            } else {
+                span = 0;
+                span_height = 0;
+            }
+        }
+        distbuf[x] = perp;
+
         if (span && span_height) {
             h = (full_h * span_height + 63) / 128;
             if (h < 2) h = 2;

@@ -2954,11 +2954,11 @@ static void place_test_imp(void) {
 static void place_powerup_test_imp(void) {
 #if NG_RUNTIME_THING_COUNT > 6
     int px, py;
-    if (!place_test_thing(6, 3001, WORLD_Q8(900), 0)) return;
+    if (!place_test_thing(6, 3001, WORLD_Q8(900), WORLD_Q8(360))) return;
     rc_player_q8(&px, &py);
     enemy_hp[6] = monster_start_hp(3001);
-    enemy_awake[6] = 1;
-    enemy_attack_cooldown[6] = 56;
+    enemy_awake[6] = 0;
+    enemy_attack_cooldown[6] = 0;
     set_monster_facing_from_delta(6, px - thing_x_q8[6], py - thing_y_q8[6]);
 #endif
 }
@@ -3277,6 +3277,30 @@ static void configure_death_test(void) {
 
 #ifdef DOOM_POWERUP_TEST
 static void configure_powerup_test(void) {
+    static const u16 power_types[6] = {2013, 2018, 2048, 2012, 2001, 2008};
+    static const short power_forward[6] = {
+        WORLD_Q8(360), WORLD_Q8(440), WORLD_Q8(520),
+        WORLD_Q8(600), WORLD_Q8(680), WORLD_Q8(760)
+    };
+    static const short power_lateral[6] = {
+        -WORLD_Q8(48), WORLD_Q8(48), -WORLD_Q8(48),
+        WORLD_Q8(48), -WORLD_Q8(48), WORLD_Q8(48)
+    };
+#if NG_RUNTIME_THING_COUNT > 0
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        enemy_dead[i] = 1;
+        enemy_hp[i] = 0;
+        enemy_awake[i] = 0;
+        enemy_attack_cooldown[i] = 0;
+        enemy_attack_anim[i] = 0;
+        enemy_ranged_readable_ticks[i] = 0;
+        thing_type_override[i] = 0;
+    }
+#endif
+    for (u8 i = 0; i < 8; i++) {
+        dynamic_drop_active[i] = 0;
+        dynamic_drop_type[i] = 0;
+    }
     player_health = 65;
     player_armor = 50;
     player_armor_class = 1;
@@ -3285,12 +3309,15 @@ static void configure_powerup_test(void) {
     shown_armor = 0xFFFF;
     shown_ammo = 0xFFFF;
 
-    place_test_thing(0, 2024, WORLD_Q8(520), -WORLD_Q8(300));  /* partial invisibility */
-    place_test_thing(1, 2025, WORLD_Q8(520), -WORLD_Q8(120));  /* radiation suit */
-    place_test_thing(2, 2026, WORLD_Q8(520), WORLD_Q8(120));   /* computer map */
-    place_test_thing(3, 2045, WORLD_Q8(520), WORLD_Q8(300));   /* light amplification */
-    place_test_thing(4, 2022, WORLD_Q8(760), -WORLD_Q8(160));  /* invulnerability fallback */
-    place_test_thing(5, 2023, WORLD_Q8(760), WORLD_Q8(160));   /* berserk fallback */
+    for (u8 i = 0; i < 6; i++) {
+        short x;
+        short y;
+        if (!test_position(&x, &y, power_forward[i], power_lateral[i])) continue;
+        dynamic_drop_x_q8[i] = x;
+        dynamic_drop_y_q8[i] = y;
+        dynamic_drop_type[i] = power_types[i];
+        dynamic_drop_active[i] = 1;
+    }
     power_lightamp_timer = 240;                                /* visible tint smoke test */
     place_powerup_test_imp();
 }
@@ -5199,7 +5226,10 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
     }
 
     if (thing_is_corpse(thing_type)) return origin_y + 2;
-    if (thing_is_pickup(thing_type)) return origin_y + 1;
+    if (thing_is_pickup(thing_type)) {
+        int lift = h < 48 ? 2 : (h < 96 ? 4 : 8);
+        return origin_y - lift;
+    }
     if (thing_is_barrel(thing_type)) return origin_y + 1;
 
     if (h < 80 && origin_y > weapon_top + 6) origin_y = weapon_top + 6;

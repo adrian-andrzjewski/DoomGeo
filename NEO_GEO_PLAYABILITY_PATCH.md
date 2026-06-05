@@ -73,7 +73,15 @@ The native-vs-NeoGeo captures generated in this run were:
 
 - `.tools/screens/compare-E1M1-start-20260605-120749-side-by-side.png`
 - `.tools/screens/compare-E1M2-start-20260605-120852-side-by-side.png`
+- `.tools/screens/compare-E1M1-start-20260605-122237-side-by-side.png`
+- `.tools/screens/compare-E1M2-start-20260605-122305-side-by-side.png`
 
 Those comparisons still show major visual gaps versus native Doom. This patch
 improves coordinate fidelity, route stability, step/ledge blocking, and sprite
-floor seating; it does not solve true multi-span Doom wall rendering yet.
+floor seating. The follow-up span pass keeps walking to the farther wall before
+letting a large lower/upper span replace a column, which restores more room
+boundaries, but it still does not solve true multi-span Doom wall rendering yet.
+The powerup smoke now stages robust visible pickup sprites in the focused ROM
+because the special powerup sprites are still too subtle in the current
+sprite-strip view; making those special sprites read like native Doom remains a
+separate art/readability gap.

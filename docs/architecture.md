@@ -134,9 +134,9 @@ current runtime accepts several compromises:
   pass through so openings can show the farther space, but the renderer still
   cannot draw a near lower/upper span and a far wall in the same column.
   Converted lower/upper spans are capped before they reach the runtime, and a
-  span must project as a large visible strip before it terminates the ray. This
-  avoids scout-route cases where a 128-unit sector delta becomes a fake
-  full-height wall.
+  span must project as a large visible strip before it replaces the farther
+  wall column. The ray keeps walking to a solid wall first, which avoids cases
+  where a small sector-height cue hides the real room boundary.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
   The default quality runtime uses a 40-column wall pass with seven visible

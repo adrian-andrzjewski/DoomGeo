@@ -65,12 +65,13 @@ readable.
 - In addition to solid linedefs, the converter now emits selected two-sided
   lower, upper, and mid-texture visual lines. The runtime can draw one
   top- or bottom-aligned partial wall span per column when that span projects
-  large enough to be readable. Small open-cell spans no longer stop the ray, so
-  window/opening views prefer the farther room or wall instead of collapsing
-  into dark horizontal fences. Converted lower/upper spans are capped so large
-  Doom sector-height deltas do not become fake full-height walls in the
-  one-span-per-column approximation; nearby larger spans still occlude as
-  ledge/step cues.
+  large enough to be readable. Open-cell spans are collected while the ray keeps
+  walking to the farther solid wall, then the span replaces the wall column only
+  when its projected height is large enough to carry the view. This keeps
+  window/opening views from collapsing into dark horizontal fences while still
+  showing nearby ledge/step cues. Converted lower/upper spans are capped so
+  large Doom sector-height deltas do not become fake full-height walls in the
+  one-span-per-column approximation.
 - Generated lower/upper span metadata uses WAD texture fallbacks when a sidedef
   omits the explicit upper/lower texture, so sector-height transitions still
   get a visible cue in the sprite-strip renderer.
@@ -240,6 +241,10 @@ readable.
   current cell instead of always assuming the player's floor. Pickups, monsters,
   corpses, drops, projectiles, and impacts therefore align better in sectors
   with raised/lowered floors.
+- Pickup sprites receive a small runtime lift so floor items remain visible in
+  the wall-heavy sprite-strip view. The focused powerup smoke uses robust
+  visible pickup sprites for the screenshot oracle; special powerup sprites are
+  still a known readability gap.
 - Visible thing selection uses one priority-ranked projection pass for
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
@@ -651,7 +656,9 @@ readable.
   comparisons.
 - Portal-span refinement now filters candidates to generated lower/upper span
   lines only, so a nearer solid render line in the same cell cannot hide a
-  farther two-sided floor or ceiling transition.
+  farther two-sided floor or ceiling transition. The ray also preserves the
+  far-wall hit before deciding whether a portal span is visually dominant enough
+  to replace that column.
 - `DOOM_ADAPTIVE_LINE_REFINEMENT`,
   `DOOM_MOVING_LINE_REFINEMENT_CELLS`, `DOOM_MOVING_SPAN_REFINEMENT`, and
   `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` can be passed through `SMOKE_MAKE_ARGS`
