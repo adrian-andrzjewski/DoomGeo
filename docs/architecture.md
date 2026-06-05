@@ -24,12 +24,12 @@ and emits generated C headers/sources under `build/`:
 
 - Coarse grid collision/render map.
 - Per-cell wall texture class and texture phase.
-- Compact visual render-line rows derived from solid Doom linedefs, stored in
-  generated map coordinates for runtime hit refinement.
+- Compact visual render-line rows derived from solid Doom linedefs plus selected
+  two-sided lower, upper, and mid-texture linedefs, stored in generated map
+  coordinates and one-span metadata for runtime hit refinement.
 - Per-cell render-line index tables, generated from the same raster cells as
   the collision grid. On E1M1 this reduces wall-hit refinement from scanning
-  325 render lines per column to checking at most 7 lines in a hit cell, with
-  about 1.7 lines on an average referenced cell.
+  hundreds of render lines per column to checking only local cell candidates.
 - Door/exit trigger tables. Exit records include the raw Doom line special plus
   the generated Episode/map destination so normal and secret exits can diverge
   without runtime WAD parsing.
@@ -105,8 +105,8 @@ current runtime accepts several compromises:
 
 - Grid/coarse collision representation with per-cell visual render-line
   refinement instead of a full BSP/seg traversal.
-- One projected wall height per column instead of multiple clipped subsector
-  spans.
+- At most one projected wall or two-sided partial span per column instead of
+  true multiple clipped subsector spans.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
   The default clarity runtime uses a 64-column wall pass with one 4-strip world

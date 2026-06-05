@@ -46,10 +46,10 @@ after the current documentation pass.
   budget.
 - Extend the current WAD render-line refinement into a true higher-fidelity
   path using generated seg/node data.
-- Add sector-aware upper/lower wall spans, two-sided windows, and multiple
-  clipped spans; these are the main remaining reasons the native Doom E1M1
-  start view does not match exactly even though the same map and player start
-  are loaded.
+- Extend the new one-span two-sided wall approximation into real multiple
+  clipped spans for windows, ledges, and upper/lower sector transitions; these
+  are still a main reason the native Doom E1M1 start view does not match exactly
+  even though the same map and player start are loaded.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
 - Profile wall, plane, thing, and HUD update costs before increasing sprite or

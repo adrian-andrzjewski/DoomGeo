@@ -33,11 +33,14 @@ readable.
   visual hits against compact WAD-derived render lines indexed by the hit cell,
   and writes Neo Geo sprite shrink/position data.
 - The render-line broadphase is done offline by the converter. The E1M1 build
-  currently emits 325 visual render lines and 857 cell references; the runtime
-  checks at most 7 line candidates in a hit cell instead of scanning the whole
-  render-line table for every wall column. Hit cells with no render-line refs
-  now return immediately to the base DDA result before doing q4 refinement
-  setup.
+  currently emits 456 visual render lines and 1310 cell references; the runtime
+  checks only the compact line candidates indexed by the traversed/hit cell
+  instead of scanning the whole render-line table for every wall column.
+- In addition to solid linedefs, the converter now emits selected two-sided
+  lower, upper, and mid-texture visual lines. The runtime can draw one
+  top- or bottom-aligned partial wall span per column when that span projects
+  large enough to be readable. Far partial spans are skipped so they do not
+  collapse into dark horizontal fences.
 - The renderer caches each column's ray vector, DDA reciprocal deltas, and step
   signs for the current angle/FOV, rebuilding that cache only when the view
   direction changes. Movement-only frames reuse those values before running

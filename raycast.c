@@ -88,6 +88,12 @@ static inline int projected_height(fix dist) {
     return projected_height_from_inv(recip(dist));
 }
 
+static inline int projected_span_height(fix dist, u8 span_height) {
+    int full_h = projected_height(dist);
+    int h = (full_h * span_height + 63) / 128;
+    return h < 2 ? 2 : h;
+}
+
 static void update_projection_cache(void) {
     fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
     if (det > -FMIN && det < FMIN) invDet = 0;
@@ -290,7 +296,7 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     return 1;
 }
 
-static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, fix *dist, u8 *kind, u8 *tex, int *side) {
+static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, fix *dist, u8 *kind, u8 *tex, int *side, u8 *span, u8 *span_height) {
 #if DOOM_RENDER_LINES
     unsigned char cell_count = g_render_cell_count[cell_y][cell_x];
     unsigned short cell_start;
@@ -351,6 +357,8 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
         *kind = g_render_lines[best_line].texture;
         *tex = (u8)tex_x;
         *side = (abs_x > abs_y) ? 1 : 0;
+        *span = g_render_lines[best_line].span;
+        *span_height = g_render_lines[best_line].height;
         return 1;
     }
 #else
@@ -363,6 +371,8 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     (void)kind;
     (void)tex;
     (void)side;
+    (void)span;
+    (void)span_height;
     return 0;
 }
 
@@ -384,6 +394,9 @@ void rc_render(void) {
         int stepX = rayStepXbuf[x];
         int stepY = rayStepYbuf[x];
         fix sideX, sideY;
+        fix span_perp = FBIG;
+        u8 span = 0;
+        u8 span_height = 0;
         if (stepX < 0) sideX = fmul(posX - (mapX << FBITS), ddX);
         else           sideX = fmul(((mapX + 1) << FBITS) - posX, ddX);
         if (stepY < 0) sideY = fmul(posY - (mapY << FBITS), ddY);
@@ -397,14 +410,35 @@ void rc_render(void) {
             if (map_at(mapX, mapY)) {
                 hit_cell = map_cell_value(mapX, mapY);
                 break;
+            } else {
+                fix line_perp = FBIG;
+                u8 line_kind = 0;
+                u8 line_tex = 0;
+                int line_side = side;
+                u8 line_span = 0;
+                u8 line_height = 0;
+                if (g_render_cell_count[mapY][mapX] &&
+                    rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
+                    line_span && projected_span_height(line_perp, line_height) >= 12) {
+                    kindbuf[x] = line_kind;
+                    texbuf[x] = line_tex;
+                    side = line_side;
+                    span_perp = line_perp;
+                    span = line_span;
+                    span_height = line_height;
+                    hit_cell = 0;
+                    break;
+                }
+                continue;
             }
         }
-        kindbuf[x] = (hit_cell >= 2) ? (TILE_WALL_ALT_COUNT + 1) : map_cell_texture(mapX, mapY);
+        if (!span) kindbuf[x] = (hit_cell >= 2) ? (TILE_WALL_ALT_COUNT + 1) : map_cell_texture(mapX, mapY);
 
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
+        if (span) perp = span_perp;
         if (perp < FMIN) perp = FMIN;
 
-        {
+        if (!span) {
             fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
             int tex_x = (int)(((wall & (FONE - 1)) * TILE_WALL_ATLAS_COLS) >> FBITS);
             if (tex_x < 0) tex_x = 0;
@@ -412,11 +446,21 @@ void rc_render(void) {
             tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
             texbuf[x] = (u8)tex_x;
         }
-        rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &perp, &kindbuf[x], &texbuf[x], &side);
+        if (!span) rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
         distbuf[x] = perp;
 
         fix inv_perp = recip(perp);
-        int h = projected_height_from_inv(inv_perp);     /* slice height px */
+        int full_h = projected_height_from_inv(inv_perp);
+        int h = full_h;                                  /* slice height px */
+        if (span && span_height) {
+            h = (full_h * span_height + 63) / 128;
+            if (h < 2) h = 2;
+            if (h < 12) {
+                span = 0;
+                span_height = 0;
+                h = full_h;
+            }
+        }
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
         /* Keep close walls on the baked Doom texture atlas.  The old coarse
@@ -425,12 +469,20 @@ void rc_render(void) {
         closebuf[x] = 0;
 
         int top = (GAME_H - h) / 2;         /* >=0 because h<=GAME_H         */
+        if (span == 1) {
+            int bottom = (GAME_H + full_h) / 2;
+            if (bottom > GAME_H) bottom = GAME_H;
+            top = bottom - h;
+        } else if (span == 2) {
+            top = (GAME_H - full_h) / 2;
+        }
+        if (top < 0) top = 0;
+        if (top > GAME_H - 1) top = GAME_H - 1;
         int vsh = h - 1;                    /* on-screen px = vshrink+1      */
         if (vsh < 0)   vsh = 0;
         if (vsh > 255) vsh = 255;
 
         scb2buf[x] = (u16)((HSHRINK << 8) | (vsh & 0xFF));
-		
         scb3buf[x] = scb3_word(top, 0, WALL_WIN);
 
         /* distance shading */
