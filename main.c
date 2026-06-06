@@ -31,6 +31,12 @@ enum {
     THING_CLASS_CORPSE = 4
 };
 
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP && defined(DOOM_CHUNK_MAX_ACTIVE_THINGS)
+#define DOOM_ACTIVE_THING_COUNT DOOM_CHUNK_MAX_ACTIVE_THINGS
+#else
+#define DOOM_ACTIVE_THING_COUNT NG_RUNTIME_THING_COUNT
+#endif
+
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 unsigned char g_runtime_lift_open[NG_RUNTIME_LIFT_COUNT ? NG_RUNTIME_LIFT_COUNT : 1];
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
@@ -48,9 +54,9 @@ static u8 chunk_drop_active[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
 static u16 chunk_drop_type[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
 static short chunk_drop_x_q8[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
 static short chunk_drop_y_q8[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
-static unsigned short thing_chunk_index[NG_RUNTIME_THING_COUNT];
-static short thing_chunk_offset_x_q8[NG_RUNTIME_THING_COUNT];
-static short thing_chunk_offset_y_q8[NG_RUNTIME_THING_COUNT];
+static unsigned short thing_chunk_index[DOOM_ACTIVE_THING_COUNT];
+static short thing_chunk_offset_x_q8[DOOM_ACTIVE_THING_COUNT];
+static short thing_chunk_offset_y_q8[DOOM_ACTIVE_THING_COUNT];
 #endif
 static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
@@ -1075,33 +1081,33 @@ static u8  player_has_backpack = 0;
 static u8  current_weapon = 0;
 static u8  pickup_message_weapon = 0;
 static u8  chaingun_flash = 0;
-static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
-static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
-static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
-static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
-static u8  enemy_attack_cooldown[NG_RUNTIME_THING_COUNT];
-static u8  enemy_attack_anim[NG_RUNTIME_THING_COUNT];
-static u8  enemy_ranged_readable_ticks[NG_RUNTIME_THING_COUNT];
-static u8  enemy_hidden_timer[NG_RUNTIME_THING_COUNT];
-static signed char monster_face_x[NG_RUNTIME_THING_COUNT];
-static signed char monster_face_y[NG_RUNTIME_THING_COUNT];
-static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
-static u8  death_anim_timer[NG_RUNTIME_THING_COUNT];
-static u8  death_drop_timer[NG_RUNTIME_THING_COUNT];
-static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
-static u16 death_anim_final_type[NG_RUNTIME_THING_COUNT];
-static u16 death_anim_drop_type[NG_RUNTIME_THING_COUNT];
-static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
-static short thing_x_q8[NG_RUNTIME_THING_COUNT];
-static short thing_y_q8[NG_RUNTIME_THING_COUNT];
-static u8 thing_static_class[NG_RUNTIME_THING_COUNT];
-static u16 thing_monster_indices[NG_RUNTIME_THING_COUNT];
+static u8  enemy_dead[DOOM_ACTIVE_THING_COUNT];
+static u8  enemy_hp[DOOM_ACTIVE_THING_COUNT];
+static u8  enemy_hit_flash[DOOM_ACTIVE_THING_COUNT];
+static u8  enemy_awake[DOOM_ACTIVE_THING_COUNT];
+static u8  enemy_attack_cooldown[DOOM_ACTIVE_THING_COUNT];
+static u8  enemy_attack_anim[DOOM_ACTIVE_THING_COUNT];
+static u8  enemy_ranged_readable_ticks[DOOM_ACTIVE_THING_COUNT];
+static u8  enemy_hidden_timer[DOOM_ACTIVE_THING_COUNT];
+static signed char monster_face_x[DOOM_ACTIVE_THING_COUNT];
+static signed char monster_face_y[DOOM_ACTIVE_THING_COUNT];
+static u8  explosion_timer[DOOM_ACTIVE_THING_COUNT];
+static u8  death_anim_timer[DOOM_ACTIVE_THING_COUNT];
+static u8  death_drop_timer[DOOM_ACTIVE_THING_COUNT];
+static u16 thing_type_override[DOOM_ACTIVE_THING_COUNT];
+static u16 death_anim_final_type[DOOM_ACTIVE_THING_COUNT];
+static u16 death_anim_drop_type[DOOM_ACTIVE_THING_COUNT];
+static u16 death_drop_type[DOOM_ACTIVE_THING_COUNT];
+static short thing_x_q8[DOOM_ACTIVE_THING_COUNT];
+static short thing_y_q8[DOOM_ACTIVE_THING_COUNT];
+static u8 thing_static_class[DOOM_ACTIVE_THING_COUNT];
+static u16 thing_monster_indices[DOOM_ACTIVE_THING_COUNT];
 static u16 thing_monster_count = 0;
-static u16 thing_shootable_indices[NG_RUNTIME_THING_COUNT];
+static u16 thing_shootable_indices[DOOM_ACTIVE_THING_COUNT];
 static u16 thing_shootable_count = 0;
-static u16 thing_render_indices[NG_RUNTIME_THING_COUNT];
+static u16 thing_render_indices[DOOM_ACTIVE_THING_COUNT];
 static u16 thing_render_count = 0;
-static u16 thing_pickup_indices[NG_RUNTIME_THING_COUNT];
+static u16 thing_pickup_indices[DOOM_ACTIVE_THING_COUNT];
 static u16 thing_pickup_count = 0;
 static u8  dynamic_drop_active[8];
 static u16 dynamic_drop_type[8];
@@ -1406,7 +1412,7 @@ static u8 projected_thing_is_hittable(int thing_index, int lateral_limit, int ne
     int h;
     int dist_q8;
     int lateral;
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (!project_point_q8(thing_x_q8[thing_index], thing_y_q8[thing_index], &sx, &h, &dist_q8)) return 0;
     lateral = iabs16(sx - SCRW / 2);
     if (lateral > lateral_limit && h < near_height) return 0;
@@ -1421,7 +1427,7 @@ static void index_monster_candidate(u16 thing_index) {
     for (u16 i = 0; i < thing_monster_count; i++) {
         if (thing_monster_indices[i] == thing_index) return;
     }
-    if (thing_monster_count < NG_RUNTIME_THING_COUNT) {
+    if (thing_monster_count < DOOM_ACTIVE_THING_COUNT) {
         thing_monster_indices[thing_monster_count++] = thing_index;
     }
 }
@@ -1430,7 +1436,7 @@ static void index_shootable_candidate(u16 thing_index) {
     for (u16 i = 0; i < thing_shootable_count; i++) {
         if (thing_shootable_indices[i] == thing_index) return;
     }
-    if (thing_shootable_count < NG_RUNTIME_THING_COUNT) {
+    if (thing_shootable_count < DOOM_ACTIVE_THING_COUNT) {
         thing_shootable_indices[thing_shootable_count++] = thing_index;
     }
 }
@@ -1439,7 +1445,7 @@ static void index_render_candidate(u16 thing_index) {
     for (u16 i = 0; i < thing_render_count; i++) {
         if (thing_render_indices[i] == thing_index) return;
     }
-    if (thing_render_count < NG_RUNTIME_THING_COUNT) {
+    if (thing_render_count < DOOM_ACTIVE_THING_COUNT) {
         thing_render_indices[thing_render_count++] = thing_index;
     }
 }
@@ -1448,7 +1454,7 @@ static void index_pickup_candidate(u16 thing_index) {
     for (u16 i = 0; i < thing_pickup_count; i++) {
         if (thing_pickup_indices[i] == thing_index) return;
     }
-    if (thing_pickup_count < NG_RUNTIME_THING_COUNT) {
+    if (thing_pickup_count < DOOM_ACTIVE_THING_COUNT) {
         thing_pickup_indices[thing_pickup_count++] = thing_index;
     }
 }
@@ -1465,7 +1471,7 @@ static int active_chunk_origin_y_q8(void) {
 static void persist_runtime_slot_to_chunk_state(u16 slot) {
     unsigned short chunk_index;
     u16 type;
-    if (slot >= NG_RUNTIME_THING_COUNT) return;
+    if (slot >= DOOM_ACTIVE_THING_COUNT) return;
     chunk_index = thing_chunk_index[slot];
     if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) return;
     type = runtime_thing_type(slot);
@@ -1531,7 +1537,7 @@ static void save_active_chunk_drop(u16 thing_type, short local_x_q8, short local
 
 static void save_active_chunk_runtime_things(void) {
     save_active_chunk_dynamic_drops();
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         unsigned short chunk_index = thing_chunk_index[i];
         u16 type;
         if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) continue;
@@ -1623,7 +1629,7 @@ static u8 load_chunk_runtime_slot(
     short x_q8;
     short y_q8;
 
-    if (slot >= NG_RUNTIME_THING_COUNT) return 0;
+    if (slot >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (chunk_index >= DOOM_CHUNK_THING_COUNT) return 0;
 
     type = chunk_thing_state_type[chunk_index];
@@ -1657,7 +1663,7 @@ static void init_runtime_things(void) {
     thing_render_count = 0;
     thing_pickup_count = 0;
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         reset_chunk_runtime_slot(i);
         thing_chunk_index[i] = 0xFFFF;
         thing_x_q8[i] = 0;
@@ -1669,9 +1675,9 @@ static void init_runtime_things(void) {
         int active_chunk_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
         int active_chunk_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
         u16 slot = 0;
-        for (u8 radius = 0; radius <= 1 && slot < NG_RUNTIME_THING_COUNT; radius++) {
-            for (signed char dy = -(signed char)radius; dy <= (signed char)radius && slot < NG_RUNTIME_THING_COUNT; dy++) {
-                for (signed char dx = -(signed char)radius; dx <= (signed char)radius && slot < NG_RUNTIME_THING_COUNT; dx++) {
+        for (u8 radius = 0; radius <= 1 && slot < DOOM_ACTIVE_THING_COUNT; radius++) {
+            for (signed char dy = -(signed char)radius; dy <= (signed char)radius && slot < DOOM_ACTIVE_THING_COUNT; dy++) {
+                for (signed char dx = -(signed char)radius; dx <= (signed char)radius && slot < DOOM_ACTIVE_THING_COUNT; dx++) {
                     int chunk_x;
                     int chunk_y;
                     unsigned short chunk;
@@ -1684,7 +1690,7 @@ static void init_runtime_things(void) {
                     chunk = (unsigned short)(chunk_y * DOOM_CHUNK_COLS + chunk_x);
                     chunk_first = g_chunk_thing_first[chunk];
                     chunk_count = g_chunk_thing_count[chunk];
-                    for (u8 n = 0; n < chunk_count && slot < NG_RUNTIME_THING_COUNT; n++) {
+                    for (u8 n = 0; n < chunk_count && slot < DOOM_ACTIVE_THING_COUNT; n++) {
                         u8 thing_class;
                         u8 thing_info;
                         unsigned short chunk_index = (unsigned short)(chunk_first + n);
@@ -1703,7 +1709,7 @@ static void init_runtime_things(void) {
         }
     }
 #else
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (int i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         u8 thing_class;
         u8 thing_info;
         thing_x_q8[i] = g_runtime_things[i].x_q8;
@@ -1742,7 +1748,7 @@ static void init_runtime_things(void) {
 }
 
 static u16 runtime_thing_type(int thing_index) {
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
     if (thing_chunk_index[thing_index] == 0xFFFF && !thing_type_override[thing_index]) return 0;
 #endif
@@ -1883,7 +1889,7 @@ static void compute_level_totals(void) {
     level_total_kills = 0;
     level_total_items = 0;
     level_total_secrets = 0;
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
 #if DOOM_SIMPLE_MAP
         u16 type;
         if (enemy_dead[i]) continue;
@@ -2211,7 +2217,7 @@ static u16 monster_score_value(u16 thing_type) {
 }
 
 static u8 monster_hp(int thing_index) {
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (enemy_hp[thing_index] == 0) {
         enemy_hp[thing_index] = monster_start_hp(runtime_thing_type(thing_index));
     }
@@ -2297,7 +2303,7 @@ static u8 monster_view_angle_bucket(int thing_index, int px, int py) {
     int abs_cross;
     int face_x;
     int face_y;
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 1;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 1;
     to_x = px - thing_x_q8[thing_index];
     to_y = py - thing_y_q8[thing_index];
     face_x = monster_face_x[thing_index];
@@ -2401,7 +2407,7 @@ static void check_e1m8_boss_exit(void);
 static u8 damage_enemy_at(int thing_index, u8 damage) {
     u8 killed = 0;
     u16 source_type;
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
     source_type = runtime_thing_type(thing_index);
     if (!thing_is_shootable(source_type)) return 0;
     if (enemy_dead[thing_index]) return 0;
@@ -3178,7 +3184,7 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
 }
 
 static void set_monster_facing_from_delta(int i, int dx, int dy) {
-    if (i < 0 || i >= NG_RUNTIME_THING_COUNT) return;
+    if (i < 0 || i >= DOOM_ACTIVE_THING_COUNT) return;
     if (iabs16(dx) + iabs16(dy) < 8) return;
     monster_face_x[i] = (dx > 0) ? 1 : (dx < 0 ? -1 : 0);
     monster_face_y[i] = (dy > 0) ? 1 : (dy < 0 ? -1 : 0);
@@ -3418,7 +3424,7 @@ static void seed_simple_map_things(void) {
     thing_shootable_count = 0;
     thing_render_count = 0;
     thing_pickup_count = 0;
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         enemy_dead[i] = 1;
         enemy_hp[i] = 0;
         enemy_awake[i] = 0;
@@ -3432,7 +3438,7 @@ static void seed_simple_map_things(void) {
     }
 
     rc_player_q8(&px, &py);
-    for (u16 i = 0; i < ENEMY_VISIBLE_COUNT && i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < ENEMY_VISIBLE_COUNT && i < DOOM_ACTIVE_THING_COUNT; i++) {
         u16 type = seeds[i].type;
         u8 thing_class;
         short x_q8;
@@ -3480,10 +3486,10 @@ static u8 test_position(short *out_x, short *out_y, short forward, short lateral
 }
 
 static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
-#if NG_RUNTIME_THING_COUNT > 0
+#if DOOM_ACTIVE_THING_COUNT > 0
     short x;
     short y;
-    if (thing >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (!test_position(&x, &y, forward, lateral)) return 0;
     thing_x_q8[thing] = x;
     thing_y_q8[thing] = y;
@@ -3513,7 +3519,7 @@ static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
 }
 
 static void place_test_imp(void) {
-#if NG_RUNTIME_THING_COUNT > 0
+#if DOOM_ACTIVE_THING_COUNT > 0
     int px, py;
     static const short forward_steps[] = { WORLD_Q8(896), WORLD_Q8(1152), WORLD_Q8(640), WORLD_Q8(1408) };
     static const short lateral_steps[] = { 0, WORLD_Q8(192), -WORLD_Q8(192), WORLD_Q8(384), -WORLD_Q8(384) };
@@ -3545,7 +3551,7 @@ static void place_test_imp(void) {
 
 #ifdef DOOM_POWERUP_TEST
 static void place_powerup_test_imp(void) {
-#if NG_RUNTIME_THING_COUNT > 6
+#if DOOM_ACTIVE_THING_COUNT > 6
     int px, py;
     if (!place_test_thing(6, 3001, WORLD_Q8(900), WORLD_Q8(360))) return;
     rc_player_q8(&px, &py);
@@ -3560,7 +3566,7 @@ static void place_powerup_test_imp(void) {
 
 #ifdef DOOM_KEY_DOOR_TEST
 static void configure_key_door_test(void) {
-#if NG_RUNTIME_THING_COUNT > 0
+#if DOOM_ACTIVE_THING_COUNT > 0
     u8 door_found = 0;
     u16 door_y_sum = 0;
     u8 door_count = 0;
@@ -3568,7 +3574,7 @@ static void configure_key_door_test(void) {
     u8 door_y = 32;
     u8 player_x = 30;
     u8 key_x = 29;
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         enemy_dead[i] = 1;
         enemy_hp[i] = 0;
         enemy_awake[i] = 0;
@@ -3655,7 +3661,7 @@ static void configure_combat_test(void) {
 
 #ifdef DOOM_HIDDEN_ATTACK_TEST
 static void configure_hidden_attack_test(void) {
-#if NG_RUNTIME_THING_COUNT > 0
+#if DOOM_ACTIVE_THING_COUNT > 0
     int px, py;
     player_health = 100;
     hurt_timer = 0;
@@ -3676,7 +3682,7 @@ static void configure_hidden_attack_test(void) {
 
 #ifdef DOOM_E1M1_ENCOUNTER_TEST
 static void configure_e1m1_encounter_test(void) {
-#if NG_RUNTIME_THING_COUNT > 13
+#if DOOM_ACTIVE_THING_COUNT > 13
     int px, py;
     rc_set_pose_q8((short)((17 << 8) + 128), (short)((18 << 8) + 128), 0, 256);
     rc_player_q8(&px, &py);
@@ -3699,7 +3705,7 @@ static void configure_e1m1_encounter_test(void) {
 
 #ifdef DOOM_E1M1_SCOUT_TEST
 static void configure_e1m1_scout_test(void) {
-#if NG_RUNTIME_THING_COUNT > 13
+#if DOOM_ACTIVE_THING_COUNT > 13
     int px, py;
     rc_set_pose_q8((short)((23 << 8) + 128), (short)((20 << 8) + 128), -243, 81);
     rc_player_q8(&px, &py);
@@ -3732,7 +3738,7 @@ static void configure_e1m1_exit_test(void) {
     player_health = 100;
     player_armor = 0;
     player_armor_class = 0;
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         enemy_dead[i] = 1;
         enemy_awake[i] = 0;
         enemy_attack_cooldown[i] = 0;
@@ -3759,7 +3765,7 @@ static void configure_e1m8_boss_test(void) {
     current_weapon = WEAPON_SHOTGUN;
     player_health = 100;
     rc_player_q8(&px, &py);
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         enemy_dead[i] = 1;
         enemy_hp[i] = 0;
         enemy_awake[i] = 0;
@@ -3804,7 +3810,7 @@ static void configure_melee_test(void) {
     current_weapon = WEAPON_CHAINSAW;
     shown_ammo = 0xFFFF;
     shown_weapon_status = 0xFFFF;
-#if NG_RUNTIME_THING_COUNT > 0
+#if DOOM_ACTIVE_THING_COUNT > 0
     {
         int px, py;
         if (place_test_thing(0, 3001, WORLD_Q8(300), 0)) {
@@ -3821,7 +3827,7 @@ static void configure_melee_test(void) {
 
 #ifdef DOOM_MONSTER_GALLERY_TEST
 static void configure_monster_gallery_test(void) {
-#if NG_RUNTIME_THING_COUNT > 5
+#if DOOM_ACTIVE_THING_COUNT > 5
     static const u16 types[] = {3004, 9, 3001, 3002, 3003, 2035};
     static const short laterals[] = {
         -WORLD_Q8(520), -WORLD_Q8(312), -WORLD_Q8(104),
@@ -3901,8 +3907,8 @@ static void configure_powerup_test(void) {
         -WORLD_Q8(240), -WORLD_Q8(144), -WORLD_Q8(48),
         WORLD_Q8(48), WORLD_Q8(144), WORLD_Q8(240)
     };
-#if NG_RUNTIME_THING_COUNT > 0
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+#if DOOM_ACTIVE_THING_COUNT > 0
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         enemy_dead[i] = 1;
         enemy_hp[i] = 0;
         enemy_awake[i] = 0;
@@ -4534,7 +4540,7 @@ static u8 is_e1m8_boss_exit_map(void) {
 static void check_e1m8_boss_exit(void) {
     u8 bosses = 0;
     if (!is_e1m8_boss_exit_map() || level_complete) return;
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         if (g_runtime_things[i].type != 3003) continue;
         bosses++;
         if (!enemy_dead[i] && thing_type_override[i] == 0) return;
@@ -5411,7 +5417,7 @@ static void draw_minimap_source_cell(int map_x, int map_y) {
 }
 
 static void redraw_minimap_thing_cell(int thing_index) {
-    if (!map_on || thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
+    if (!map_on || thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return;
     draw_minimap_source_cell(thing_x_q8[thing_index] >> 8, thing_y_q8[thing_index] >> 8);
     prev_px = -1;
 }
@@ -5419,7 +5425,7 @@ static void redraw_minimap_thing_cell(int thing_index) {
 static void set_runtime_thing_position(int thing_index, short x_q8, short y_q8) {
     short old_x;
     short old_y;
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return;
     old_x = thing_x_q8[thing_index];
     old_y = thing_y_q8[thing_index];
     if (old_x == x_q8 && old_y == y_q8) return;
@@ -6365,7 +6371,7 @@ static u8 thing_render_bucket(u16 thing_type) {
 }
 
 static u8 runtime_thing_is_monster(int thing_index) {
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_monster(thing_type_override[thing_index]);
 #if DOOM_SIMPLE_MAP
     return thing_static_class[thing_index] == THING_CLASS_MONSTER;
@@ -6377,7 +6383,7 @@ static u8 runtime_thing_is_monster(int thing_index) {
 }
 
 static u8 runtime_thing_is_pickup(int thing_index) {
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_pickup(thing_type_override[thing_index]);
 #if DOOM_SIMPLE_MAP
     return thing_static_class[thing_index] == THING_CLASS_PICKUP;
@@ -6390,7 +6396,7 @@ static u8 runtime_thing_is_pickup(int thing_index) {
 
 static u8 runtime_thing_is_threat(int thing_index) {
     u8 thing_class;
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_runtime_threat(thing_type_override[thing_index]);
 #if DOOM_SIMPLE_MAP
     thing_class = thing_static_class[thing_index];
@@ -6405,7 +6411,7 @@ static u8 runtime_thing_is_threat(int thing_index) {
 
 static u8 runtime_thing_is_shootable(int thing_index) {
     u8 thing_class;
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_shootable(thing_type_override[thing_index]);
 #if DOOM_SIMPLE_MAP
     thing_class = thing_static_class[thing_index];
@@ -6440,7 +6446,7 @@ u8 rc_dynamic_blocked_q8(short x_q8, short y_q8) {
 static u8 runtime_thing_render_bucket(int thing_index, u16 *thing_type) {
     u16 type;
     u8 thing_class;
-    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) {
+    if (thing_index < 0 || thing_index >= DOOM_ACTIVE_THING_COUNT) {
         if (thing_type) *thing_type = 0;
         return 0;
     }
@@ -6631,7 +6637,7 @@ static void update_enemy_ranged_readiness(void) {
                 break;
             }
         }
-        if (!still_readable && thing >= 0 && thing < NG_RUNTIME_THING_COUNT) enemy_ranged_readable_ticks[thing] = 0;
+        if (!still_readable && thing >= 0 && thing < DOOM_ACTIVE_THING_COUNT) enemy_ranged_readable_ticks[thing] = 0;
     }
 
     ranged_readable_prev_count = current_count;
@@ -6810,7 +6816,7 @@ static void restart_level(void) {
         dynamic_drop_x_q8[i] = 0;
         dynamic_drop_y_q8[i] = 0;
     }
-    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 i = 0; i < DOOM_ACTIVE_THING_COUNT; i++) {
         enemy_dead[i] = 0;
         enemy_hp[i] = 0;
         enemy_hit_flash[i] = 0;

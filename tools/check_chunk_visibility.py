@@ -215,6 +215,7 @@ def main() -> int:
     chunk_cols = parse_define_int(text, "DOOM_CHUNK_COLS")
     chunk_count = parse_define_int(text, "DOOM_CHUNK_COUNT")
     thing_count = parse_define_int(text, "DOOM_CHUNK_THING_COUNT")
+    max_active_define = parse_define_int(text, "DOOM_CHUNK_MAX_ACTIVE_THINGS")
     start_chunk = parse_define_int(text, "DOOM_CHUNK_START_CHUNK")
     start_local = (
         parse_define_int(text, "DOOM_CHUNK_START_X_Q8") >> 8,
@@ -331,11 +332,17 @@ def main() -> int:
             f"max 3x3 thing window {max_window_things} at chunk {max_window_chunk} "
             f"exceeds runtime cap {args.runtime_thing_cap}"
         )
+    if max_active_define < max_window_things:
+        errors.append(
+            f"DOOM_CHUNK_MAX_ACTIVE_THINGS={max_active_define} is below max 3x3 thing window "
+            f"{max_window_things} at chunk {max_window_chunk}"
+        )
 
     summary = " ".join(f"{name}={category_counts[name]}" for name in sorted(category_counts))
     print(
         f"{label} chunk visibility: chunks={chunk_count} reachable={len(reachable_chunks)} "
         f"things={len(things)} max_3x3_window={max_window_things}@{max_window_chunk} "
+        f"active_cap={max_active_define} "
         f"categories: {summary}"
     )
     for chunk in range(chunk_count):

@@ -608,6 +608,27 @@ def write_i16_chunks(f, name: str, grids: list[list[int]], chunk_count: int, chu
     f.write("};\n\n")
 
 
+def max_active_window_things(chunk_count_things: list[int], chunk_cols: int) -> int:
+    chunk_count = len(chunk_count_things)
+    max_window = 0
+    for chunk in range(chunk_count):
+        chunk_x = chunk % chunk_cols
+        chunk_y = chunk // chunk_cols
+        total = 0
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                nx = chunk_x + dx
+                ny = chunk_y + dy
+                if nx < 0 or ny < 0 or nx >= chunk_cols:
+                    continue
+                neighbor = ny * chunk_cols + nx
+                if neighbor >= chunk_count:
+                    continue
+                total += chunk_count_things[neighbor]
+        max_window = max(max_window, total)
+    return max(1, max_window)
+
+
 def write_outputs(
     header_path: str,
     source_path: str,
@@ -671,7 +692,8 @@ def write_outputs(
         f.write(f"#define DOOM_CHUNK_COLS {chunk_cols}\n")
         f.write(f"#define DOOM_CHUNK_ROWS {chunk_rows}\n")
         f.write(f"#define DOOM_CHUNK_COUNT {chunk_count}\n")
-        f.write(f"#define DOOM_CHUNK_THING_COUNT {len(things)}\n\n")
+        f.write(f"#define DOOM_CHUNK_THING_COUNT {len(things)}\n")
+        f.write(f"#define DOOM_CHUNK_MAX_ACTIVE_THINGS {max_active_window_things(chunk_count_things, chunk_cols)}\n\n")
         f.write(f"#define DOOM_CHUNK_EXIT_COUNT {len(exits)}\n")
         f.write(f"#define DOOM_CHUNK_DOOR_COUNT {len(doors)}\n\n")
         f.write(f"#define DOOM_CHUNK_LIFT_COUNT {len(lifts)}\n")

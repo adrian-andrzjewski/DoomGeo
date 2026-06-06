@@ -46,7 +46,11 @@ readable.
   key first. `make chunk-movement-check` mirrors the runtime player-radius
   collision and chunk-stream update enough to prove the generated start can
   walk forward instead of spawning wedged against a wall. `make
-  chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
+  chunk-visibility-check` verifies generated monster/pickup/weapon coverage
+  and the generated maximum active 3x3 chunk-window thing count. Chunked runtime
+  actor arrays use that active-window cap instead of the full converted map's
+  thing count, so E1M1 keeps persistent state for all things but scans only the
+  currently streamable actor set.
 - `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
   ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
   player input. `make chunk-movement-test-rom` uses the same scale but replaces
