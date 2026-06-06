@@ -85,6 +85,108 @@ def start_direction_score(grid: list[list[int]], start_x: float, start_y: float,
     return score
 
 
+def open_span_lengths(grid: list[list[int]], x: int, y: int) -> tuple[int, int]:
+    width = len(grid[0])
+    height = len(grid)
+    left = x
+    right = x
+    up = y
+    down = y
+    while left > 0 and not grid[y][left - 1]:
+        left -= 1
+    while right + 1 < width and not grid[y][right + 1]:
+        right += 1
+    while up > 0 and not grid[up - 1][x]:
+        up -= 1
+    while down + 1 < height and not grid[down + 1][x]:
+        down += 1
+    return right - left + 1, down - up + 1
+
+
+def wall_clearance(grid: list[list[int]], x: int, y: int, limit: int = 5) -> int:
+    width = len(grid[0])
+    height = len(grid)
+    for radius in range(1, limit + 1):
+        for yy in range(y - radius, y + radius + 1):
+            for xx in range(x - radius, x + radius + 1):
+                if max(abs(xx - x), abs(yy - y)) != radius:
+                    continue
+                if xx < 0 or yy < 0 or xx >= width or yy >= height or grid[yy][xx]:
+                    return radius - 1
+    return limit
+
+
+def sector_index_for_point(
+    x: float,
+    y: float,
+    linedefs: list[dc.LineDef],
+    sidedefs: list[dc.SideDef],
+    vertices: list[dc.Vertex],
+    sectors: list[dc.Sector],
+) -> int | None:
+    for sector_index in range(len(sectors)):
+        if dc.point_in_sector(x, y, dc.sector_segments(sector_index, linedefs, sidedefs, vertices)):
+            return sector_index
+    return None
+
+
+def start_room_center_cell(
+    grid: list[list[int]],
+    linedefs: list[dc.LineDef],
+    sidedefs: list[dc.SideDef],
+    sectors: list[dc.Sector],
+    vertices: list[dc.Vertex],
+    origin_x: int,
+    origin_y: int,
+    cell_units: int,
+    player: dc.Thing,
+    fallback_x: int,
+    fallback_y: int,
+    chunk_size: int,
+) -> tuple[int, int]:
+    sector_index = sector_index_for_point(player.x, player.y, linedefs, sidedefs, vertices, sectors)
+    if sector_index is None:
+        return fallback_x, fallback_y
+
+    segments = dc.sector_segments(sector_index, linedefs, sidedefs, vertices)
+    chunk_min_x = (fallback_x // chunk_size) * chunk_size
+    chunk_min_y = (fallback_y // chunk_size) * chunk_size
+    chunk_max_x = chunk_min_x + chunk_size
+    chunk_max_y = chunk_min_y + chunk_size
+    candidates: list[tuple[int, int]] = []
+    for y in range(chunk_min_y, min(chunk_max_y, len(grid))):
+        row = grid[y]
+        for x in range(chunk_min_x, min(chunk_max_x, len(row))):
+            solid = row[x]
+            if solid:
+                continue
+            doom_x, doom_y = doom_coord_from_cell(x, y, origin_x, origin_y, cell_units)
+            if dc.point_in_sector(doom_x, doom_y, segments):
+                candidates.append((x, y))
+
+    if not candidates:
+        return fallback_x, fallback_y
+
+    min_x = min(x for x, _y in candidates)
+    max_x = max(x for x, _y in candidates)
+    min_y = min(y for _x, y in candidates)
+    max_y = max(y for _x, y in candidates)
+    target_x = (min_x + max_x) / 2.0
+    target_y = (min_y + max_y) / 2.0
+    best_cell = (fallback_x, fallback_y)
+    best_score = -999999
+    for x, y in candidates:
+        dx = x - target_x
+        dy = y - target_y
+        horizontal, vertical = open_span_lengths(grid, x, y)
+        clearance = wall_clearance(grid, x, y)
+        score = int(-(dx * dx + dy * dy) * 64 + clearance * 16 + horizontal + vertical)
+        if score > best_score:
+            best_score = score
+            best_cell = (x, y)
+    return best_cell
+
+
 def chunk_start_view(
     start_angle: int,
     grid: list[list[int]],
@@ -794,6 +896,23 @@ def convert(args: argparse.Namespace) -> None:
         start_cell_x, start_cell_y = dc.nearest_open(grid, start_cell_x, start_cell_y)
         start_x = start_cell_x + 0.5
         start_y = start_cell_y + 0.5
+    if not args.keep_wad_start_offset:
+        start_cell_x, start_cell_y = start_room_center_cell(
+            grid,
+            linedefs,
+            sidedefs,
+            sectors,
+            vertices,
+            origin_x,
+            origin_y,
+            args.cell_units,
+            player,
+            start_cell_x,
+            start_cell_y,
+            args.chunk_size,
+        )
+        start_x = start_cell_x + 0.5
+        start_y = start_cell_y + 0.5
     route_start = (start_cell_x, start_cell_y)
     route_repair_cells = repair_start_exit_route(
         grid,
@@ -877,6 +996,11 @@ def main() -> int:
         type=float,
         default=8.5,
         help="Preferred player start Y inside the active 16x16 runtime chunk",
+    )
+    parser.add_argument(
+        "--keep-wad-start-offset",
+        action="store_true",
+        help="Keep the exact WAD-derived fractional player start instead of centering in the open start area",
     )
     args = parser.parse_args()
     if args.chunk_size <= 0:
