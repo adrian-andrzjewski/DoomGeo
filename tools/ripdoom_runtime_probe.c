@@ -9,8 +9,12 @@ int main(void) {
     int player_block_x = -1;
     int player_block_y = -1;
     int player_block_lines = 0;
+    int player_local_lines = 0;
+    int player_local_segs = 0;
     int sector_hits = 0;
     int block_hits = 0;
+    unsigned short local_lines[64];
+    unsigned short local_segs[96];
 
     for (int i = 0; i < NG_RIP_THING_COUNT; i++) {
         const NgRipThing *thing = &g_rip_things[i];
@@ -26,6 +30,8 @@ int main(void) {
             player_block_x = bx;
             player_block_y = by;
             player_block_lines = ripdoom_blockmap_line_count(bx, by);
+            player_local_lines = ripdoom_collect_local_lines(thing->x, thing->y, 1, local_lines, 64);
+            player_local_segs = ripdoom_collect_local_segs(thing->x, thing->y, 1, local_segs, 96);
         }
     }
 
@@ -41,18 +47,24 @@ int main(void) {
         fprintf(stderr, "RIPDOOM runtime probe failed: player block=(%d,%d) lines=%d\n", player_block_x, player_block_y, player_block_lines);
         return 1;
     }
+    if (player_local_lines <= 0 || player_local_segs <= 0) {
+        fprintf(stderr, "RIPDOOM runtime probe failed: local_lines=%d local_segs=%d\n", player_local_lines, player_local_segs);
+        return 1;
+    }
     if (sector_hits < NG_RIP_THING_COUNT / 2 || block_hits < NG_RIP_THING_COUNT / 2) {
         fprintf(stderr, "RIPDOOM runtime probe failed: sector_hits=%d block_hits=%d things=%d\n", sector_hits, block_hits, NG_RIP_THING_COUNT);
         return 1;
     }
 
     printf(
-        "RIPDOOM runtime probe OK: player subsector=%d sector=%d block=(%d,%d) block_lines=%d thing_sectors=%d/%d thing_blocks=%d/%d\n",
+        "RIPDOOM runtime probe OK: player subsector=%d sector=%d block=(%d,%d) block_lines=%d local_lines=%d local_segs=%d thing_sectors=%d/%d thing_blocks=%d/%d\n",
         player_subsector,
         player_sector,
         player_block_x,
         player_block_y,
         player_block_lines,
+        player_local_lines,
+        player_local_segs,
         sector_hits,
         NG_RIP_THING_COUNT,
         block_hits,

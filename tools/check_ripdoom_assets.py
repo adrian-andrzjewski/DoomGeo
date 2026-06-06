@@ -59,6 +59,14 @@ def parse_subsector_rows(body: str) -> list[tuple[int, int, int]]:
     return rows
 
 
+def parse_line_seg_spans(body: str) -> list[tuple[int, int]]:
+    rows = []
+    pattern = re.compile(r"^\s*\{(\d+),(\d+)\},\s*$", re.MULTILINE)
+    for match in pattern.finditer(body):
+        rows.append((int(match.group(1)), int(match.group(2))))
+    return rows
+
+
 def parse_node_rows(body: str) -> list[tuple[list[int], int, int]]:
     rows = []
     pattern = re.compile(
@@ -75,6 +83,10 @@ def scalar_count(body: str) -> int:
     return len(re.findall(r"0x[0-9a-fA-F]+|-?\d+", body))
 
 
+def parse_scalar_values(body: str) -> list[int]:
+    return [int(match.group(0), 0) for match in re.finditer(r"0x[0-9a-fA-F]+|-?\d+", body)]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--header", default="build/doom_ripdoom_generated.h")
@@ -89,6 +101,7 @@ def main() -> int:
     side_count = macro_value(header, "NG_RIP_SIDE_COUNT")
     sector_count = macro_value(header, "NG_RIP_SECTOR_COUNT")
     seg_count = macro_value(header, "NG_RIP_SEG_COUNT")
+    line_seg_index_count = macro_value(header, "NG_RIP_LINE_SEG_INDEX_COUNT")
     subsector_count = macro_value(header, "NG_RIP_SUBSECTOR_COUNT")
     node_count = macro_value(header, "NG_RIP_NODE_COUNT")
     thing_count = macro_value(header, "NG_RIP_THING_COUNT")
@@ -123,6 +136,30 @@ def main() -> int:
         if front_sector >= sector_count or back_sector >= sector_count:
             errors.append(f"seg {i} references missing sector front={front_sector} back={back_sector}")
             break
+
+    line_seg_spans = parse_line_seg_spans(array_body(source, "NgRipLineSegSpan", "g_rip_line_seg_spans"))
+    if len(line_seg_spans) != line_count:
+        errors.append(f"g_rip_line_seg_spans parsed row count {len(line_seg_spans)} != {line_count}")
+    line_seg_indices = parse_scalar_values(array_body(source, "uint16_t", "g_rip_line_seg_indices"))
+    if len(line_seg_indices) != line_seg_index_count:
+        errors.append(f"g_rip_line_seg_indices scalar count {len(line_seg_indices)} != {line_seg_index_count}")
+    if line_seg_index_count != seg_count:
+        errors.append(f"line seg index count {line_seg_index_count} != seg count {seg_count}")
+    if not errors:
+        for line_index, (firstseg, numsegs) in enumerate(line_seg_spans):
+            if firstseg + numsegs > line_seg_index_count:
+                errors.append(f"line {line_index} seg span {firstseg}+{numsegs} exceeds {line_seg_index_count}")
+                break
+            for offset in range(numsegs):
+                seg_index = line_seg_indices[firstseg + offset]
+                if seg_index >= seg_count:
+                    errors.append(f"line {line_index} references missing seg {seg_index}")
+                    break
+                if segs[seg_index][2] != line_index:
+                    errors.append(f"line {line_index} span includes seg {seg_index} for line {segs[seg_index][2]}")
+                    break
+            if errors:
+                break
 
     subsectors = parse_subsector_rows(array_body(source, "NgRipSubsector", "g_rip_subsectors"))
     if len(subsectors) != subsector_count:

@@ -9,5 +9,8 @@ int ripdoom_point_subsector(short x, short y);
 int ripdoom_point_sector(short x, short y);
 int ripdoom_blockmap_cell(short x, short y, int *block_x, int *block_y);
 int ripdoom_blockmap_line_count(int block_x, int block_y);
+int ripdoom_blockmap_lines(int block_x, int block_y, unsigned short *out_lines, int max_lines);
+int ripdoom_collect_local_lines(short x, short y, int block_radius, unsigned short *out_lines, int max_lines);
+int ripdoom_collect_local_segs(short x, short y, int block_radius, unsigned short *out_segs, int max_segs);
 
 #endif /* RIPDOOM_RUNTIME_H */

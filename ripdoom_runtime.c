@@ -71,6 +71,20 @@ int ripdoom_blockmap_cell(short x, short y, int *block_x, int *block_y) {
 }
 
 int ripdoom_blockmap_line_count(int block_x, int block_y) {
+    return ripdoom_blockmap_lines(block_x, block_y, 0, 0);
+}
+
+static int ripdoom_append_unique(unsigned short value, unsigned short *out_values, int count, int max_values) {
+    int i;
+    int stored = count < max_values ? count : max_values;
+    for (i = 0; i < stored; i++) {
+        if (out_values[i] == value) return count;
+    }
+    if (count < max_values) out_values[count] = value;
+    return count + 1;
+}
+
+int ripdoom_blockmap_lines(int block_x, int block_y, unsigned short *out_lines, int max_lines) {
     int cell;
     int offset;
     int count = 0;
@@ -81,7 +95,65 @@ int ripdoom_blockmap_line_count(int block_x, int block_y) {
     if (g_rip_blockmap_words[offset] == 0) offset++;
     while (offset < NG_RIP_BLOCKMAP_WORD_COUNT && g_rip_blockmap_words[offset] != -1) {
         int line = g_rip_blockmap_words[offset++];
-        if (line >= 0 && line < NG_RIP_LINE_COUNT) count++;
+        if (line >= 0 && line < NG_RIP_LINE_COUNT) {
+            if (out_lines && count < max_lines) out_lines[count] = (unsigned short)line;
+            count++;
+        }
     }
     return count;
+}
+
+int ripdoom_collect_local_lines(short x, short y, int block_radius, unsigned short *out_lines, int max_lines) {
+    int center_x;
+    int center_y;
+    int count = 0;
+    int by;
+    if (!out_lines || max_lines <= 0) return 0;
+    if (block_radius < 0) block_radius = 0;
+    if (!ripdoom_blockmap_cell(x, y, &center_x, &center_y)) return 0;
+
+    for (by = center_y - block_radius; by <= center_y + block_radius; by++) {
+        int bx;
+        for (bx = center_x - block_radius; bx <= center_x + block_radius; bx++) {
+            int cell;
+            int offset;
+            if (bx < 0 || by < 0 || bx >= NG_RIP_BLOCKMAP_W || by >= NG_RIP_BLOCKMAP_H) continue;
+            cell = by * NG_RIP_BLOCKMAP_W + bx;
+            offset = g_rip_blockmap_words[4 + cell];
+            if (offset < 0 || offset >= NG_RIP_BLOCKMAP_WORD_COUNT) continue;
+            if (g_rip_blockmap_words[offset] == 0) offset++;
+            while (offset < NG_RIP_BLOCKMAP_WORD_COUNT && g_rip_blockmap_words[offset] != -1) {
+                int line = g_rip_blockmap_words[offset++];
+                if (line >= 0 && line < NG_RIP_LINE_COUNT) {
+                    count = ripdoom_append_unique((unsigned short)line, out_lines, count, max_lines);
+                }
+            }
+        }
+    }
+    return count > max_lines ? max_lines : count;
+}
+
+int ripdoom_collect_local_segs(short x, short y, int block_radius, unsigned short *out_segs, int max_segs) {
+    enum { LOCAL_LINE_LIMIT = 96 };
+    unsigned short lines[LOCAL_LINE_LIMIT];
+    int line_count;
+    int seg_count = 0;
+    int line_index;
+    if (!out_segs || max_segs <= 0) return 0;
+    line_count = ripdoom_collect_local_lines(x, y, block_radius, lines, LOCAL_LINE_LIMIT);
+    for (line_index = 0; line_index < line_count; line_index++) {
+        const NgRipLineSegSpan *span;
+        int span_index;
+        unsigned short line = lines[line_index];
+        if (line >= NG_RIP_LINE_COUNT) continue;
+        span = &g_rip_line_seg_spans[line];
+        if ((int)span->firstseg + (int)span->numsegs > NG_RIP_LINE_SEG_INDEX_COUNT) continue;
+        for (span_index = 0; span_index < span->numsegs; span_index++) {
+            unsigned short seg = g_rip_line_seg_indices[span->firstseg + span_index];
+            if (seg < NG_RIP_SEG_COUNT) {
+                seg_count = ripdoom_append_unique(seg, out_segs, seg_count, max_segs);
+            }
+        }
+    }
+    return seg_count > max_segs ? max_segs : seg_count;
 }
