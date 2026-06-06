@@ -160,6 +160,20 @@ source. For CPU-side wall intersection tuning, pass
 `ROM=...` directory is used, the smoke helper copies the local
 `neogeo.zip` BIOS package there before launching GnGeo.
 
+For chunked RIPDOOM movement debugging, run:
+
+```sh
+SMOKE_XVFB=1 tools/bench_chunk_debug_movement.sh
+```
+
+This uses `chunk-playable-debug-rom`, stores captures under
+`.tools/screens/latest/chunk-debug-movement/`, and checks both the usual
+movement screenshot evidence and the visible HUD debug-register delta. In debug
+builds the HUD counters mirror global chunk position and active chunk state, so
+this bench can distinguish stale ROMs, blocked movement, and valid chunk
+recentering without relying on fix-layer rows that can be hidden behind
+playfield sprites.
+
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
 death/corpse feedback frame. Override `COMBAT_DEATH_WAIT_SECS` if an emulator

@@ -4377,15 +4377,17 @@ static void update_frame_stats_overlay(u8 frame_overrun) {
 static void update_input_debug_overlay(u8 pressed) {
     int px;
     int py;
+    const u16 col = 28;
+    const u16 row = 10;
     rc_player_q8(&px, &py);
-    draw_stat3(0, 0, FIX_SOLID, pressed);
-    draw_stat3(0, 1, FIX_AMMO_M, (u16)(px >> 8));
-    draw_stat3(0, 2, FIX_KEY_MSG_Y, (u16)(py >> 8));
+    draw_stat3(col, row, FIX_SOLID, pressed);
+    draw_stat3(col, (u16)(row + 1), FIX_AMMO_M, (u16)(px >> 8));
+    draw_stat3(col, (u16)(row + 2), FIX_KEY_MSG_Y, (u16)(py >> 8));
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
-    draw_stat3(0, 3, FIX_DEAD_D, SIMPLE_ACTIVE_CHUNK);
-    draw_stat3(0, 4, FIX_EXIT_BASE, (u16)((active_chunk_origin_x_q8() + px) >> 8));
-    draw_stat3(0, 5, FIX_KEY_MSG_K, (u16)((active_chunk_origin_y_q8() + py) >> 8));
-    draw_stat3(0, 6, FIX_SECRET_S, rc_moved_last_input());
+    draw_stat3(col, (u16)(row + 3), FIX_DEAD_D, SIMPLE_ACTIVE_CHUNK);
+    draw_stat3(col, (u16)(row + 4), FIX_EXIT_BASE, (u16)((active_chunk_origin_x_q8() + px) >> 8));
+    draw_stat3(col, (u16)(row + 5), FIX_KEY_MSG_K, (u16)((active_chunk_origin_y_q8() + py) >> 8));
+    draw_stat3(col, (u16)(row + 6), FIX_SECRET_S, rc_moved_last_input());
 #endif
 }
 #endif
@@ -6928,13 +6930,17 @@ int main(void) {
             }
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
             update_chunk_streaming();
-#if defined(DOOM_CHUNK_MOVEMENT_TEST)
+#if defined(DOOM_CHUNK_MOVEMENT_TEST) || defined(DOOM_INPUT_DEBUG)
             {
                 int debug_px;
                 int debug_py;
+                int debug_global_x;
+                int debug_global_y;
                 rc_player_q8(&debug_px, &debug_py);
-                player_ammo = (u16)(debug_px >> 8);
-                player_kills = (u16)(debug_py >> 8);
+                debug_global_x = active_chunk_origin_x_q8() + debug_px;
+                debug_global_y = active_chunk_origin_y_q8() + debug_py;
+                player_ammo = (u16)(debug_global_x >> 8);
+                player_kills = (u16)(debug_global_y >> 8);
                 player_armor = SIMPLE_ACTIVE_CHUNK;
             }
             shown_ammo = 0xFFFF;
@@ -6991,6 +6997,9 @@ int main(void) {
         update_power_timers();
         update_status_numbers(pressed);
         update_center_message();
+#ifdef DOOM_INPUT_DEBUG
+        update_input_debug_overlay(pressed);
+#endif
 
         /* C cycles weapons. Holding C and pressing a direction jumps directly
          * to weapon shortcuts; A+C keeps the minimap out of normal weapon flow. */
