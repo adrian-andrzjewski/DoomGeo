@@ -96,10 +96,10 @@ and emits generated C headers/sources under `build/`:
   waypoint, and opened chunk-door ray coverage. With `DOOM_RIPDOOM_RENDER=1`,
   the sprite-strip wall renderer can use those local ray hits for an
   experimental WAD-native wall view while preserving the existing simple-map
-  collision/gameplay path. Opened generated chunk doors are also skipped by the
-  RIPDOOM ray candidate path, so a door that becomes passable no longer remains
-  a static visual blocker in the sprite-strip renderer. This render mode is not
-  the default gameplay path yet.
+  collision/gameplay path. Opened generated chunk doors and lifts are also
+  skipped by the RIPDOOM ray candidate path, so a door or platform cell that
+  becomes passable no longer remains a static visual blocker in the
+  sprite-strip renderer. This render mode is not the default gameplay path yet.
 - Chunk movement validation mirrors the runtime stream contract. The
   `chunk-movement-check` host probe still verifies that the real start pose can
   move forward for the first scripted ticks, and now also follows a generated

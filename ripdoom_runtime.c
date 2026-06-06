@@ -4,6 +4,7 @@
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 #include "doom_chunks_generated.h"
 extern unsigned char g_chunk_door_open[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
+extern unsigned char g_chunk_lift_open[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 1];
 #endif
 
 enum { RIPDOOM_BLOCKMAP_SHIFT = 7 };
@@ -116,6 +117,17 @@ static int ripdoom_chunk_door_open_at(int grid_x, int grid_y) {
     return door_id >= 2 && g_chunk_door_open[door_id - 2];
 }
 
+static int ripdoom_chunk_lift_open_at(int grid_x, int grid_y) {
+    unsigned short chunk;
+    unsigned short cell;
+    unsigned char lift_id;
+    if (grid_x < 0 || grid_y < 0 || grid_x >= DOOM_CHUNK_GRID_W || grid_y >= DOOM_CHUNK_GRID_H) return 0;
+    chunk = (unsigned short)((grid_y / DOOM_CHUNK_SIZE) * DOOM_CHUNK_COLS + (grid_x / DOOM_CHUNK_SIZE));
+    cell = (unsigned short)((grid_y % DOOM_CHUNK_SIZE) * DOOM_CHUNK_SIZE + (grid_x % DOOM_CHUNK_SIZE));
+    lift_id = g_chunk_lift_cell[chunk][cell];
+    return lift_id && g_chunk_lift_open[lift_id - 1];
+}
+
 static int ripdoom_chunk_door_open_near(short doom_x, short doom_y, int along_x, int along_y) {
     int grid_x = ripdoom_floor_div((long)doom_x - DOOM_CHUNK_ORIGIN_X, DOOM_CHUNK_CELL_DOOM_UNITS);
     int grid_y = ripdoom_floor_div((long)DOOM_CHUNK_ORIGIN_Y - doom_y, DOOM_CHUNK_CELL_DOOM_UNITS);
@@ -136,6 +148,26 @@ static int ripdoom_chunk_door_open_near(short doom_x, short doom_y, int along_x,
     return 0;
 }
 
+static int ripdoom_chunk_lift_open_near(short doom_x, short doom_y, int along_x, int along_y) {
+    int grid_x = ripdoom_floor_div((long)doom_x - DOOM_CHUNK_ORIGIN_X, DOOM_CHUNK_CELL_DOOM_UNITS);
+    int grid_y = ripdoom_floor_div((long)DOOM_CHUNK_ORIGIN_Y - doom_y, DOOM_CHUNK_CELL_DOOM_UNITS);
+    int dx = 0;
+    int dy = 0;
+    if (along_x < 0) along_x = -along_x;
+    if (along_y < 0) along_y = -along_y;
+    if (along_x >= along_y) {
+        dy = 1;
+    } else {
+        dx = 1;
+    }
+    if (ripdoom_chunk_lift_open_at(grid_x, grid_y)) return 1;
+    if (ripdoom_chunk_lift_open_at(grid_x + dx, grid_y + dy)) return 1;
+    if (ripdoom_chunk_lift_open_at(grid_x - dx, grid_y - dy)) return 1;
+    if (ripdoom_chunk_lift_open_at(grid_x + dy, grid_y + dx)) return 1;
+    if (ripdoom_chunk_lift_open_at(grid_x - dy, grid_y - dx)) return 1;
+    return 0;
+}
+
 static int ripdoom_chunk_door_seg_open(const NgRipSeg *seg, const NgRipVertex *v1, const NgRipVertex *v2) {
     short mid_x;
     short mid_y;
@@ -143,6 +175,16 @@ static int ripdoom_chunk_door_seg_open(const NgRipSeg *seg, const NgRipVertex *v
     mid_x = (short)(((long)v1->x + v2->x) / 2);
     mid_y = (short)(((long)v1->y + v2->y) / 2);
     return ripdoom_chunk_door_open_near(mid_x, mid_y, (int)v2->x - v1->x, (int)v2->y - v1->y);
+}
+
+static int ripdoom_chunk_lift_seg_open(const NgRipSeg *seg, const NgRipVertex *v1, const NgRipVertex *v2) {
+    short mid_x;
+    short mid_y;
+    if (seg->flags & NG_RIP_SEG_ONE_SIDED) return 0;
+    if (!(seg->flags & (NG_RIP_SEG_LOWER | NG_RIP_SEG_UPPER | NG_RIP_SEG_MID | NG_RIP_SEG_DOOR))) return 0;
+    mid_x = (short)(((long)v1->x + v2->x) / 2);
+    mid_y = (short)(((long)v1->y + v2->y) / 2);
+    return ripdoom_chunk_lift_open_near(mid_x, mid_y, (int)v2->x - v1->x, (int)v2->y - v1->y);
 }
 #endif
 
@@ -179,6 +221,7 @@ static void ripdoom_consider_seg_ray(
     v2 = &g_rip_vertices[seg->v2];
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
     if (ripdoom_chunk_door_seg_open(seg, v1, v2)) return;
+    if (ripdoom_chunk_lift_seg_open(seg, v1, v2)) return;
 #endif
     seg_x = (long)v2->x - v1->x;
     seg_y = (long)v2->y - v1->y;

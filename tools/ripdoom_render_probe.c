@@ -9,6 +9,7 @@
 #include "chunk_stream.h"
 
 unsigned char g_chunk_door_open[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
+unsigned char g_chunk_lift_open[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 1];
 #endif
 
 #define FBITS 8
@@ -191,6 +192,17 @@ static unsigned char global_cell_door_id(int x, int y) {
     return g_chunk_door_cell[chunk][cell];
 }
 
+static unsigned char global_cell_lift_id(int x, int y) {
+    unsigned short chunk;
+    unsigned short cell;
+    int width = global_grid_w();
+    int height = global_grid_h();
+    if (x < 0 || y < 0 || x >= width || y >= height) return 0;
+    chunk = (unsigned short)((y / SIMPLE_MAP_H) * DOOM_CHUNK_COLS + (x / SIMPLE_MAP_W));
+    cell = (unsigned short)((y % SIMPLE_MAP_H) * SIMPLE_MAP_W + (x % SIMPLE_MAP_W));
+    return g_chunk_lift_cell[chunk][cell];
+}
+
 static short cell_center_doom_x(int grid_x) {
     return (short)(DOOM_CHUNK_ORIGIN_X + grid_x * DOOM_CHUNK_CELL_DOOM_UNITS + DOOM_CHUNK_CELL_DOOM_UNITS / 2);
 }
@@ -247,6 +259,59 @@ static int validate_opened_door_ray_skip(void) {
         }
     }
     fprintf(stderr, "RIPDOOM render probe failed: no chunk door could be ray-validated\n");
+    return 0;
+}
+
+static int validate_opened_lift_ray_skip(void) {
+    static const signed char dirs[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    if (DOOM_CHUNK_LIFT_COUNT <= 0) return 1;
+    for (unsigned short ref_index = 0; ref_index < DOOM_CHUNK_LIFT_CELL_REF_COUNT; ref_index++) {
+        int lift_x = g_chunk_lift_cells[ref_index] % DOOM_CHUNK_GRID_W;
+        int lift_y = g_chunk_lift_cells[ref_index] / DOOM_CHUNK_GRID_W;
+        unsigned char lift_id = global_cell_lift_id(lift_x, lift_y);
+        if (!lift_id) continue;
+        for (int d = 0; d < 4; d++) {
+            int source_x = lift_x + dirs[d][0];
+            int source_y = lift_y + dirs[d][1];
+            short ray_x;
+            short ray_y;
+            short source_doom_x;
+            short source_doom_y;
+            NgRipRayHit closed_hit;
+            NgRipRayHit open_hit;
+            int open_has_hit;
+            if (global_cell_blocked(source_x, source_y)) continue;
+            if (global_cell_door_id(source_x, source_y) >= 2) continue;
+            if (global_cell_lift_id(source_x, source_y)) continue;
+            ray_x = (short)((lift_x - source_x) * 256);
+            ray_y = (short)((source_y - lift_y) * 256);
+            source_doom_x = cell_center_doom_x(source_x);
+            source_doom_y = cell_center_doom_y(source_y);
+            for (unsigned short i = 0; i < DOOM_CHUNK_LIFT_COUNT; i++) g_chunk_lift_open[i] = 0;
+            if (!ripdoom_cast_local_ray(source_doom_x, source_doom_y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &closed_hit)) continue;
+            if (closed_hit.flags & NG_RIP_SEG_ONE_SIDED) continue;
+            if (!(closed_hit.flags & (NG_RIP_SEG_LOWER | NG_RIP_SEG_UPPER | NG_RIP_SEG_MID | NG_RIP_SEG_DOOR))) continue;
+            g_chunk_lift_open[lift_id - 1] = 1;
+            open_has_hit = ripdoom_cast_local_ray(source_doom_x, source_doom_y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &open_hit);
+            g_chunk_lift_open[lift_id - 1] = 0;
+            if (open_has_hit && open_hit.seg == closed_hit.seg && open_hit.distance_q8 <= closed_hit.distance_q8 + 16) {
+                fprintf(
+                    stderr,
+                    "RIPDOOM render probe failed: opened chunk lift still blocks ray cell=(%d,%d) source=(%d,%d) seg=%u dist=%u flags=0x%x\n",
+                    lift_x,
+                    lift_y,
+                    source_x,
+                    source_y,
+                    closed_hit.seg,
+                    closed_hit.distance_q8,
+                    closed_hit.flags
+                );
+                return 0;
+            }
+            return 1;
+        }
+    }
+    fprintf(stderr, "RIPDOOM render probe failed: no chunk lift could be ray-validated\n");
     return 0;
 }
 
@@ -610,6 +675,7 @@ int main(void) {
             int route_waypoints = 0;
             int route_steps = 0;
             int door_skip = 0;
+            int lift_skip = 0;
             long start_global_x_q8 = chunk_global_x_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_X_Q8);
             long start_global_y_q8 = chunk_global_y_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_Y_Q8);
 
@@ -674,8 +740,10 @@ int main(void) {
             }
             door_skip = validate_opened_door_ray_skip();
             if (!door_skip) return 1;
+            lift_skip = validate_opened_lift_ray_skip();
+            if (!lift_skip) return 1;
             printf(
-                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d\n",
+                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d lift_skip=%d\n",
                 start_angle,
                 mode,
                 hits,
@@ -695,7 +763,8 @@ int main(void) {
                 moved_ticks,
                 route_waypoints,
                 route_steps,
-                door_skip
+                door_skip,
+                lift_skip
             );
             return 0;
         }
