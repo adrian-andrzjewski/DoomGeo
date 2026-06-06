@@ -56,11 +56,11 @@ after the current documentation pass.
   are still a main reason the native Doom E1M1 start view does not match exactly
   even though the same map and player start are loaded.
 - Keep checking native-vs-NeoGeo waypoints after converter changes. The centered
-  `96x72` map, route-validated `DOOM_MAP_DETAIL_CULL=6.0` collision grid, and
-  lower `DOOM_RENDER_DETAIL_CULL=2.0` visual-line pass improve coordinate
-  fidelity and remove many false wall fragments, but current E1M1/E1M2 start
-  comparisons still show large visual differences from native Doom. The next
-  major renderer gap is choosing the correct sector/span owner for visible
+  `48x36` map, route-validated `DOOM_MAP_DETAIL_CULL=2.0` collision grid, and
+  `DOOM_RENDER_DETAIL_CULL=1.5` visual-line pass deliberately reduce runtime
+  map complexity while retaining larger Doom room-edge cues. Current E1M1/E1M2
+  start comparisons still show large visual differences from native Doom. The
+  next major renderer gap is choosing the correct sector/span owner for visible
   portals, windows, and height transitions.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.

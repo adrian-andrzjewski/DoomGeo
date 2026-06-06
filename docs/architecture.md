@@ -48,21 +48,20 @@ and emits generated C headers/sources under `build/`:
   WAD-to-grid coordinate conversion on the 68000. `make bsp-asset-check`
   verifies the generated counts, bounds, partition vectors, and child indices
   for the selected map.
-- Centered WAD-to-grid bounds. The default conversion is `96x72`, and generated
+- Centered WAD-to-grid bounds. The default conversion is `48x36`, and generated
   starts/things preserve sub-cell WAD positions where possible instead of
   drifting to one anchored corner of the converted grid.
-- Scale-aware map simplification. The normal build keeps the `96x72` coordinate
-  frame but now uses a deliberately aggressive `DOOM_MAP_DETAIL_CULL=6.0`,
-  opens isolated coarse-grid wall specks, and prunes short dead-end wall tails,
-  because Doom's minor linedef details read as false full-height columns in the
-  Neo Geo sprite-strip renderer. The pass protects map borders, doors, exits,
-  things, and player-start clearance, and the 6.0 default is the strongest
-  tested value that preserved strict Episode 1 route coverage. Visual WAD-line
-  metadata is generated with the separate `DOOM_RENDER_DETAIL_CULL=2.0`
-  default, so the runtime can still draw larger Doom room edges and pillars
-  that no longer need to be blocking collision cells. `DOOM_MAP_DETAIL_CULL`,
+- Scale-aware map simplification. The normal build now halves the older
+  `96x72` grid to a `48x36` runtime map and uses
+  `DOOM_MAP_DETAIL_CULL=2.0`, opens isolated coarse-grid wall specks, and
+  prunes short dead-end wall tails. This reduces the collision, floor, light,
+  secret, lift, and damage grids by 75% while keeping strict Episode 1 route
+  coverage with the shareware WAD. Visual WAD-line metadata is generated with
+  the separate `DOOM_RENDER_DETAIL_CULL=1.5` default, so the runtime can still
+  draw larger Doom room-edge and pillar cues without keeping every minor line
+  as a blocking collision cell. `DOOM_MAP_DETAIL_CULL`,
   `DOOM_RENDER_DETAIL_CULL`, and `DOOM_MAP_READABILITY_CLEANUP` can be
-  overridden for exact-conversion experiments.
+  overridden for exact-conversion or higher-resolution experiments.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

@@ -18,16 +18,16 @@ readable.
   `DOOM_MAP_READABILITY_CLEANUP`, and `DOOM_SKILL_MASK` at build time. The
   default skill mask is `4`, matching hard/Ultra-Violence THING placement; use
   `1` for easy or `2` for medium placement. The default grid remains centered
-  at `96x72`, which gives the converter room to preserve original WAD
-  placement, but the default map pass now uses `DOOM_MAP_DETAIL_CULL=6.0` to
-  remove solid-line noise, isolated wall specks, and short dead-end wall tails
-  that become false full-height obstacles in the sprite-strip raycaster.
-  Generated visual lines use the separate `DOOM_RENDER_DETAIL_CULL=2.0`
-  default, preserving larger room-edge and pillar cues without requiring those
-  lines to stay as blocking collision cells. The defaults were chosen from E1M1
-  visual captures plus strict Episode 1 route checks; lower collision culls
-  leave more false pillars, while higher collision culls start dropping required
-  map structure.
+  but is now `48x36`, deliberately cutting the runtime map area to one quarter
+  of the earlier `96x72` conversion. The default map pass uses
+  `DOOM_MAP_DETAIL_CULL=2.0` to remove solid-line noise, isolated wall specks,
+  and short dead-end wall tails that become false full-height obstacles in the
+  sprite-strip raycaster. Generated visual lines use the separate
+  `DOOM_RENDER_DETAIL_CULL=1.5` default, preserving larger room-edge and pillar
+  cues without requiring those lines to stay as blocking collision cells. The
+  defaults were chosen from strict Episode 1 route checks and E1M1 converter
+  metrics; higher-resolution builds can still override the map size for
+  comparison work.
 - Generated map tables are split into `doom_map_generated.h` and
   `doom_map_generated.c` for Makefile builds so large arrays are compiled once
   instead of duplicated by every file that includes the generated header.
