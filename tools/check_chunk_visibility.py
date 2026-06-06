@@ -200,6 +200,12 @@ def main() -> int:
         action="store_true",
         help="Also fail when generated things are placed on blocked, interactive, or unreachable cells",
     )
+    parser.add_argument(
+        "--runtime-thing-cap",
+        type=int,
+        default=0,
+        help="Fail when any active 3x3 chunk window exceeds this runtime thing slot count",
+    )
     args = parser.parse_args()
 
     text = Path(args.header).read_text(encoding="ascii")
@@ -300,10 +306,37 @@ def main() -> int:
                     f"expected>={args.min_reachable_chunk_things}"
                 )
 
+    max_window_things = 0
+    max_window_chunk = 0
+    for chunk in range(chunk_count):
+        chunk_x = chunk % chunk_cols
+        chunk_y = chunk // chunk_cols
+        window_things = 0
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                nx = chunk_x + dx
+                ny = chunk_y + dy
+                if nx < 0 or ny < 0:
+                    continue
+                neighbor = ny * chunk_cols + nx
+                if neighbor >= chunk_count:
+                    continue
+                window_things += thing_counts[neighbor]
+        if window_things > max_window_things:
+            max_window_things = window_things
+            max_window_chunk = chunk
+
+    if args.runtime_thing_cap and max_window_things > args.runtime_thing_cap:
+        errors.append(
+            f"max 3x3 thing window {max_window_things} at chunk {max_window_chunk} "
+            f"exceeds runtime cap {args.runtime_thing_cap}"
+        )
+
     summary = " ".join(f"{name}={category_counts[name]}" for name in sorted(category_counts))
     print(
         f"{label} chunk visibility: chunks={chunk_count} reachable={len(reachable_chunks)} "
-        f"things={len(things)} categories: {summary}"
+        f"things={len(things)} max_3x3_window={max_window_things}@{max_window_chunk} "
+        f"categories: {summary}"
     )
     for chunk in range(chunk_count):
         rendered = sum(1 for thing, _x, _y in thing_cells[chunk] if thing.info & dc.THING_INFO_RENDER)

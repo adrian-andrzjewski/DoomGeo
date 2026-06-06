@@ -45,6 +45,8 @@ static u16 chunk_drop_type[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
 static short chunk_drop_x_q8[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
 static short chunk_drop_y_q8[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
 static unsigned short thing_chunk_index[NG_RUNTIME_THING_COUNT];
+static short thing_chunk_offset_x_q8[NG_RUNTIME_THING_COUNT];
+static short thing_chunk_offset_y_q8[NG_RUNTIME_THING_COUNT];
 #endif
 static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
@@ -1464,8 +1466,8 @@ static void persist_runtime_slot_to_chunk_state(u16 slot) {
     if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) return;
     type = runtime_thing_type(slot);
     chunk_thing_state_type[chunk_index] = type;
-    chunk_thing_state_x_q8[chunk_index] = thing_x_q8[slot];
-    chunk_thing_state_y_q8[chunk_index] = thing_y_q8[slot];
+    chunk_thing_state_x_q8[chunk_index] = (short)(thing_x_q8[slot] - thing_chunk_offset_x_q8[slot]);
+    chunk_thing_state_y_q8[chunk_index] = (short)(thing_y_q8[slot] - thing_chunk_offset_y_q8[slot]);
     chunk_thing_state_dead[chunk_index] = (u8)(enemy_dead[slot] || type == 0);
     chunk_thing_state_hp[chunk_index] = enemy_hp[slot];
 }
@@ -1503,10 +1505,10 @@ static void save_active_chunk_dynamic_drops(void) {
     }
 }
 
-static void save_active_chunk_drop(u16 thing_type, short local_x_q8, short local_y_q8) {
-    unsigned short chunk = SIMPLE_ACTIVE_CHUNK;
+static void save_chunk_drop(unsigned short chunk, u16 thing_type, short local_x_q8, short local_y_q8) {
     u8 slot = 0;
     if (!thing_type) return;
+    if (chunk >= DOOM_CHUNK_COUNT) return;
     for (u8 i = 0; i < CHUNK_DYNAMIC_DROP_SLOTS; i++) {
         if (!chunk_drop_active[chunk][i]) {
             slot = i;
@@ -1519,6 +1521,10 @@ static void save_active_chunk_drop(u16 thing_type, short local_x_q8, short local
     chunk_drop_y_q8[chunk][slot] = local_y_q8;
 }
 
+static void save_active_chunk_drop(u16 thing_type, short local_x_q8, short local_y_q8) {
+    save_chunk_drop(SIMPLE_ACTIVE_CHUNK, thing_type, local_x_q8, local_y_q8);
+}
+
 static void save_active_chunk_runtime_things(void) {
     save_active_chunk_dynamic_drops();
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
@@ -1527,7 +1533,14 @@ static void save_active_chunk_runtime_things(void) {
         if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) continue;
         type = runtime_thing_type(i);
         if (death_anim_final_type[i]) {
-            if (death_anim_drop_type[i]) save_active_chunk_drop(death_anim_drop_type[i], thing_x_q8[i], thing_y_q8[i]);
+            if (death_anim_drop_type[i]) {
+                save_chunk_drop(
+                    g_chunk_things[chunk_index].chunk,
+                    death_anim_drop_type[i],
+                    (short)(thing_x_q8[i] - thing_chunk_offset_x_q8[i]),
+                    (short)(thing_y_q8[i] - thing_chunk_offset_y_q8[i])
+                );
+            }
             type = death_anim_final_type[i];
         } else if (death_drop_type[i]) {
             type = death_drop_type[i];
@@ -1539,8 +1552,8 @@ static void save_active_chunk_runtime_things(void) {
             continue;
         }
         chunk_thing_state_type[chunk_index] = type;
-        chunk_thing_state_x_q8[chunk_index] = thing_x_q8[i];
-        chunk_thing_state_y_q8[chunk_index] = thing_y_q8[i];
+        chunk_thing_state_x_q8[chunk_index] = (short)(thing_x_q8[i] - thing_chunk_offset_x_q8[i]);
+        chunk_thing_state_y_q8[chunk_index] = (short)(thing_y_q8[i] - thing_chunk_offset_y_q8[i]);
         chunk_thing_state_dead[chunk_index] = 0;
         chunk_thing_state_hp[chunk_index] = enemy_hp[i];
     }
@@ -1590,6 +1603,47 @@ static void reset_chunk_runtime_slot(u16 i) {
     death_anim_final_type[i] = 0;
     death_anim_drop_type[i] = 0;
     death_drop_type[i] = 0;
+    thing_chunk_offset_x_q8[i] = 0;
+    thing_chunk_offset_y_q8[i] = 0;
+}
+
+static u8 load_chunk_runtime_slot(
+    u16 slot,
+    unsigned short chunk_index,
+    short offset_x_q8,
+    short offset_y_q8,
+    u8 *thing_class,
+    u8 *thing_info
+) {
+    u16 type;
+    short x_q8;
+    short y_q8;
+
+    if (slot >= NG_RUNTIME_THING_COUNT) return 0;
+    if (chunk_index >= DOOM_CHUNK_THING_COUNT) return 0;
+
+    type = chunk_thing_state_type[chunk_index];
+    if (chunk_thing_state_dead[chunk_index] || type == 0) return 0;
+
+    x_q8 = (short)(chunk_thing_state_x_q8[chunk_index] + offset_x_q8);
+    y_q8 = (short)(chunk_thing_state_y_q8[chunk_index] + offset_y_q8);
+
+    thing_chunk_index[slot] = chunk_index;
+    thing_chunk_offset_x_q8[slot] = offset_x_q8;
+    thing_chunk_offset_y_q8[slot] = offset_y_q8;
+    thing_x_q8[slot] = x_q8;
+    thing_y_q8[slot] = y_q8;
+    thing_type_override[slot] = type;
+
+    *thing_class = thing_render_class(type);
+    *thing_info = 0;
+    if (*thing_class != THING_CLASS_NONE) *thing_info |= NG_THING_INFO_RENDER;
+    if (*thing_class == THING_CLASS_MONSTER) *thing_info |= NG_THING_INFO_MONSTER | NG_THING_INFO_SHOOTABLE;
+    if (*thing_class == THING_CLASS_THREAT) *thing_info |= NG_THING_INFO_THREAT | NG_THING_INFO_SHOOTABLE;
+    if (*thing_class == THING_CLASS_PICKUP) *thing_info |= NG_THING_INFO_PICKUP;
+    enemy_dead[slot] = 0;
+    enemy_hp[slot] = chunk_thing_state_hp[chunk_index];
+    return 1;
 }
 #endif
 
@@ -1598,54 +1652,56 @@ static void init_runtime_things(void) {
     thing_shootable_count = 0;
     thing_render_count = 0;
     thing_pickup_count = 0;
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        reset_chunk_runtime_slot(i);
+        thing_chunk_index[i] = 0xFFFF;
+        thing_x_q8[i] = 0;
+        thing_y_q8[i] = 0;
+        thing_type_override[i] = 0;
+        thing_static_class[i] = THING_CLASS_NONE;
+    }
+    {
+        int active_chunk_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
+        int active_chunk_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
+        u16 slot = 0;
+        for (u8 radius = 0; radius <= 1 && slot < NG_RUNTIME_THING_COUNT; radius++) {
+            for (signed char dy = -(signed char)radius; dy <= (signed char)radius && slot < NG_RUNTIME_THING_COUNT; dy++) {
+                for (signed char dx = -(signed char)radius; dx <= (signed char)radius && slot < NG_RUNTIME_THING_COUNT; dx++) {
+                    int chunk_x;
+                    int chunk_y;
+                    unsigned short chunk;
+                    unsigned short chunk_first;
+                    unsigned char chunk_count;
+                    if (radius && iabs16(dx) < radius && iabs16(dy) < radius) continue;
+                    chunk_x = active_chunk_x + dx;
+                    chunk_y = active_chunk_y + dy;
+                    if (chunk_x < 0 || chunk_y < 0 || chunk_x >= DOOM_CHUNK_COLS || chunk_y >= DOOM_CHUNK_ROWS) continue;
+                    chunk = (unsigned short)(chunk_y * DOOM_CHUNK_COLS + chunk_x);
+                    chunk_first = g_chunk_thing_first[chunk];
+                    chunk_count = g_chunk_thing_count[chunk];
+                    for (u8 n = 0; n < chunk_count && slot < NG_RUNTIME_THING_COUNT; n++) {
+                        u8 thing_class;
+                        u8 thing_info;
+                        unsigned short chunk_index = (unsigned short)(chunk_first + n);
+                        short offset_x_q8 = (short)(dx * WORLD_Q8(SIMPLE_MAP_W));
+                        short offset_y_q8 = (short)(dy * WORLD_Q8(SIMPLE_MAP_H));
+                        if (!load_chunk_runtime_slot(slot, chunk_index, offset_x_q8, offset_y_q8, &thing_class, &thing_info)) continue;
+                        thing_static_class[slot] = thing_class;
+                        if (thing_info & NG_THING_INFO_RENDER) index_render_candidate(slot);
+                        if (thing_info & NG_THING_INFO_MONSTER) index_monster_candidate(slot);
+                        if (thing_info & NG_THING_INFO_SHOOTABLE) index_shootable_candidate(slot);
+                        if (thing_info & NG_THING_INFO_PICKUP) index_pickup_candidate(slot);
+                        slot++;
+                    }
+                }
+            }
+        }
+    }
+#else
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u8 thing_class;
         u8 thing_info;
-#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
-        unsigned short chunk_first = g_chunk_thing_first[SIMPLE_ACTIVE_CHUNK];
-        unsigned char chunk_count = g_chunk_thing_count[SIMPLE_ACTIVE_CHUNK];
-        reset_chunk_runtime_slot((u16)i);
-        thing_chunk_index[i] = 0xFFFF;
-        if (i >= chunk_count) {
-            thing_x_q8[i] = 0;
-            thing_y_q8[i] = 0;
-            thing_type_override[i] = 0;
-            thing_static_class[i] = THING_CLASS_NONE;
-            continue;
-        }
-        {
-            unsigned short chunk_index = (unsigned short)(chunk_first + i);
-            u16 type = chunk_thing_state_type[chunk_index];
-            short x_q8 = chunk_thing_state_x_q8[chunk_index];
-            short y_q8 = chunk_thing_state_y_q8[chunk_index];
-            if (chunk_thing_state_dead[chunk_index] || type == 0) {
-                thing_x_q8[i] = 0;
-                thing_y_q8[i] = 0;
-                thing_type_override[i] = 0;
-                thing_static_class[i] = THING_CLASS_NONE;
-                continue;
-            }
-            if (x_q8 < 0 || y_q8 < 0 || x_q8 >= WORLD_Q8(SIMPLE_MAP_W) || y_q8 >= WORLD_Q8(SIMPLE_MAP_H)) {
-                thing_x_q8[i] = 0;
-                thing_y_q8[i] = 0;
-                thing_type_override[i] = 0;
-                thing_static_class[i] = THING_CLASS_NONE;
-                continue;
-            }
-            thing_chunk_index[i] = chunk_index;
-            thing_x_q8[i] = x_q8;
-            thing_y_q8[i] = y_q8;
-            thing_type_override[i] = type;
-            thing_class = thing_render_class(type);
-            thing_info = 0;
-            if (thing_class != THING_CLASS_NONE) thing_info |= NG_THING_INFO_RENDER;
-            if (thing_class == THING_CLASS_MONSTER) thing_info |= NG_THING_INFO_MONSTER | NG_THING_INFO_SHOOTABLE;
-            if (thing_class == THING_CLASS_THREAT) thing_info |= NG_THING_INFO_THREAT | NG_THING_INFO_SHOOTABLE;
-            if (thing_class == THING_CLASS_PICKUP) thing_info |= NG_THING_INFO_PICKUP;
-            enemy_dead[i] = 0;
-            enemy_hp[i] = chunk_thing_state_hp[chunk_index];
-        }
-#else
         thing_x_q8[i] = g_runtime_things[i].x_q8;
         thing_y_q8[i] = g_runtime_things[i].y_q8;
 #if DOOM_SIMPLE_MAP
@@ -1666,7 +1722,6 @@ static void init_runtime_things(void) {
         if (thing_class == THING_CLASS_THREAT) thing_info |= NG_THING_INFO_THREAT | NG_THING_INFO_SHOOTABLE;
         if (thing_class == THING_CLASS_PICKUP) thing_info |= NG_THING_INFO_PICKUP;
 #endif
-#endif
         thing_static_class[i] = thing_class;
         if (thing_info & NG_THING_INFO_RENDER) index_render_candidate((u16)i);
         if (thing_info & NG_THING_INFO_MONSTER) {
@@ -1679,6 +1734,7 @@ static void init_runtime_things(void) {
             index_pickup_candidate((u16)i);
         }
     }
+#endif
 }
 
 static u16 runtime_thing_type(int thing_index) {
