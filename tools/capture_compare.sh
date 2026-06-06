@@ -10,7 +10,8 @@ WAYPOINT="${COMPARE_WAYPOINT:-start}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 SCREENDIR=".tools/screens"
 LOGDIR=".tools/logs"
-COMPARISON_WORKSPACE="${COMPARISON_WORKSPACE:-}"
+COMPARISON_WORKSPACE="${COMPARISON_WORKSPACE:-4}"
+COMPARISON_TILE_WINDOWS="${COMPARISON_TILE_WINDOWS:-0}"
 LOCKDIR="${COMPARE_LOCKDIR:-${SMOKE_LOCKDIR:-.tools/locks/smoke-capture.lock}}"
 LOCK_OWNER="$LOCKDIR/pid"
 LOCK_ACQUIRED=0
@@ -134,8 +135,27 @@ acquire_capture_lock() {
 }
 
 switch_workspace() {
-    if [ -n "$COMPARISON_WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
+    if [ "${COMPARE_FOCUS_WORKSPACE:-0}" = "1" ] && [ -n "$COMPARISON_WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
         i3-msg workspace "$COMPARISON_WORKSPACE" >/dev/null 2>&1 || true
+    fi
+}
+
+tile_window() {
+    local wid="$1"
+    local floating="enable"
+    if [ "$COMPARISON_TILE_WINDOWS" = "1" ]; then
+        floating="disable"
+    fi
+    if [ -n "$COMPARISON_WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
+        i3-msg "[id=\"$wid\"] move container to workspace number $COMPARISON_WORKSPACE, floating $floating" >/dev/null 2>&1 || true
+    elif [ -n "$COMPARISON_WORKSPACE" ] && command -v swaymsg >/dev/null 2>&1; then
+        local title=""
+        title="$(xdotool getwindowname "$wid" 2>/dev/null || true)"
+        if printf '%s' "$title" | grep -qi 'Gngeo'; then
+            swaymsg '[class="ngdevkit-gngeo"] move container to workspace number '"$COMPARISON_WORKSPACE"', floating '"$floating" >/dev/null 2>&1 || true
+        elif [ -n "$title" ]; then
+            swaymsg '[title="'"$title"'"] move container to workspace number '"$COMPARISON_WORKSPACE"', floating '"$floating" >/dev/null 2>&1 || true
+        fi
     fi
 }
 
@@ -149,7 +169,7 @@ capture_window() {
     for _ in $(seq 1 10); do
         wid="$(window_for_pid_or_name "$pid" "$name" || true)"
         if [ -n "$wid" ] && xwininfo -id "$wid" >/dev/null 2>&1; then
-            xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+            tile_window "$wid"
             sleep 0.3
             rm -f "$xwd_out"
             if xwd -silent -id "$wid" -out "$xwd_out" >/dev/null 2>&1 && [ -s "$xwd_out" ]; then
@@ -170,10 +190,9 @@ hold_key() {
     local wid="$1"
     local key="$2"
     local secs="$3"
-    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    xdotool keydown "$key"
+    xdotool keydown --window "$wid" "$key"
     sleep "$secs"
-    xdotool keyup "$key"
+    xdotool keyup --window "$wid" "$key"
     sleep 0.15
 }
 
@@ -182,15 +201,14 @@ hold_move_key() {
     local key="$2"
     local secs="$3"
     local modifier="${4:-}"
-    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
     if [ -n "$modifier" ]; then
-        xdotool keydown "$modifier"
+        xdotool keydown --window "$wid" "$modifier"
     fi
-    xdotool keydown "$key"
+    xdotool keydown --window "$wid" "$key"
     sleep "$secs"
-    xdotool keyup "$key"
+    xdotool keyup --window "$wid" "$key"
     if [ -n "$modifier" ]; then
-        xdotool keyup "$modifier"
+        xdotool keyup --window "$wid" "$modifier"
     fi
     sleep 0.15
 }
@@ -198,8 +216,7 @@ hold_move_key() {
 tap_key() {
     local wid="$1"
     local key="$2"
-    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    xdotool key "$key"
+    xdotool key --window "$wid" "$key"
     sleep 0.15
 }
 
@@ -207,23 +224,32 @@ drive_waypoint_script() {
     local wid="$1"
     local use_key="$2"
     local move_modifier="${3:-}"
+    local route_prefix="${4:-COMPARE_ROUTE}"
+    local e1m1_encounter_forward="${route_prefix}_E1M1_ENCOUNTER_FORWARD"
+    local e1m1_encounter_turn="${route_prefix}_E1M1_ENCOUNTER_TURN"
+    local e1m1_scout_forward1="${route_prefix}_E1M1_SCOUT_FORWARD1"
+    local e1m1_scout_turn="${route_prefix}_E1M1_SCOUT_TURN"
+    local e1m1_scout_forward2="${route_prefix}_E1M1_SCOUT_FORWARD2"
+    local e1m2_keydoor_forward1="${route_prefix}_E1M2_KEYDOOR_FORWARD1"
+    local e1m2_keydoor_turn="${route_prefix}_E1M2_KEYDOOR_TURN"
+    local e1m2_keydoor_forward2="${route_prefix}_E1M2_KEYDOOR_FORWARD2"
     case "$WAYPOINT" in
         start|e1m1-start|e1m2-start)
             return 0
             ;;
         e1m1-encounter)
-            hold_move_key "$wid" Up 1.0 "$move_modifier"
-            hold_key "$wid" Right 0.35
+            hold_move_key "$wid" Up "${!e1m1_encounter_forward:-1.0}" "$move_modifier"
+            hold_key "$wid" Right "${!e1m1_encounter_turn:-0.35}"
             ;;
         e1m1-scout)
-            hold_move_key "$wid" Up 1.8 "$move_modifier"
-            hold_key "$wid" Left 0.85
-            hold_move_key "$wid" Up 0.55 "$move_modifier"
+            hold_move_key "$wid" Up "${!e1m1_scout_forward1:-1.8}" "$move_modifier"
+            hold_key "$wid" Left "${!e1m1_scout_turn:-0.85}"
+            hold_move_key "$wid" Up "${!e1m1_scout_forward2:-0.55}" "$move_modifier"
             ;;
         e1m2-keydoor)
-            hold_move_key "$wid" Up 1.2 "$move_modifier"
-            hold_key "$wid" Left 0.45
-            hold_move_key "$wid" Up 0.8 "$move_modifier"
+            hold_move_key "$wid" Up "${!e1m2_keydoor_forward1:-1.2}" "$move_modifier"
+            hold_key "$wid" Left "${!e1m2_keydoor_turn:-0.45}"
+            hold_move_key "$wid" Up "${!e1m2_keydoor_forward2:-0.8}" "$move_modifier"
             tap_key "$wid" "$use_key"
             ;;
         *)
@@ -243,7 +269,7 @@ drive_native_waypoint() {
             ;;
     esac
     wid="$(window_for_pid_or_name "$pid" "$title")"
-    drive_waypoint_script "$wid" space "$native_move_modifier"
+    drive_waypoint_script "$wid" space "$native_move_modifier" COMPARE_NATIVE_ROUTE
 }
 
 drive_neo_waypoint() {
@@ -255,7 +281,7 @@ drive_neo_waypoint() {
             ;;
     esac
     wid="$(window_for_pid_or_name "$pid" "")"
-    drive_waypoint_script "$wid" s
+    drive_waypoint_script "$wid" s "" COMPARE_NEO_ROUTE
 }
 
 configure_waypoint() {
@@ -326,6 +352,11 @@ configure_waypoint() {
 
 configure_waypoint
 
+if [ "$neo_make_target" = "episode-map-gngeo" ]; then
+    neo_make_args+=("DOOM_SKIP_INTRO=1")
+    neo_press_start="0"
+fi
+
 episode="${MAP:1:1}"
 level="${MAP:3:1}"
 if [[ ! "$MAP" =~ ^E[0-9]M[0-9]$ ]]; then
@@ -394,7 +425,7 @@ if [ -z "$neo_pid" ]; then
 fi
 neo_wid="$(window_for_pid_or_name "$neo_pid" "" || true)"
 if [ -n "$neo_wid" ]; then
-    xdotool windowactivate "$neo_wid" >/dev/null 2>&1 || true
+    tile_window "$neo_wid"
     if [ "$neo_press_start" = "1" ]; then
         sleep 1.5
         hold_key "$neo_wid" x 0.25

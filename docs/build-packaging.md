@@ -76,7 +76,14 @@ For native Doom visual comparisons, run `tools/capture_compare.sh`. By default
 it captures the compiled map start view and writes native, Neo Geo, and
 side-by-side PNGs under `.tools/screens/`. The helper uses the same capture lock
 as smoke screenshots, so native and GnGeo windows cannot be cross-captured by a
-parallel comparison run. Set `COMPARE_WAYPOINT` to capture a named view:
+parallel comparison run. The smoke and comparison helpers place emulator windows
+on workspace 4 by default and send targeted key events instead of activating the
+window, so captures do not take focus from the desktop. Direct i3/sway tiling of
+`ngdevkit-gngeo` is disabled by default because forcing `floating disable`
+resizes the SDL window and reliably crashes GnGeo on this host; set
+`SMOKE_TILE_WINDOWS=1` or `COMPARISON_TILE_WINDOWS=1` only when intentionally
+rechecking that behavior or when running under a wrapper that tolerates resize.
+Set `COMPARE_WAYPOINT` to capture a named view:
 
 ```sh
 DOOM_MAP=E1M1 tools/capture_compare.sh
@@ -91,7 +98,9 @@ Doom and the Neo Geo ROM with the same timed input script from that map spawn,
 with native Doom holding its speed modifier during forward movement. This makes
 the side-by-side more useful for judging equivalent route views; set
 `COMPARE_NATIVE_MOVE_MODIFIER=` to disable the native speed modifier when
-checking walk-speed captures.
+checking walk-speed captures. When the engines drift to different places, tune
+the route per side with `COMPARE_NATIVE_ROUTE_*` and `COMPARE_NEO_ROUTE_*`
+variables such as `COMPARE_NEO_ROUTE_E1M1_SCOUT_FORWARD1=0.9`.
 Set `COMPARE_ROUTE_MODE=focused` to use the older focused Neo Geo verification
 ROMs for `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Focused captures
 wait briefly before grabbing the window and reject all-black frames, so
@@ -251,7 +260,8 @@ evidence.
 launches with an owner-tracked lock under `.tools/locks/` so parallel screenshot
 refreshes do not capture the wrong native or GnGeo window. If a previous aborted
 run left a directory-only or dead-PID lock, the helpers clear it automatically
-before starting the next capture.
+before starting the next capture. Set `SMOKE_WORKSPACE=` or
+`COMPARISON_WORKSPACE=` to override the default workspace 4 placement.
 
 Fast weapon shortcut input can be smoke-checked with:
 

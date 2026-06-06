@@ -39,20 +39,42 @@ DOOM_SHAREWARE_ZIP=.tools/assets/doom1.wad.zip
 DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
 DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
 DOOM_MAP?=E1M1
-DOOM_MAP_WIDTH?=76
-DOOM_MAP_HEIGHT?=54
+DOOM_SIMPLE_MAP?=0
+DOOM_CHUNKED_SIMPLE_MAP?=0
+ifeq ($(DOOM_SIMPLE_MAP),1)
+DOOM_MAP_WIDTH?=16
+DOOM_MAP_HEIGHT?=16
+else
+DOOM_MAP_WIDTH?=48
+DOOM_MAP_HEIGHT?=36
+endif
+DOOM_MAP_DETAIL_CULL?=0.5
+DOOM_RENDER_DETAIL_CULL?=1.5
+DOOM_MAP_READABILITY_CLEANUP?=1
 DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
-DOOM_DETAIL?=balanced
+DOOM_DETAIL?=quality
 DOOM_FRAME_STATS?=0
+DOOM_SKIP_INTRO?=0
 DOOM_WALL_UPLOAD_COLUMNS?=
 DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
 EPISODE_MAPS?=E1M1 E1M2 E1M3 E1M4 E1M5 E1M6 E1M7 E1M8 E1M9
 EPISODE_MAP?=E1M1
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
+DOOM_MAP_SOURCE=$(BUILDDIR)/doom_map_generated.c
+DOOM_MAP_OBJECT=$(BUILDDIR)/doom_map_generated.o
+DOOM_CHUNK_HEADER=$(BUILDDIR)/doom_chunks_generated.h
+DOOM_CHUNK_SOURCE=$(BUILDDIR)/doom_chunks_generated.c
+DOOM_CHUNK_OBJECT=
+DOOM_CHUNK_DEP=
+DOOM_CHUNK_PREVIEW=$(BUILDDIR)/doom_chunks_preview.txt
+DOOM_CHUNK_SIZE?=16
+DOOM_CHUNK_CELL_UNITS?=64
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
+DOOM_MAP_CLEANUP_ARGS=$(if $(filter 1 yes true,$(DOOM_MAP_READABILITY_CLEANUP)),--readability-cleanup,)
+GFX_SIMPLE_MAP_ARG=$(if $(filter 1 yes true,$(DOOM_SIMPLE_MAP)),--simple-map,)
 GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
 GFX_ROM_DIR?=rom
 GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
@@ -72,6 +94,19 @@ endif
 override CFLAGS += $(DOOM_DETAIL_DEFINE)
 ifeq ($(DOOM_FRAME_STATS),1)
 override CFLAGS += -DDOOM_FRAME_STATS=1
+endif
+ifeq ($(DOOM_SKIP_INTRO),1)
+override CFLAGS += -DDOOM_SKIP_INTRO=1
+endif
+ifeq ($(DOOM_SIMPLE_MAP),1)
+override CFLAGS += -DDOOM_SIMPLE_MAP=1
+ifeq ($(DOOM_CHUNKED_SIMPLE_MAP),1)
+override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=1
+DOOM_CHUNK_OBJECT=$(BUILDDIR)/doom_chunks_generated.o
+DOOM_CHUNK_DEP=$(DOOM_CHUNK_HEADER)
+else
+override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=0
+endif
 endif
 ifneq ($(strip $(DOOM_WALL_UPLOAD_COLUMNS)),)
 override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUMNS)
@@ -109,6 +144,10 @@ include build.mk
 # Some default targets for running your project via emulators
 include emu.mk
 
+# The Doom sprite bank now includes monsters, corpses, weapons, keys and item
+# pickups. That crosses the 2 MiB C-ROM default, so package 4 MiB C-ROMs.
+CROMSIZE=4194304
+
 
 
 # program ROM: your main program
@@ -117,11 +156,15 @@ include emu.mk
 # 
 # Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
 ELF=$(BUILDDIR)/rom.elf
-$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_ASSETS_OBJECT)
+$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_CHUNK_OBJECT) $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
 
-$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
-$(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
+$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
+$(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_ASSETS_HEADER)
+$(DOOM_MAP_OBJECT): $(DOOM_MAP_SOURCE) $(DOOM_MAP_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_MAP_SOURCE) -o $@
+$(BUILDDIR)/doom_chunks_generated.o: $(DOOM_CHUNK_SOURCE) $(DOOM_CHUNK_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_CHUNK_SOURCE) -o $@
 $(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
 
@@ -212,7 +255,6 @@ hud-test-gngeo: $(HUD_TEST_CART)
 
 key-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
-	cp $(ROM)/neogeo.zip build/key-test-rom/neogeo.zip
 
 key-test-gngeo:
 	$(MAKE) key-test-rom
@@ -220,15 +262,20 @@ key-test-gngeo:
 
 key-door-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-door-test ROM=build/key-door-test-rom GFX_ROM_DIR=build/key-door-test-assets CFLAGS="-Ibuild/key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
-	cp $(ROM)/neogeo.zip build/key-door-test-rom/neogeo.zip
 
 key-door-test-gngeo:
 	$(MAKE) key-door-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-door-test-rom $(GAMEROM)
 
+chunk-key-door-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M2 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-key-door-test ROM=build/chunk-key-door-test-rom GFX_ROM_DIR=build/chunk-key-door-test-assets CFLAGS="-Ibuild/chunk-key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
+
+chunk-key-door-test-gngeo:
+	$(MAKE) chunk-key-door-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-key-door-test-rom $(GAMEROM)
+
 combat-test-rom:
 	$(MAKE) cart BUILDDIR=build/combat-test ROM=build/combat-test-rom GFX_ROM_DIR=build/combat-test-assets CFLAGS="-Ibuild/combat-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_COMBAT_TEST"
-	cp $(ROM)/neogeo.zip build/combat-test-rom/neogeo.zip
 
 combat-test-gngeo:
 	$(MAKE) combat-test-rom
@@ -236,7 +283,6 @@ combat-test-gngeo:
 
 encounter-test-rom:
 	$(MAKE) cart BUILDDIR=build/encounter-test ROM=build/encounter-test-rom GFX_ROM_DIR=build/encounter-test-assets CFLAGS="-Ibuild/encounter-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_ENCOUNTER_TEST"
-	cp $(ROM)/neogeo.zip build/encounter-test-rom/neogeo.zip
 
 encounter-test-gngeo:
 	$(MAKE) encounter-test-rom
@@ -244,7 +290,6 @@ encounter-test-gngeo:
 
 scout-test-rom:
 	$(MAKE) cart BUILDDIR=build/scout-test ROM=build/scout-test-rom GFX_ROM_DIR=build/scout-test-assets CFLAGS="-Ibuild/scout-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_SCOUT_TEST"
-	cp $(ROM)/neogeo.zip build/scout-test-rom/neogeo.zip
 
 scout-test-gngeo:
 	$(MAKE) scout-test-rom
@@ -252,7 +297,6 @@ scout-test-gngeo:
 
 exit-test-rom:
 	$(MAKE) cart BUILDDIR=build/exit-test ROM=build/exit-test-rom GFX_ROM_DIR=build/exit-test-assets CFLAGS="-Ibuild/exit-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_EXIT_TEST"
-	cp $(ROM)/neogeo.zip build/exit-test-rom/neogeo.zip
 
 exit-test-gngeo:
 	$(MAKE) exit-test-rom
@@ -260,7 +304,6 @@ exit-test-gngeo:
 
 e1m8-boss-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M8 DOOM_DETAIL=quality BUILDDIR=build/e1m8-boss-test ROM=build/e1m8-boss-test-rom GFX_ROM_DIR=build/e1m8-boss-test-assets CFLAGS="-Ibuild/e1m8-boss-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M8_BOSS_TEST"
-	cp $(ROM)/neogeo.zip build/e1m8-boss-test-rom/neogeo.zip
 
 e1m8-boss-test-gngeo:
 	$(MAKE) e1m8-boss-test-rom
@@ -268,7 +311,6 @@ e1m8-boss-test-gngeo:
 
 episode-map-rom:
 	$(MAKE) cart DOOM_MAP=$(EPISODE_MAP) BUILDDIR=build/episode-roms/$(EPISODE_MAP) ROM=build/episode-roms/$(EPISODE_MAP)-rom GFX_ROM_DIR=build/episode-roms/$(EPISODE_MAP)-assets
-	cp $(ROM)/neogeo.zip build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip
 
 episode-map-gngeo:
 	$(MAKE) episode-map-rom
@@ -282,7 +324,6 @@ episode-roms:
 
 hidden-attack-test-rom:
 	$(MAKE) cart BUILDDIR=build/hidden-attack-test ROM=build/hidden-attack-test-rom GFX_ROM_DIR=build/hidden-attack-test-assets CFLAGS="-Ibuild/hidden-attack-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_HIDDEN_ATTACK_TEST"
-	cp $(ROM)/neogeo.zip build/hidden-attack-test-rom/neogeo.zip
 
 hidden-attack-test-gngeo:
 	$(MAKE) hidden-attack-test-rom
@@ -290,7 +331,6 @@ hidden-attack-test-gngeo:
 
 melee-test-rom:
 	$(MAKE) cart BUILDDIR=build/melee-test ROM=build/melee-test-rom GFX_ROM_DIR=build/melee-test-assets CFLAGS="-Ibuild/melee-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MELEE_TEST"
-	cp $(ROM)/neogeo.zip build/melee-test-rom/neogeo.zip
 
 melee-test-gngeo:
 	$(MAKE) melee-test-rom
@@ -298,7 +338,6 @@ melee-test-gngeo:
 
 monster-gallery-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
-	cp $(ROM)/neogeo.zip build/monster-gallery-rom/neogeo.zip
 
 monster-gallery-gngeo:
 	$(MAKE) monster-gallery-rom
@@ -306,7 +345,6 @@ monster-gallery-gngeo:
 
 arsenal-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
-	cp $(ROM)/neogeo.zip build/arsenal-test-rom/neogeo.zip
 
 arsenal-test-gngeo:
 	$(MAKE) arsenal-test-rom
@@ -314,19 +352,31 @@ arsenal-test-gngeo:
 
 death-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
-	cp $(ROM)/neogeo.zip build/death-test-rom/neogeo.zip
 
 death-test-gngeo:
 	$(MAKE) death-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
 
+chunk-death-test-rom:
+	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-death-test ROM=build/chunk-death-test-rom GFX_ROM_DIR=build/chunk-death-test-assets CFLAGS="-Ibuild/chunk-death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
+
+chunk-death-test-gngeo:
+	$(MAKE) chunk-death-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-death-test-rom $(GAMEROM)
+
 powerup-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
-	cp $(ROM)/neogeo.zip build/powerup-test-rom/neogeo.zip
 
 powerup-test-gngeo:
 	$(MAKE) powerup-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/powerup-test-rom $(GAMEROM)
+
+chunk-powerup-test-rom:
+	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-powerup-test ROM=build/chunk-powerup-test-rom GFX_ROM_DIR=build/chunk-powerup-test-assets CFLAGS="-Ibuild/chunk-powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
+
+chunk-powerup-test-gngeo:
+	$(MAKE) chunk-powerup-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-powerup-test-rom $(GAMEROM)
 
 ASM_ROM=$(BUILDDIR)/asm-rom
 ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
@@ -382,19 +432,25 @@ asm-gngeo: $(ASM_CART)
 smoke-screenshot:
 	tools/smoke_capture.sh
 
-route-check: $(DOOM_MAP_HEADER)
-	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER)
+route-check: $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE)
+	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER) --source $(DOOM_MAP_SOURCE)
 
 episode-route-report: $(DOOM_IWAD)
-	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK)
+	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) --render-detail-cull $(DOOM_RENDER_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --skill-mask $(DOOM_SKILL_MASK)
 
 episode-route-check: $(DOOM_IWAD)
-	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK) --strict
+	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) --render-detail-cull $(DOOM_RENDER_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --skill-mask $(DOOM_SKILL_MASK) --strict
 
 bsp-asset-check: doom-assets
 	$(PYTHON) tools/check_bsp_assets.py --map-header $(DOOM_MAP_HEADER) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check
+chunk-route-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
+	$(PYTHON) tools/check_chunk_route.py --header $(DOOM_CHUNK_HEADER) --source $(DOOM_CHUNK_SOURCE)
+
+chunk-visibility-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
+	$(PYTHON) tools/check_chunk_visibility.py --header $(DOOM_CHUNK_HEADER) --source $(DOOM_CHUNK_SOURCE)
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
@@ -404,12 +460,17 @@ $(DOOM_SHAREWARE_ZIP):
 	mkdir -p $(dir $@)
 	curl -L --fail --output $@ $(DOOM_SHAREWARE_URL)
 
-$(DOOM_MAP_HEADER): Makefile tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
-	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+$(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE): Makefile tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) --render-detail-cull $(DOOM_RENDER_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --out $(DOOM_MAP_HEADER) --map-source $(DOOM_MAP_SOURCE) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+
+$(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE): Makefile tools/doom_chunk_convert.py tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/doom_chunk_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --chunk-size $(DOOM_CHUNK_SIZE) --cell-units $(DOOM_CHUNK_CELL_UNITS) --out $(DOOM_CHUNK_HEADER) --chunk-source $(DOOM_CHUNK_SOURCE) --preview $(DOOM_CHUNK_PREVIEW)
+
+chunk-map: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 
 $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
 
-doom-assets: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE)
+doom-assets: $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE) $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE)
 
 
 
@@ -440,7 +501,7 @@ $(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin $(GFX_ROM_DIR)/s1.bin $(GFX_ROM_DIR)
 	@test -f $@
 
 $(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR) $(GFX_ROM_DIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) $(GFX_SIMPLE_MAP_ARG) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
 	touch $@
 
 $(GFX_ROM_DIR):

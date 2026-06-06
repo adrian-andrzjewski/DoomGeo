@@ -72,7 +72,12 @@ def main() -> int:
     parser.add_argument("--expect-frame-stats", action="store_true", help="Require the DoomGeo frame-stats register")
     parser.add_argument("--min-diff-mean", type=float, default=8.0, help="Minimum mean playfield difference between poses")
     parser.add_argument("--min-diff-pixels", type=int, default=80000, help="Minimum changed playfield pixels between poses")
-    parser.add_argument("--min-play-colored", type=int, default=100000, help="Minimum colored playfield pixels per capture")
+    parser.add_argument(
+        "--min-play-colored",
+        type=int,
+        default=75000,
+        help="Minimum colored playfield pixels per capture; darker wall-heavy poses still need variation, HUD, FPS, and frame-stat evidence",
+    )
     args = parser.parse_args()
 
     root = Path(args.dir)

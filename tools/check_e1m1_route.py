@@ -26,20 +26,23 @@ def parse_define_string(text: str, name: str) -> str:
 
 
 def parse_grid(text: str, symbol: str) -> list[list[int]]:
-    marker = f"static const unsigned char {symbol}"
-    start = text.find(marker)
-    if start < 0:
+    match = re.search(
+        rf"(?:static\s+)?const\s+unsigned\s+char\s+{re.escape(symbol)}\s*"
+        rf"\[[^\]]+\]\s*\[[^\]]+\]\s*=",
+        text,
+    )
+    if not match:
         raise ValueError(f"missing {symbol}")
-    start = text.index("{", start)
+    start = text.index("{", match.end())
     end = text.index("};", start) + 1
     return ast.literal_eval(text[start:end].replace("{", "[").replace("}", "]"))
 
 
 def parse_exits(text: str) -> list[tuple[int, int]]:
-    marker = "static const NgRuntimeExit g_runtime_exits"
-    start = text.find(marker)
-    if start < 0:
+    match = re.search(r"(?:static\s+)?const\s+NgRuntimeExit\s+g_runtime_exits\s*\[[^\]]+\]\s*=", text)
+    if not match:
         raise ValueError("missing g_runtime_exits")
+    start = text.index("{", match.end())
     end = text.index("};", start)
     exits: list[tuple[int, int]] = []
     for match in re.finditer(r"\{(-?\d+),(-?\d+),(\d+)(?:,\d+,\d+)?\}", text[start:end]):
@@ -89,11 +92,14 @@ def bfs(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--header", default="build/doom_map_generated.h", help="Generated map header to inspect")
+    parser.add_argument("--source", help="Generated map source to inspect when large arrays are emitted out-of-line")
     parser.add_argument("--label", help="Label to print in route results")
     args = parser.parse_args()
 
     header = Path(args.header)
     text = header.read_text(encoding="ascii")
+    if args.source:
+        text += "\n" + Path(args.source).read_text(encoding="ascii")
     label = args.label or parse_define_string(text, "DOOM_MAP_NAME")
     grid = parse_grid(text, "g_map")
     start = (int(parse_define_number(text, "DOOM_START_X")), int(parse_define_number(text, "DOOM_START_Y")))

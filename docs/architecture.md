@@ -26,7 +26,9 @@ and emits generated C headers/sources under `build/`:
 - Per-cell wall texture class and texture phase.
 - Compact visual render-line rows derived from solid Doom linedefs plus selected
   two-sided lower, upper, and mid-texture linedefs, stored in generated map
-  coordinates and one-span metadata for runtime hit refinement.
+  coordinates with span kind, height, texture, and side-ownership metadata for
+  runtime hit refinement. A single Doom linedef can emit both lower and upper
+  visual spans when both adjacent sector floors and ceilings differ.
 - Per-cell render-line index tables, generated from the same raster cells as
   the collision grid. On E1M1 this reduces wall-hit refinement from scanning
   hundreds of render lines per column to checking only local cell candidates.
@@ -34,8 +36,9 @@ and emits generated C headers/sources under `build/`:
   the generated Episode/map destination so normal and secret exits can diverge
   without runtime WAD parsing.
 - Damage and secret bit grids.
-- Per-cell sector floor visual class and light band, derived from sector flat
-  names, specials, and light levels for low-cost runtime palette cues.
+- Per-cell sector floor visual class, light band, floor height, and ceiling
+  height, derived from sector flat names, specials, light levels, and sector
+  heights for low-cost runtime palette cues and sprite floor seating.
 - Runtime thing list with supported Doom thing types.
 - Runtime thing class/info bytes for monster, threat, pickup, corpse,
   shootable, and render predicates, so the 68000 can test generated metadata
@@ -47,8 +50,50 @@ and emits generated C headers/sources under `build/`:
   WAD-to-grid coordinate conversion on the 68000. `make bsp-asset-check`
   verifies the generated counts, bounds, partition vectors, and child indices
   for the selected map.
+- Centered WAD-to-grid bounds. The default conversion is `48x36`, and generated
+  starts/things preserve sub-cell WAD positions where possible instead of
+  drifting to one anchored corner of the converted grid.
+- Scale-aware map simplification. The normal build now halves the older
+  `96x72` grid to a `48x36` runtime map and uses
+  `DOOM_MAP_DETAIL_CULL=0.5`, opens isolated coarse-grid wall specks, and
+  prunes short dead-end wall tails. This reduces the collision, floor, light,
+  secret, lift, and damage grids by 75% while keeping strict Episode 1 route
+  coverage with the shareware WAD. The lower default cull is deliberate: the
+  E1M1 start room depends on short solid linedefs for its columns and framed
+  window, and dropping those lines makes the first view collapse into an
+  over-open courtyard. Visual WAD-line metadata is generated with the separate
+  `DOOM_RENDER_DETAIL_CULL=1.5` default, so the runtime can still draw larger
+  Doom room-edge and pillar cues without keeping every minor line as a blocking
+  collision cell. `DOOM_MAP_DETAIL_CULL`,
+  `DOOM_RENDER_DETAIL_CULL`, and `DOOM_MAP_READABILITY_CLEANUP` can be
+  overridden for exact-conversion or higher-resolution experiments.
+- Simple/chunk-shaped renderer baseline. `DOOM_SIMPLE_MAP=1` keeps the
+  NGRayEx-style active `16x16` map and pure grid DDA columns, while Doom
+  sprites, weapons, HUD, and baked floor/ceiling assets still come from the
+  normal offline asset path. The active page can be authored or loaded from
+  compact WAD-derived chunk data around the player instead of scaling the whole
+  WAD map into one large runtime grid.
+- `tools/doom_chunk_convert.py` is the first build-time version of that chunk
+  pass. It defaults to 64 Doom units per cell, emits `16x16` chunk pages with
+  wall, texture-class, floor visual, damage, light, floor/ceiling height, and
+  chunk-local thing metadata, and writes an ASCII preview for inspection. The
+  runtime streams one generated page at a time into the existing simple-map
+  renderer.
+- Doom-like two-sided opening tests. Small floor deltas stay passable, but
+  openings lower than player height or taller than the configured step height
+  remain blocking, which keeps high ledges/platform sides from becoming holes.
+- Runtime thing placement has a narrow coarse-grid repair pass. When a
+  supported thing cell has no cardinal open neighbor, the converter can open a
+  single adjacent blocked cell that already touches open floor. This prevents
+  isolated thing pockets caused by low-resolution line rasterization while
+  preserving the surrounding map shape.
 
 The ROM does not load a WAD at runtime.
+
+Normal builds emit map declarations in `doom_map_generated.h` and the large
+tables in `doom_map_generated.c`. Focused tools can still emit inline arrays
+when no map source path is requested, but the Makefile path uses the split
+source so large arrays are not duplicated across translation units.
 
 The keycard verification ROM is built through recursive Make targets with
 `DOOM_MAP=E1M2`, `BUILDDIR=build/key-test`, and `ROM=build/key-test-rom`,
@@ -66,8 +111,9 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   each offline tile now preserves the horizontal source band for that phase
   instead of flattening it to one repeated texel column.
 - The graphics converter follows the same `DOOM_DETAIL` tier as the C build:
-  clarity mode emits 32-phase wall/door atlases and a four-direction plane
-  cache, while balanced/quality/speed keep the 16-phase wall atlases and
+  the quality default and clarity mode emit 32-phase wall/door atlases for
+  close-wall readability, while balanced/speed keep the 16-phase wall atlases.
+  Clarity also uses a four-direction plane cache; the other tiers keep the
   16-direction plane cache. The runtime defaults to the cached perspective plane
   upload path; `DOOM_FLAT_PLANES=1` enables static solid planes for debugging.
 - Doom flats are sampled into tile banks and perspective plane caches at build
@@ -76,9 +122,11 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   than raw map X/Y, which keeps the cached floor/ceiling bank inside the
   hardware-safe tile range while avoiding runtime floor casting. The player cell
   and a few wall-stopped forward view samples choose a representative visible
-  sector class, so hazards/liquids can read before contact. Liquid classes add a
-  slow palette pulse over the same floor gradients instead of animating flat
-  pixels.
+  sector class, so nearby hazards/liquids can read before contact. The preview
+  distance is capped because the Neo Geo floor is a whole-row palette cue; a
+  distant sector should not recolor the entire current room through a coarse
+  opening. Liquid classes add a slow palette pulse over the same floor gradients
+  instead of animating flat pixels.
 - The floor/ceiling path intentionally follows the same performance trade seen
   in the Super FX Doom source: spend active runtime budget on wall visibility and
   control response, while floors remain a cheap solid/palette/pre-baked cue
@@ -120,18 +168,24 @@ current runtime accepts several compromises:
   of true multiple clipped subsector spans. Small open-cell spans are allowed to
   pass through so openings can show the farther space, but the renderer still
   cannot draw a near lower/upper span and a far wall in the same column.
+  Converted lower/upper spans are capped before they reach the runtime, and a
+  span must project as a large visible strip before it replaces the farther
+  wall column. The ray keeps walking to a solid wall first, which avoids cases
+  where a small sector-height cue hides the real room boundary.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The default balanced runtime uses a 32-column wall pass with nine visible
+  The default quality runtime uses a 40-column wall pass with seven visible
   world things so walls, backdrop, weapon, and HUD stay inside the practical
-  96-sprites-per-scanline limit. `DOOM_DETAIL=quality` and `DOOM_DETAIL=clarity`
-  keep heavier visual comparison paths, while `speed` spends fewer sprites on
-  walls and more on visible world things.
+  96-sprites-per-scanline limit. `DOOM_DETAIL=balanced` and `DOOM_DETAIL=speed`
+  spend fewer sprites on walls and more on visible world things, while
+  `DOOM_DETAIL=clarity` is the heavier wall-readability comparison tier.
 - Runtime wall projection still uses one sprite strip per wall column. In the
   balanced/speed tiers, solid grid-cell hits use the rasterized map wall
   directly and skip solid-line refinement; open-cell WAD render-line spans stay
   enabled for windows, lower walls, upper walls, and doors. The quality/clarity
   tiers keep solid-line refinement for closer native-Doom still comparisons.
+  Refined solid-line hits also carry the front sector height, so low rooms such
+  as the E1M1 start do not render every wall column as a full 128-unit slab.
 - The converter now emits grid/q8 BSP node and vertex arrays beside the raw WAD
   geometry, but the active renderer has not yet switched to front-to-back
   visible-seg ownership. That is the next step toward replacing first-grid-wall
@@ -140,10 +194,10 @@ current runtime accepts several compromises:
 - Wall strip geometry updates every dirty frame, but texture/palette SCB1
   rewrites are budgeted by `WALL_TILE_UPLOAD_COLUMNS_PER_FRAME`. This keeps
   controller response and wall height motion from stalling behind a full
-  15-tile rewrite of every wall column while turning. Balanced mode refreshes
-  all 32 wall columns during normal movement, so texture changes settle in the
-  same frame as wall geometry in the common case; the overrun path clamps the
-  budget back down when `wait_vblank_status()` reports late frames.
+  15-tile rewrite of every wall column while turning. The quality default now
+  accepts a bounded texture-settle delay in exchange for 40 wall columns and
+  32-phase wall atlases; the overrun path clamps the budget back down when
+  `wait_vblank_status()` reports late frames.
 - Wall depth shading uses 11 bands per side. With the primary wall, door, and
   seven alternate wall texture palettes, this keeps every wall-depth palette
   below Neo Geo palette index 256. Higher band counts overflow palette RAM and

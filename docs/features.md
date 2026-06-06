@@ -10,13 +10,45 @@ readable.
   `SIDEDEFS`, `VERTEXES`, `SECTORS`, `SEGS`, `SSECTORS`, `NODES`, `REJECT`, and
   `BLOCKMAP`.
 - Emits a compact runtime grid plus texture class, texture phase, damaging
-  sector, secret sector, door, exit, and thing data.
+  sector, secret sector, floor/ceiling height, door, exit, and thing data.
 - Keeps richer generated map arrays for future work, but the runtime path uses
   Neo Geo-friendly fixed-size structures instead of a generic WAD directory.
 - Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
-  `DOOM_MAP_HEIGHT`, and `DOOM_SKILL_MASK` at build time. The default skill
-  mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
-  or `2` for medium placement.
+  `DOOM_MAP_HEIGHT`, `DOOM_MAP_DETAIL_CULL`, `DOOM_RENDER_DETAIL_CULL`,
+  `DOOM_MAP_READABILITY_CLEANUP`, and `DOOM_SKILL_MASK` at build time. The
+  default skill mask is `4`, matching hard/Ultra-Violence THING placement; use
+  `1` for easy or `2` for medium placement. The default grid remains centered
+  but is now `48x36`, deliberately cutting the runtime map area to one quarter
+  of the earlier `96x72` conversion. The default map pass uses
+  `DOOM_MAP_DETAIL_CULL=0.5`: low enough to keep short architectural lines such
+  as E1M1's start-room columns and window frame, but still scale-aware so very
+  tiny solid-line noise can be removed before it becomes false full-height
+  obstacles in the sprite-strip raycaster. Generated visual lines use the separate
+  `DOOM_RENDER_DETAIL_CULL=1.5` default, preserving larger room-edge and pillar
+  cues without requiring those lines to stay as blocking collision cells. The
+  defaults were chosen from strict Episode 1 route checks and E1M1 converter
+  metrics; higher-resolution builds can still override the map size for
+  comparison work.
+- `DOOM_SIMPLE_MAP=1` switches to the simplified NGRayEx-style runtime shape:
+  an active `16x16` map, 80 wall columns, full-height grid DDA walls, no
+  generated WAD render-line refinement, and full-screen baked floor/ceiling
+  plane tiles. The active page can be authored or loaded from WAD-derived
+  `16x16` chunks while HUD/assets/thing metadata continue to come from the
+  offline conversion path.
+- `make chunk-map` runs `tools/doom_chunk_convert.py`, which converts the WAD
+  map at a fixed cell scale and emits generated `16x16` chunk pages plus
+  `doom_chunks_preview.txt`. The default chunk scale is 64 Doom units per cell:
+  E1M1 becomes a 5x3 set of pages, but the Neo Geo runtime still loads only one
+  `16x16` page into the original NGRayEx-style 80-column renderer. `make
+  chunk-route-check` verifies the generated chunk start-to-exit route, treating
+  generated doors and lift cells as interactive pass-through cells, and `make
+  chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
+- In simple-map play, pickups are given a foreground/readability bias and a
+  larger minimum projected size so ammo, armor, health, and weapons remain
+  visible among monsters and barrels.
+- Generated map tables are split into `doom_map_generated.h` and
+  `doom_map_generated.c` for Makefile builds so large arrays are compiled once
+  instead of duplicated by every file that includes the generated header.
 - The generated header exposes the current map code and Episode 1 next-map
   metadata. Exit records also carry a compact destination derived from the Doom
   line special, so E1M3's secret exit can report E1M9 while the normal exit
@@ -28,14 +60,24 @@ readable.
   converter moves the pickup into the nearest open cell but clamps it toward
   the original point instead of snapping it to the cell center. This keeps E1M2
   key/weapon placements closer to native Doom while staying collectible.
+- Supported runtime things can also reopen their own coarse cell when the cell
+  was only closed by rasterization overlap. This preserves original player and
+  thing placement without punching general-purpose holes through high ledges.
+- If a supported runtime thing lands in a sealed coarse-grid pocket, the
+  converter opens one adjacent escape cell that already borders open floor.
+  This keeps monsters/pickups from being stranded by the lower-resolution map
+  without broadly erasing nearby walls.
+- Two-sided lines are passable only when their vertical opening fits Doom's
+  player height and their floor delta is within the configured step height.
+  Small stairs remain walkable; tall platforms and ledges stay blocking.
 
 ## Rendering
 
-- The default `DOOM_DETAIL=balanced` renderer uses 32 wall-column sprites over
-  the 320-pixel playfield, giving 10-pixel logical columns backed by 16-pixel
-  Neo Geo strips. This is the playable-response mode for normal builds;
-  `DOOM_DETAIL=quality` and the heavier 64-column `clarity` tier remain
-  available for visual comparison.
+- The default `DOOM_DETAIL=quality` renderer uses 40 wall-column sprites over
+  the 320-pixel playfield, giving 8-pixel logical columns backed by 16-pixel
+  Neo Geo strips. This is the normal readable-navigation mode; `balanced` and
+  `speed` remain lower-cost stress tiers, while the heavier 64-column
+  `clarity` tier remains available for visual comparison.
 - Each frame casts fixed-point DDA rays, computes projected wall height, refines
   visual hits against compact WAD-derived render lines indexed by the hit cell,
   and writes Neo Geo sprite shrink/position data.
@@ -47,31 +89,43 @@ readable.
   checks only the compact line candidates indexed by the traversed/hit cell
   instead of scanning the whole render-line table for every wall column.
 - In balanced/speed tiers, solid grid-cell hits skip the extra solid-line
-  refinement pass. Open-cell portal/lower/upper span hits still run, so visible
-  sector transitions keep their Doom-like cues without paying the full
-  per-column line-intersection cost on every solid wall.
+  refinement pass. The default quality tier keeps solid-line refinement for
+  better close-wall phase/orientation readability. Open-cell portal/lower/upper
+  span hits still run, so visible sector transitions keep their Doom-like cues
+  without paying the full per-column line-intersection cost on every solid wall
+  in the stress tiers.
 - In addition to solid linedefs, the converter now emits selected two-sided
-  lower, upper, and mid-texture visual lines. The runtime can draw one
-  top- or bottom-aligned partial wall span per column when that span projects
-  large enough to be readable. Small open-cell spans no longer stop the ray, so
-  window/opening views prefer the farther room or wall instead of collapsing
-  into dark horizontal fences. Nearby larger spans still occlude as ledge/step
-  cues.
+  lower, upper, and mid-texture visual lines. Lower/upper spans are side-owned
+  from the WAD sidedef that should see them, so a stair lip or upper window cap
+  is not considered from the opposite sector. A single Doom linedef can now emit
+  both lower and upper visual spans when adjacent floor and ceiling heights both
+  differ. The runtime can draw one top- or bottom-aligned partial wall span per
+  column when that span projects large enough to be readable. Open-cell spans
+  are collected while the ray keeps walking to the farther solid wall, then the
+  span replaces the wall column only when its projected height is large enough
+  to carry the view. This keeps window/opening views from collapsing into dark
+  horizontal fences while still showing nearby ledge/step cues. Converted
+  lower/upper spans are capped so large Doom sector-height deltas do not become
+  fake full-height walls in the one-span-per-column approximation.
+- Generated lower/upper span metadata uses WAD texture fallbacks when a sidedef
+  omits the explicit upper/lower texture, so sector-height transitions still
+  get a visible cue in the sprite-strip renderer.
 - The renderer caches each column's ray vector, DDA reciprocal deltas, and step
   signs for the current angle/FOV, rebuilding that cache only when the view
   direction changes. Movement-only frames reuse those values before running
   DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
   column.
-- The default renderer now leaves more active playfield sprite headroom for
-  world things: 20 backdrop strips, 32 wall columns, nine 4-strip world things,
-  and seven weapon strips fit inside the first 95 active sprites. Alternate
-  build tiers are available for different tradeoffs: `DOOM_DETAIL=clarity` uses
-  64 wall columns and one world thing, `balanced` uses 32 columns and nine
-  things, and `speed` uses 20 columns and eleven things.
+- The default renderer spends more active playfield sprites on walls: 20
+  backdrop strips, 40 wall columns, seven 4-strip world things, and seven weapon
+  strips fit inside the first 95 active sprites. Alternate build tiers are
+  available for different tradeoffs: `DOOM_DETAIL=clarity` uses 64 wall columns
+  and one visible world thing, `balanced` uses 32 columns and nine things, and
+  `speed` uses 20 columns and eleven things.
 - Wall textures are precomposed offline from Doom wall patches into Neo Geo
-  tile strips. In clarity mode the wall, alternate-wall, and door atlases use
-  32 texture-phase columns for closer-range readability; the other detail tiers
-  keep the older 16-column atlases. The current preferred wall texture is
+  tile strips. In the quality default and clarity mode, the wall,
+  alternate-wall, and door atlases use 32 texture-phase columns for closer-range
+  readability; the lower-cost balanced/speed tiers keep the older 16-column
+  atlases. The current preferred wall texture is
   `STARTAN3`, with alternate atlases for common E1M1 walls and `BIGDOOR2`
   doors.
 - Each baked wall strip samples the narrow source texture band represented by
@@ -84,21 +138,32 @@ readable.
   columns incrementally so strafing moves the planes while keeping the tile bank
   inside the hardware-safe range. `DOOM_FLAT_PLANES=1` switches back to static
   solid planes for debugging.
+- Sector floor/liquid preview is deliberately local. The current floor is a
+  whole-row Neo Geo backdrop palette, so distant hazards no longer recolor the
+  whole room through coarse-grid openings before the player reaches them.
+- Wall projection is intentionally a little taller than the original NGRayEx
+  baseline. `DOOM_WALL_PROJECTION_NUM` / `DOOM_WALL_PROJECTION_DEN` tune the
+  projection constant at compile time, keeping more of the view occupied by
+  walls and less by the approximate floor/ceiling backdrop without changing the
+  sprite-strip architecture.
 - The converter also emits a compact per-cell sector floor visual class and
   light band derived from `SECTORS` floor flat names, specials, and light
   levels. The runtime uses those generated cells to tint floor/ceiling palettes
   when the player enters water-like, damaging nukage/slime/lava, blood, or
   darker/brighter sectors. This keeps sector identity visible without runtime
   WAD parsing or extra floor-casting work.
-- The floor palette selector also samples a few wall-stopped view rays ahead of
-  the player and lets visible higher-priority sector classes bias the active
-  flat-plane tint. Nukage, slime, lava, blood, and water therefore read with a
-  restrained preview tint before the player steps into them, while the renderer
-  still avoids runtime floor casting.
+- The floor palette selector samples a few wall-stopped view rays plus a small
+  forward cone ahead of the player, then lets visible higher-priority sector
+  classes bias the active flat-plane tint. Preview sectors tint the far floor
+  gradient rows first, keeping the near floor neutral while making nukage,
+  slime, lava, blood, and water readable before contact, including E1M1's
+  start-window hazard view. Cone candidates must have a coarse visible path
+  from the player before they can bias the palette; the scan is palette-only
+  and does not change collision or ray hits.
 - Sector floor/ceiling palette preview sampling is cached by coarse player
   position and view vector. Straight movement inside the same coarse pose
-  bucket skips the three forward preview rays, while liquid pulse sectors still
-  advance their low-cost palette phase.
+  bucket skips the forward ray/cone preview work, while liquid pulse sectors
+  still advance their low-cost palette phase.
 - Water, blood, and hazardous liquid classes also apply a slow four-phase
   palette pulse to the already-baked floor gradients. This is a low-cost
   substitute for Doom's animated flats that keeps liquid sectors visibly active
@@ -218,6 +283,14 @@ readable.
 - Converted pickups keep sub-cell placement after coarse-grid correction, so
   keys and weapons no longer drift as far from their original WAD locations when
   a nearby wall line occupies the raw grid cell.
+- Visible world sprites are seated against the generated floor height for their
+  current cell instead of always assuming the player's floor. Pickups, monsters,
+  corpses, drops, projectiles, and impacts therefore align better in sectors
+  with raised/lowered floors.
+- Pickup sprites receive a small runtime lift so floor items remain visible in
+  the wall-heavy sprite-strip view. The focused powerup smoke uses robust
+  visible pickup sprites for the screenshot oracle; special powerup sprites are
+  still a known readability gap.
 - Visible thing selection uses one priority-ranked projection pass for
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
@@ -330,6 +403,12 @@ readable.
 - `make route-check` statically verifies the generated E1M1 start-to-exit
   route against `build/doom_map_generated.h`, including whether completion
   depends on generated door cells.
+- `make chunk-route-check` statically verifies the generated `16x16` chunk map
+  route against `build/doom_chunks_generated.h` and
+  `build/doom_chunks_generated.c`. If the exact WAD player start falls on a
+  coarse-grid wall, chunk conversion moves it to the nearest open cell and
+  opens the minimum number of coarse wall cells needed to preserve a playable
+  start-to-exit route.
 - `make episode-route-report` converts shareware `E1M1` through `E1M9` into
   isolated generated headers and reports whether each map has a coarse-grid
   start-to-exit route. `make episode-route-check` runs the same pass in strict
@@ -381,8 +460,18 @@ readable.
   engines with the same timed input script from the map spawn by default, with
   native Doom holding its speed modifier during forward movement.
   `COMPARE_NATIVE_MOVE_MODIFIER=` disables that speed modifier, and
+  `COMPARE_NATIVE_ROUTE_*` / `COMPARE_NEO_ROUTE_*` can override individual
+  route timings when matching exact views for visual investigation.
   `COMPARE_ROUTE_MODE=focused` keeps the older focused Neo Geo verification ROM
   visual registers when that is the useful evidence.
+- Smoke and comparison captures default to workspace 4 and targeted X11 key
+  events so they do not steal focus while the user is working. Direct i3/sway
+  tiling remains opt-in (`SMOKE_TILE_WINDOWS=1` or
+  `COMPARISON_TILE_WINDOWS=1`) because `ngdevkit-gngeo` currently crashes when
+  the window manager resizes it out of floating mode.
+- `tools/inspect_map_specials.py --map E1M2` audits linedef and sector specials
+  from the same WAD conversion path. It makes unsupported Doom mechanics such
+  as lifts/platforms visible before they are mistaken for only renderer bugs.
 - The wall atlas keeps seven alternate texture banks but now spends two of
   those banks on high-coverage Episode 1 textures (`SLADWALL` and `COMPTALL`)
   instead of lower-impact slots. The converter maps related stone, tech,
@@ -590,16 +679,15 @@ readable.
   `NN` is the number of frames in the latest 64-frame window that reached
   `wait_vblank_status()` after vblank had already started. The checker rejects
   captures where the register is missing.
-- The default balanced wall-strip upload budget refreshes all 32 wall columns
-  on normal movement frames, so texture/palette changes settle with geometry
-  instead of smearing across later frames. The overrun budget still backs off
-  when a frame reaches vblank late, and `DOOM_WALL_UPLOAD_COLUMNS` /
-  `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS` let movement benches test alternate
-  budgets without hand-editing `CFLAGS`.
+- The default quality wall-strip upload budget refreshes a bounded slice of the
+  40 wall columns each frame, so texture/palette changes do not monopolize
+  vblank. The overrun budget backs off when a frame reaches vblank late, and
+  `DOOM_WALL_UPLOAD_COLUMNS` / `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS` let movement
+  benches test alternate budgets without hand-editing `CFLAGS`.
 - Balanced movement frames skip portal-span refinement and tighten near-line
-  refinement to a smaller radius, so held input spends less CPU time on
-  WAD-line intersection scans. Standing frames keep the richer portal-span pass
-  for visual recovery.
+  refinement to a smaller radius, so held input spends less CPU time on WAD-line
+  intersection scans in the lower-cost stress tier. The quality default keeps
+  the richer solid-line path for readable close walls.
 - The cached floor/ceiling updater refreshes 10 of its 20 backdrop columns per
   normal frame and four after a late frame, so turn/strafe plane changes settle
   quickly without runtime floor casting. `DOOM_BG_SCROLL_COLUMNS` and
@@ -608,20 +696,32 @@ readable.
 - Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
   to both the build and GnGeo run targets. This lets the same stress path test
   isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
-  ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`; custom
-  ROM directories receive the local `neogeo.zip` BIOS package automatically.
+  ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`;
+  GnGeo still receives BIOS data through its configured `--datafile` path.
 - Balanced rendering keeps the cheaper coarse wall path for distant solid walls
-  but refines nearby solid hits against the converted WAD line metadata. This
-  improves close wall texture phase/orientation readability without returning
-  the default ROM to the full-column refinement cost of the comparison tiers.
+  but refines nearby solid hits against the converted WAD line metadata. The
+  quality default goes further and enables solid-line refinement across the wall
+  pass because navigation readability is the current bottleneck.
+- Quality and clarity tiers also allow generated solid WAD lines to act as
+  visual-only occluders while rays cross open coarse cells. This lets the
+  default simplified collision grid stay playable while still drawing larger
+  Doom pillars and room edges from the offline render-line table.
 - Balanced mode tightens that near-line refinement radius while the player is
   actively moving and skips portal-span refinement on those moving frames.
   Standing frames restore the portal-span pass, and after a late frame the same
-  reduced work is kept for one recovery frame. The quality/clarity tiers keep
-  solid-line refinement for closer native-Doom still comparisons.
+  reduced work is kept for one recovery frame. The default quality tier and
+  clarity tier keep solid-line refinement for closer native-Doom still
+  comparisons.
 - Portal-span refinement now filters candidates to generated lower/upper span
   lines only, so a nearer solid render line in the same cell cannot hide a
-  farther two-sided floor or ceiling transition.
+  farther two-sided floor or ceiling transition. The ray also preserves the
+  far-wall hit before deciding whether a portal span is visually dominant enough
+  to replace that column.
+- Solid WAD render lines now keep their front-sector height in the generated
+  render metadata. Quality/clarity solid-line refinement uses that height to
+  shrink low-room walls instead of projecting every one-sided wall as a full
+  128-unit column, improving the E1M1 start-room read without changing collision
+  or door cells.
 - `DOOM_ADAPTIVE_LINE_REFINEMENT`,
   `DOOM_MOVING_LINE_REFINEMENT_CELLS`, `DOOM_MOVING_SPAN_REFINEMENT`, and
   `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` can be passed through `SMOKE_MAKE_ARGS`

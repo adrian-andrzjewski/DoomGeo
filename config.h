@@ -17,7 +17,7 @@
  * budget on walls first because navigation readability is the main bottleneck.
  */
 #if !defined(DOOM_DETAIL_CLARITY) && !defined(DOOM_DETAIL_QUALITY) && !defined(DOOM_DETAIL_BALANCED) && !defined(DOOM_DETAIL_SPEED)
-#define DOOM_DETAIL_BALANCED 1
+#define DOOM_DETAIL_QUALITY 1
 #endif
 
 #if defined(DOOM_DETAIL_CLARITY) && (defined(DOOM_DETAIL_QUALITY) || defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
@@ -30,7 +30,9 @@
 #error "Select exactly one Doom detail tier"
 #endif
 
-#if defined(DOOM_DETAIL_CLARITY)
+#if DOOM_SIMPLE_MAP
+#define NUM_COLS 80                 /* original NGRayEx: 4px wall strips */
+#elif defined(DOOM_DETAIL_CLARITY)
 #define NUM_COLS 64                 /* 5px wall strips: readable navigation */
 #elif defined(DOOM_DETAIL_BALANCED)
 #define NUM_COLS 32                 /* 10px wall strips: frees eight sprites */
@@ -50,18 +52,35 @@
 #define BG_SPLIT  (BG_WIN / 2)
 
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
-#define WALLH    ((GAME_H * 3) / 2) /* projection scale: wall height @ dist 1 */
+#if DOOM_SIMPLE_MAP
+#define WALLH    SCRH               /* original NGRayEx projection scale */
+#define MAX_H    SCRH               /* original NGRayEx full-height clamp */
+#else
+#ifndef DOOM_WALL_PROJECTION_NUM
+#define DOOM_WALL_PROJECTION_NUM 2  /* taller walls reduce floor-dominated views */
+#endif
+#ifndef DOOM_WALL_PROJECTION_DEN
+#define DOOM_WALL_PROJECTION_DEN 1
+#endif
+#define WALLH    ((GAME_H * DOOM_WALL_PROJECTION_NUM) / DOOM_WALL_PROJECTION_DEN)
 #define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
+#endif
+#if DOOM_SIMPLE_MAP
+#define DOOM_RENDER_LINES 0         /* pure NGRayEx-style grid DDA */
+#else
 #define DOOM_RENDER_LINES 1         /* visual ray hits use WAD-derived lines  */
+#endif
 #ifndef DOOM_SOLID_LINE_REFINEMENT
-#if defined(DOOM_DETAIL_CLARITY) || defined(DOOM_DETAIL_QUALITY)
+#if DOOM_SIMPLE_MAP
+#define DOOM_SOLID_LINE_REFINEMENT 0
+#elif defined(DOOM_DETAIL_CLARITY) || defined(DOOM_DETAIL_QUALITY)
 #define DOOM_SOLID_LINE_REFINEMENT 1
 #else
 #define DOOM_SOLID_LINE_REFINEMENT 0
 #endif
 #endif
 #ifndef DOOM_NEAR_LINE_REFINEMENT
-#if defined(DOOM_DETAIL_SPEED)
+#if DOOM_SIMPLE_MAP || defined(DOOM_DETAIL_SPEED)
 #define DOOM_NEAR_LINE_REFINEMENT 0
 #else
 #define DOOM_NEAR_LINE_REFINEMENT 1
@@ -69,7 +88,9 @@
 #endif
 #define DOOM_NEAR_LINE_REFINEMENT_CELLS 5
 #ifndef DOOM_ADAPTIVE_LINE_REFINEMENT
-#if defined(DOOM_DETAIL_BALANCED)
+#if DOOM_SIMPLE_MAP
+#define DOOM_ADAPTIVE_LINE_REFINEMENT 0
+#elif defined(DOOM_DETAIL_BALANCED)
 #define DOOM_ADAPTIVE_LINE_REFINEMENT 1
 #else
 #define DOOM_ADAPTIVE_LINE_REFINEMENT 0
@@ -85,8 +106,24 @@
 #define DOOM_MOVING_SPAN_REFINEMENT 1
 #endif
 #endif
+#ifndef DOOM_VISUAL_SOLID_LINE_OCCLUSION
+#if DOOM_SIMPLE_MAP
+#define DOOM_VISUAL_SOLID_LINE_OCCLUSION 0
+#elif defined(DOOM_DETAIL_CLARITY) || defined(DOOM_DETAIL_QUALITY)
+#define DOOM_VISUAL_SOLID_LINE_OCCLUSION 1
+#else
+#define DOOM_VISUAL_SOLID_LINE_OCCLUSION 0
+#endif
+#endif
 #ifndef DOOM_OVERRUN_LINE_REFINEMENT_CELLS
 #define DOOM_OVERRUN_LINE_REFINEMENT_CELLS 2
+#endif
+
+/* Floor/ceiling tiles are whole-row Neo Geo backdrop sprites, not Doom's
+ * per-pixel visplanes. Keep sector preview local so a distant hazard sector
+ * cannot recolor the entire current room through coarse-map openings. */
+#ifndef DOOM_SECTOR_PREVIEW_MAX_Q8
+#define DOOM_SECTOR_PREVIEW_MAX_Q8 896
 #endif
 
 #ifndef WALL_TILE_UPLOAD_COLUMNS_PER_FRAME
@@ -125,15 +162,21 @@
  */
 #define BG_BASE   1                
 #define BG_COUNT  (SCRW / 16)       
+#if DOOM_SIMPLE_MAP
+#define BG_WIN    14                /* original NGRayEx full-screen backdrop */
+#else
 #define BG_WIN    (GAME_H / 16)     
+#endif
 #define WALL_BASE (BG_BASE + BG_COUNT)   
 /*
  * Runtime sprite budget on active playfield scanlines depends on DOOM_DETAIL.
- * The default clarity tier uses 20 backdrop + 64 wall columns + 4 thing strips
+ * The default quality tier uses 20 backdrop + 40 wall columns + 28 thing strips
  * + 7 weapon strips = 95. Neo Geo evaluates 96 sprites per scanline, so every
  * tier keeps the weapon in front while staying inside the practical budget.
  */
-#if defined(DOOM_DETAIL_CLARITY)
+#if DOOM_SIMPLE_MAP
+#define ENEMY_VISIBLE_COUNT 8       /* 3 monsters + barrel + 4 pickups before HUD palettes */
+#elif defined(DOOM_DETAIL_CLARITY)
 #define ENEMY_VISIBLE_COUNT 1       /* 20 backdrop + 64 walls + 4 thing + 7 weapon = 95 */
 #elif defined(DOOM_DETAIL_BALANCED)
 #define ENEMY_VISIBLE_COUNT 9
@@ -154,10 +197,10 @@
 #define WEAPON_Y_OFFSET 0
 #define DOOM_PLAYFIELD_SPRITE_COUNT (BG_COUNT + NUM_COLS + ENEMY_COUNT + WEAPON_COUNT)
 #define DOOM_PLAYFIELD_SCANLINE_LIMIT 95
-#if DOOM_PLAYFIELD_SPRITE_COUNT > DOOM_PLAYFIELD_SCANLINE_LIMIT
+#if !DOOM_SIMPLE_MAP && DOOM_PLAYFIELD_SPRITE_COUNT > DOOM_PLAYFIELD_SCANLINE_LIMIT
 #error "Active playfield sprites exceed the Neo Geo scanline budget"
 #endif
-#if (WEAPON_BASE + WEAPON_COUNT - 1) > DOOM_PLAYFIELD_SCANLINE_LIMIT
+#if !DOOM_SIMPLE_MAP && (WEAPON_BASE + WEAPON_COUNT - 1) > DOOM_PLAYFIELD_SCANLINE_LIMIT
 #error "Weapon sprites must stay inside the first 95 active playfield sprites"
 #endif
 
@@ -173,6 +216,12 @@
 #define HUD_COUNTER_SHADOW_COUNT 24
 #define HUD_COUNTER_BASE (HUD_COUNTER_SHADOW_BASE + HUD_COUNTER_SHADOW_COUNT)
 #define HUD_COUNTER_COUNT 24
+#define FLASH_OVERLAY_BASE 280
+#define FLASH_OVERLAY_COUNT (SCRW / 16)
+#define FLASH_OVERLAY_WIN (GAME_H / 16)
+#if (FLASH_OVERLAY_BASE + FLASH_OVERLAY_COUNT) > HUD_VALUE_BASE
+#error "flash overlay sprites overlap HUD value sprites"
+#endif
 #define SPR_TOTAL 381               
 
 /* ---- C-ROM tile numbers (see tools/gen_gfx.py) ----------------------- */
@@ -180,7 +229,9 @@
 #define TILE_BRICK 1                /* mipmapped Doom wall texture tile      */
 #define TILE_SOLID 2                /* all pixels = palette index 1          */
 #define TILE_WALL_ATLAS_BASE 3
-#if defined(DOOM_DETAIL_CLARITY)
+#if DOOM_SIMPLE_MAP
+#define TILE_WALL_ATLAS_COLS 32     /* match generated quality wall atlas */
+#elif defined(DOOM_DETAIL_CLARITY) || defined(DOOM_DETAIL_QUALITY)
 #define TILE_WALL_ATLAS_COLS 32     /* denser texture phase sampling for close walls */
 #else
 #define TILE_WALL_ATLAS_COLS 16
@@ -239,7 +290,9 @@
 #define TILE_TITLEPIC_COLS 20
 #define TILE_TITLEPIC_ROWS 13
 #define TILE_TITLEPIC_TILES (TILE_TITLEPIC_COLS * TILE_TITLEPIC_ROWS)
-#define TILE_SPRITE_CACHE_BASE (TILE_TITLEPIC_BASE + TILE_TITLEPIC_TILES)
+#define TILE_FLASH_CHECKER (TILE_TITLEPIC_BASE + TILE_TITLEPIC_TILES)
+#define TILE_FLASH_CHECKER_COUNT 1
+#define TILE_SPRITE_CACHE_BASE (TILE_FLASH_CHECKER + TILE_FLASH_CHECKER_COUNT)
 
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */
@@ -257,6 +310,7 @@
 #define FIX_AMMO_O 65
 #define FIX_SECRET_S 66             /* S,C for compact secret message        */
 #define FIX_SECRET_C 67
+#define FIX_CHECKER 68              /* sparse flash overlay tile             */
 
  
 #define MAP_FIX_COL 1             
@@ -274,16 +328,27 @@
 #define PAL_FLOOR_GRAD_BASE   56
 #define PAL_DOOR_DEPTH_BASE   62
 #define PAL_WALL_ALT_DEPTH_BASE 90
+#if DOOM_SIMPLE_MAP
+#define PAL_WALL_ALT_DEPTH_STRIDE 1  /* alt walls are not used by original map */
+#else
 #define PAL_WALL_ALT_DEPTH_STRIDE (DEPTH_BANDS * 2)
+#endif
 #define PAL_WEAPON    36
 #define PAL_TITLE     35
 #define PAL_ENEMY_BASE 37
 #define PAL_AMMO_COUNTER_SHADOW 45
 #define PAL_HUD_KEY_BASE 46
 #define PAL_AMMO_COUNTER 49
+#if DOOM_SIMPLE_MAP && (PAL_ENEMY_BASE + ENEMY_VISIBLE_COUNT) > PAL_AMMO_COUNTER_SHADOW
+#error "simple-map enemy palettes overlap HUD ammo/key palettes"
+#endif
 
  
+#if DOOM_SIMPLE_MAP
+#define DEPTH_BANDS    14           /* original NGRayEx depth bands */
+#else
 #define DEPTH_BANDS    11
+#endif
 #define PAL_DEPTH_BASE 8            /* lit + dark depth bands                 */
 #define PAL_LAST_WALL_ALT_DEPTH (PAL_WALL_ALT_DEPTH_BASE + TILE_WALL_ALT_COUNT * PAL_WALL_ALT_DEPTH_STRIDE - 1)
 #if PAL_LAST_WALL_ALT_DEPTH > 255
@@ -291,8 +356,14 @@
 #endif
 
 /* ---- movement feel --------------------------------------------------- */
+#if DOOM_SIMPLE_MAP
+#define MOVE_SPEED 0.12
+#define ROT_COS    0.99452
+#define ROT_SIN    0.10453
+#else
 #define MOVE_SPEED 0.16
 #define ROT_COS    0.99619
 #define ROT_SIN    0.08716
+#endif
 
 #endif /* CONFIG_H */

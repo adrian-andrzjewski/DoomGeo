@@ -23,20 +23,23 @@ def parse_define_number(text: str, name: str) -> float:
 
 
 def parse_grid(text: str, symbol: str) -> list[list[int]]:
-    marker = f"static const unsigned char {symbol}"
-    start = text.find(marker)
-    if start < 0:
+    match = re.search(
+        rf"(?:static\s+)?const\s+unsigned\s+char\s+{re.escape(symbol)}\s*"
+        rf"\[[^\]]+\]\s*\[[^\]]+\]\s*=",
+        text,
+    )
+    if not match:
         raise ValueError(f"missing {symbol}")
-    start = text.index("{", start)
+    start = text.index("{", match.end())
     end = text.index("};", start) + 1
     return ast.literal_eval(text[start:end].replace("{", "[").replace("}", "]"))
 
 
 def parse_exits(text: str) -> list[tuple[int, int]]:
-    marker = "static const NgRuntimeExit g_runtime_exits"
-    start = text.find(marker)
-    if start < 0:
+    match = re.search(r"(?:static\s+)?const\s+NgRuntimeExit\s+g_runtime_exits\s*\[[^\]]+\]\s*=", text)
+    if not match:
         raise ValueError("missing g_runtime_exits")
+    start = text.index("{", match.end())
     end = text.index("};", start)
     exits: list[tuple[int, int]] = []
     for match in re.finditer(r"\{(-?\d+),(-?\d+),(\d+)(?:,\d+,\d+)?\}", text[start:end]):
@@ -46,10 +49,10 @@ def parse_exits(text: str) -> list[tuple[int, int]]:
 
 
 def parse_runtime_thing_types(text: str) -> list[int]:
-    marker = "static const NgRuntimeThing g_runtime_things"
-    start = text.find(marker)
-    if start < 0:
+    match = re.search(r"(?:static\s+)?const\s+NgRuntimeThing\s+g_runtime_things\s*\[[^\]]+\]\s*=", text)
+    if not match:
         raise ValueError("missing g_runtime_things")
+    start = text.index("{", match.end())
     end = text.index("};", start)
     return [int(match.group(3)) for match in re.finditer(r"\{(-?\d+),(-?\d+),(\d+),0x[0-9a-fA-F]+\}", text[start:end])]
 
@@ -90,8 +93,10 @@ def bfs(
     return None
 
 
-def route_status(header: Path, map_name: str) -> tuple[str, str]:
+def route_status(header: Path, source: Path, map_name: str) -> tuple[str, str]:
     text = header.read_text(encoding="ascii")
+    if source.exists():
+        text += "\n" + source.read_text(encoding="ascii")
     grid = parse_grid(text, "g_map")
     start = (int(parse_define_number(text, "DOOM_START_X")), int(parse_define_number(text, "DOOM_START_Y")))
     exits = parse_exits(text)
@@ -121,7 +126,7 @@ def route_status(header: Path, map_name: str) -> tuple[str, str]:
     return "route_open", f"start={start} exit={door_path[-1]} steps={len(door_path) - 1}"
 
 
-def convert_map(args: argparse.Namespace, map_name: str, header: Path) -> None:
+def convert_map(args: argparse.Namespace, map_name: str, header: Path, source: Path) -> None:
     header.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
@@ -137,13 +142,20 @@ def convert_map(args: argparse.Namespace, map_name: str, header: Path) -> None:
             str(args.width),
             "--height",
             str(args.height),
+            "--detail-cull",
+            str(args.detail_cull),
+            "--render-detail-cull",
+            str(args.render_detail_cull),
             "--out",
             str(header),
+            "--map-source",
+            str(source),
             "--assets-header",
             str(header.with_name("doom_assets_generated.h")),
             "--assets-source",
             str(header.with_name("doom_assets_generated.c")),
-        ],
+        ]
+        + (["--readability-cleanup"] if args.readability_cleanup else []),
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -155,8 +167,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--iwad", default=".tools/assets/doom1.wad.zip")
     parser.add_argument("--maps", default=",".join(DEFAULT_MAPS))
-    parser.add_argument("--width", type=int, default=76)
-    parser.add_argument("--height", type=int, default=54)
+    parser.add_argument("--width", type=int, default=96)
+    parser.add_argument("--height", type=int, default=72)
+    parser.add_argument("--detail-cull", type=float, default=6.0)
+    parser.add_argument("--render-detail-cull", type=float, default=2.0)
+    parser.add_argument("--readability-cleanup", action="store_true")
     parser.add_argument("--skill-mask", type=int, default=4)
     parser.add_argument("--build-dir", default="build/episode-route")
     parser.add_argument("--strict", action="store_true", help="Fail if any map does not have a generated route")
@@ -166,9 +181,10 @@ def main() -> int:
     failures = 0
     for map_name in maps:
         header = Path(args.build_dir) / map_name / "doom_map_generated.h"
+        source = header.with_name("doom_map_generated.c")
         try:
-            convert_map(args, map_name, header)
-            status, detail = route_status(header, map_name)
+            convert_map(args, map_name, header, source)
+            status, detail = route_status(header, source, map_name)
         except subprocess.CalledProcessError as exc:
             status = "convert_failed"
             detail = (exc.stdout or "").strip().splitlines()[-1] if exc.stdout else str(exc)

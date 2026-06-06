@@ -5,9 +5,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
+TILE_WINDOWS="${SMOKE_TILE_WINDOWS:-0}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
+BUILD_TARGET="${KEY_DOOR_BUILD_TARGET:-key-door-test-rom}"
+RUN_TARGET="${KEY_DOOR_RUN_TARGET:-key-door-test-gngeo}"
+DIRECT_ROM="${KEY_DOOR_DIRECT_ROM:-}"
+MAKE_ARGS_VALUE="${SMOKE_MAKE_ARGS:-}"
 INITIAL_OUT="${OUT_DIR}/key-door-initial.png"
 MISSING_OUT="${OUT_DIR}/key-door-missing-key.png"
 PICKED_OUT="${OUT_DIR}/key-door-picked-key.png"
@@ -24,11 +29,16 @@ require_cmd() {
 window_for_gngeo() {
     local wid=""
     for _ in $(seq 1 100); do
-        wid="$(DISPLAY="$DISPLAY_VALUE" xdotool search --class ngdevkit-gngeo 2>/dev/null | tail -n 1 || true)"
-        if [ -n "$wid" ] && DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" >/dev/null 2>&1; then
-            echo "$wid"
-            return 0
-        fi
+        for wid in $(DISPLAY="$DISPLAY_VALUE" xdotool search --class ngdevkit-gngeo 2>/dev/null || true) \
+                   $(DISPLAY="$DISPLAY_VALUE" xdotool search --name 'Gngeo' 2>/dev/null || true); do
+            if [ -z "$wid" ] || ! DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" >/dev/null 2>&1; then
+                continue
+            fi
+            if DISPLAY="$DISPLAY_VALUE" xdotool getwindowname "$wid" 2>/dev/null | grep -qi 'Gngeo'; then
+                echo "$wid"
+                return 0
+            fi
+        done
         sleep 0.1
     done
     echo "ngdevkit-gngeo window not found" >&2
@@ -39,23 +49,41 @@ capture_window() {
     local wid="$1"
     local out="$2"
     local xwd_out="${out%.png}.xwd"
-    xwd -silent -id "$wid" -out "$xwd_out"
+    if [ -z "$wid" ] || ! DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" >/dev/null 2>&1; then
+        wid="$(window_for_gngeo)"
+    fi
+    DISPLAY="$DISPLAY_VALUE" xwd -silent -id "$wid" -out "$xwd_out"
     convert "$xwd_out" "$out"
 }
 
+tile_window() {
+    local wid="$1"
+    local floating="enable"
+    if [ "$TILE_WINDOWS" = "1" ]; then
+        floating="disable"
+    fi
+    if [ -n "$WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
+        i3-msg "[id=\"$wid\"] move container to workspace number $WORKSPACE, floating $floating" >/dev/null 2>&1 || true
+    elif [ -n "$WORKSPACE" ] && command -v swaymsg >/dev/null 2>&1; then
+        swaymsg '[class="ngdevkit-gngeo"] move container to workspace number '"$WORKSPACE"', floating '"$floating" >/dev/null 2>&1 || true
+    elif [ -n "$WORKSPACE" ]; then
+        DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
+    fi
+}
+
 press_d() {
-    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown s
+    wid="$(window_for_gngeo)"
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" s
     sleep "${KEY_DOOR_USE_SECS:-0.45}"
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup s
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" s
 }
 
 hold_up() {
     local seconds="$1"
-    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
+    wid="$(window_for_gngeo)"
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" Up
     sleep "$seconds"
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" Up
 }
 
 require_cmd xdotool
@@ -65,19 +93,18 @@ require_cmd convert
 
 mkdir -p "$OUT_DIR"
 
-SMOKE_BUILD_TARGET=key-door-test-rom \
-SMOKE_RUN_TARGET=key-door-test-gngeo \
+SMOKE_BUILD_TARGET="$BUILD_TARGET" \
+SMOKE_RUN_TARGET="$RUN_TARGET" \
+SMOKE_DIRECT_ROM="$DIRECT_ROM" \
 SMOKE_OUTPUT="$INITIAL_OUT" \
 SMOKE_WAIT_SECS="$WAIT_SECS" \
 SMOKE_DISPLAY="$DISPLAY_VALUE" \
 SMOKE_WORKSPACE="$WORKSPACE" \
+SMOKE_MAKE_ARGS="$MAKE_ARGS_VALUE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-if [ -n "$WORKSPACE" ]; then
-    DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
-fi
+tile_window "$wid"
 sleep 0.3
 
 # GnGeo maps Neo Geo D to keyboard "s" in config.mk. The first press should
@@ -97,7 +124,7 @@ press_d
 sleep 0.25
 capture_window "$wid" "$OPENED_OUT"
 
-hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-3.0}"
+hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-0.85}"
 sleep 0.4
 capture_window "$wid" "$THROUGH_OUT"
 

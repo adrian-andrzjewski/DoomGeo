@@ -27,7 +27,7 @@ from doom_convert import (
     read_wad,
 )
 
-C_PAD = 0x200000  # pad each C ROM to 2 MiB for larger precomputed tile banks
+C_PAD = 0x400000  # pad each C ROM to 4 MiB for the full sprite/item bank
 S_PAD = 0x20000   # 128 KiB fix ROM, all blank
 M_PAD = 0x10000   # 64 KiB Z80 program, all 0x00 (NOP) -> silent
 V_PAD = 0x10000   # 64 KiB ADPCM samples, empty
@@ -61,6 +61,8 @@ PLANE_PERSPECTIVE_TILES = (
     * PLANE_PERSPECTIVE_COLS
 )
 PLANE_TEXEL_Q8_DIV = 1
+PLANE_HORIZON = 96
+PLANE_GAME_H = 192
 CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
 FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
 HUD_BASE = FLOOR_FLAT_BASE + FLAT_TILES
@@ -103,6 +105,18 @@ WEAPON_FRAMES = (
     "PUNGA0", "PUNGB0", "PUNGC0", "PUNGD0",
     "SAWGA0", "SAWGB0", "SAWGC0", "SAWGD0",
 )
+CRITICAL_SPRITE_TYPES = {
+    5, 6, 8, 13, 17, 38, 39, 40,
+    2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
+    2010, 2011, 2012, 2013, 2014, 2015, 2018, 2019,
+    2022, 2023, 2024, 2025, 2026, 2035, 2045, 2046,
+    2047, 2048, 2049,
+    9000, 9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008,
+    9009, 9010, 9011, 9012, 9013, 9014, 9015, 9016, 9017,
+    9018, 9019, 9020, 9021, 9022, 9023, 9024, 9025, 9026,
+    9027, 9028, 9029, 9030, 9031, 9032, 9033, 9034, 9035,
+    9036,
+}
 HUD_KEYCARD_FRAMES = ("BKEYA0", "RKEYA0", "YKEYA0")
 HUD_KEYCARD_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
 HUD_KEYCARD_TILES = len(HUD_KEYCARD_FRAMES)
@@ -116,7 +130,9 @@ TITLEPIC_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
 TITLEPIC_COLS = 20
 TITLEPIC_ROWS = 13
 TITLEPIC_TILES = TITLEPIC_COLS * TITLEPIC_ROWS
-SPRITE_CACHE_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+FLASH_CHECKER_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+FLASH_CHECKER_TILES = 1
+SPRITE_CACHE_BASE = FLASH_CHECKER_BASE + FLASH_CHECKER_TILES
 # Must match main.c/config.h's weapon sprite-chain top. If this differs, the
 # correct Doom psprite is baked into the wrong part of the visible tile window.
 WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
@@ -129,14 +145,17 @@ WEAPON_CENTERED_FRAMES = {"SHTGB0", "SHTGC0", "SHTGD0"}
 
 def recompute_layout() -> None:
     global WALL_ATLAS_TILES, WALL_ALT_ATLAS_BASE, DOOR_ATLAS_BASE
-    global PLANE_PERSPECTIVE_TILES, CEILING_FLAT_BASE, FLOOR_FLAT_BASE
+    global BG_HALF_TILES, PLANE_PERSPECTIVE_ROWS, PLANE_PERSPECTIVE_TILES
+    global CEILING_FLAT_BASE, FLOOR_FLAT_BASE
     global HUD_BASE, HUD_FACE_BASE, WEAPON_BASE, HUD_KEYCARD_BASE
     global HUD_DIGIT_BASE, HUD_SMALL_DIGIT_BASE, CEILING_PERSPECTIVE_BASE
-    global FLOOR_PERSPECTIVE_BASE, TITLEPIC_BASE, SPRITE_CACHE_BASE
+    global FLOOR_PERSPECTIVE_BASE, TITLEPIC_BASE, FLASH_CHECKER_BASE, SPRITE_CACHE_BASE
 
     WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
     WALL_ALT_ATLAS_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
     DOOR_ATLAS_BASE = WALL_ALT_ATLAS_BASE + len(WALL_ALT_TEXTURES) * WALL_ATLAS_TILES
+    BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
+    PLANE_PERSPECTIVE_ROWS = BG_HALF_ROWS
     PLANE_PERSPECTIVE_TILES = (
         PLANE_PERSPECTIVE_DIRS
         * PLANE_PERSPECTIVE_PHASES
@@ -155,18 +174,35 @@ def recompute_layout() -> None:
     CEILING_PERSPECTIVE_BASE = HUD_SMALL_DIGIT_BASE + HUD_SMALL_DIGIT_TILES
     FLOOR_PERSPECTIVE_BASE = CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
     TITLEPIC_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
-    SPRITE_CACHE_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+    FLASH_CHECKER_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+    SPRITE_CACHE_BASE = FLASH_CHECKER_BASE + FLASH_CHECKER_TILES
 
 
 def apply_detail_layout(detail: str) -> None:
     global WALL_ATLAS_COLS, PLANE_PERSPECTIVE_DIRS
 
-    if detail == "clarity":
+    if detail in ("clarity", "quality"):
         WALL_ATLAS_COLS = 32
-        PLANE_PERSPECTIVE_DIRS = 4
     else:
         WALL_ATLAS_COLS = 16
+    if detail == "clarity":
+        PLANE_PERSPECTIVE_DIRS = 4
+    else:
         PLANE_PERSPECTIVE_DIRS = 16
+    recompute_layout()
+
+
+def apply_simple_map_layout(simple_map: bool) -> None:
+    global BG_HALF_ROWS, PLANE_HORIZON, PLANE_GAME_H
+
+    if simple_map:
+        BG_HALF_ROWS = 7
+        PLANE_HORIZON = 112
+        PLANE_GAME_H = 224
+    else:
+        BG_HALF_ROWS = 6
+        PLANE_HORIZON = 96
+        PLANE_GAME_H = 192
     recompute_layout()
 
 
@@ -195,6 +231,10 @@ def tile_blank():
 
 def tile_solid():
     return [[1] * 16 for _ in range(16)]
+
+
+def tile_checker():
+    return [[1 if ((x ^ y) & 1) == 0 else 0 for x in range(16)] for y in range(16)]
 
 
 DIGIT_GLYPHS = (
@@ -634,8 +674,8 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
     playpal = playpal_rgb(wad)
     tiles = []
     fov_plane = 0.66
-    horizon = 96
-    game_h = 192
+    horizon = PLANE_HORIZON
+    game_h = PLANE_GAME_H
     base_rgb = tuple(sum(rgb[i] for rgb in palette) // len(palette) for i in range(3))
     floor_blend = (42, 39, 34)
     ceiling_blend = (32, 35, 58)
@@ -1167,7 +1207,8 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     next_tile = SPRITE_CACHE_BASE
     wad = Wad(read_wad(iwad, zip_member)) if iwad else None
     playpal = playpal_rgb(wad) if wad is not None else None
-    for thing_type, angle, frame, flip_x in specs:
+    specs = sorted(enumerate(specs), key=lambda item: (0 if item[1][0] in CRITICAL_SPRITE_TYPES else 1, item[0]))
+    for _order, (thing_type, angle, frame, flip_x) in specs:
         first_scale = len(metas)
         frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile, flip_x=flip_x, wad=wad, playpal=playpal)
         if not frame_meta:
@@ -1305,7 +1346,8 @@ def main():
     ap.add_argument("--wall-texture", default=WALL_TEXTURE, help="Doom wall texture to precompose into C-ROM tiles")
     ap.add_argument("--wall-alt-textures", default=",".join(WALL_ALT_TEXTURES), help="Comma-separated extra Doom wall atlases for per-cell map texture classes")
     ap.add_argument("--door-texture", default=DOOR_TEXTURE, help="Doom door texture to precompose into the second wall atlas")
-    ap.add_argument("--detail", choices=("clarity", "quality", "balanced", "speed"), default="balanced", help="Tile layout tier; clarity doubles wall atlas sampling and trims plane direction cache")
+    ap.add_argument("--detail", choices=("clarity", "quality", "balanced", "speed"), default="quality", help="Tile layout tier; quality/clarity double wall atlas sampling, clarity also trims the plane direction cache")
+    ap.add_argument("--simple-map", action="store_true", help="Bake full-screen NGRayEx-style floor/ceiling plane tiles")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
@@ -1359,6 +1401,7 @@ def main():
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
     apply_detail_layout(args.detail)
+    apply_simple_map_layout(args.simple_map)
 
     here = os.path.dirname(os.path.abspath(__file__))
     out = args.out_dir if args.out_dir else os.path.join(here, "..", "rom")
@@ -1436,6 +1479,7 @@ def main():
         + ceiling_perspective_tiles
         + floor_perspective_tiles
         + title_tiles
+        + [tile_checker()]
         + sprite_tiles
     )
     assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
@@ -1476,6 +1520,10 @@ def main():
         s1 += encode_fix_glyph(glyph)
     for glyph in SECRET_GLYPHS:
         s1 += encode_fix_glyph(glyph)
+    checker = bytearray()
+    for y in range(8):
+        checker += bytes([0xF0 if (y & 1) == 0 else 0x0F]) * 4
+    s1 += checker
     s1 += bytes(S_PAD - len(s1))
 
     files = {
