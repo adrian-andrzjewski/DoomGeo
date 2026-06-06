@@ -51,6 +51,10 @@ readable.
   actor arrays use that active-window cap instead of the full converted map's
   thing count, so E1M1 keeps persistent state for all things but scans only the
   currently streamable actor set.
+- The chunk converter now repairs tiny coarse-grid gaps between reachable lift
+  triggers and their target lift sectors. Lifts still remain blocking until
+  triggered, but once opened their coarse `16x16` platform cells have a playable
+  route instead of being stranded by rasterization.
 - Chunk start placement still prefers an open centered cell in the player's
   source sector, but now also scores exact forward visual clearance against WAD
   linedefs. This keeps the E1M1 playable start from being pushed into a coarse

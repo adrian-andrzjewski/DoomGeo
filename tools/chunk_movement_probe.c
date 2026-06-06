@@ -171,6 +171,115 @@ static int global_cell_blocked_for_route(int x, int y) {
     return g_chunk_solid[chunk][cell] ? 1 : 0;
 }
 
+static unsigned char global_cell_lift_id(int x, int y) {
+    unsigned short chunk;
+    unsigned short cell;
+    int width = global_grid_w();
+    int height = global_grid_h();
+    if (x < 0 || y < 0 || x >= width || y >= height) return 0;
+    chunk = (unsigned short)((y / SIMPLE_MAP_H) * DOOM_CHUNK_COLS + (x / SIMPLE_MAP_W));
+    cell = (unsigned short)((y % SIMPLE_MAP_H) * SIMPLE_MAP_W + (x % SIMPLE_MAP_W));
+    return g_chunk_lift_cell[chunk][cell];
+}
+
+static int global_cell_blocked_for_lift_state(int x, int y, unsigned int opened_lift_mask) {
+    unsigned short chunk;
+    unsigned short cell;
+    unsigned char lift_id;
+    int width = global_grid_w();
+    int height = global_grid_h();
+    if (x < 0 || y < 0 || x >= width || y >= height) return 1;
+    chunk = (unsigned short)((y / SIMPLE_MAP_H) * DOOM_CHUNK_COLS + (x / SIMPLE_MAP_W));
+    cell = (unsigned short)((y % SIMPLE_MAP_H) * SIMPLE_MAP_W + (x % SIMPLE_MAP_W));
+    if (g_chunk_door_cell[chunk][cell] >= 2) return 0;
+    lift_id = g_chunk_lift_cell[chunk][cell];
+    if (lift_id) return (opened_lift_mask & (1u << (lift_id - 1))) ? 0 : 1;
+    return g_chunk_solid[chunk][cell] ? 1 : 0;
+}
+
+static int start_global_cell(void) {
+    int width = global_grid_w();
+    return (DOOM_CHUNK_START_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H * width
+        + (DOOM_CHUNK_START_Y_Q8 >> 8) * width
+        + (DOOM_CHUNK_START_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W
+        + (DOOM_CHUNK_START_X_Q8 >> 8);
+}
+
+static int route_exists_with_lift_state(
+    int start_x,
+    int start_y,
+    int target_x,
+    int target_y,
+    int target_lift,
+    unsigned int opened_lift_mask,
+    int *out_steps
+) {
+    static const signed char dirs[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+    int width = global_grid_w();
+    int height = global_grid_h();
+    int cell_count = width * height;
+    int head = 0;
+    int tail = 0;
+    if (out_steps) *out_steps = 0;
+    if (cell_count > MAX_ROUTE_CELLS) return 0;
+    if (start_x < 0 || start_y < 0 || start_x >= width || start_y >= height) return 0;
+    if (global_cell_blocked_for_lift_state(start_x, start_y, opened_lift_mask)) return 0;
+    for (int i = 0; i < cell_count; i++) route_prev[i] = -2;
+    route_prev[start_y * width + start_x] = -1;
+    route_queue[tail++] = start_y * width + start_x;
+    while (head < tail) {
+        int cell = route_queue[head++];
+        int x = cell % width;
+        int y = cell / width;
+        if ((target_lift >= 0 && global_cell_lift_id(x, y) == (unsigned char)(target_lift + 1))
+            || (target_lift < 0 && x == target_x && y == target_y)) {
+            int steps = 0;
+            for (int cur = cell; route_prev[cur] >= 0; cur = route_prev[cur]) steps++;
+            if (out_steps) *out_steps = steps;
+            return 1;
+        }
+        for (int d = 0; d < 4; d++) {
+            int nx = x + dirs[d][0];
+            int ny = y + dirs[d][1];
+            int next;
+            if (global_cell_blocked_for_lift_state(nx, ny, opened_lift_mask)) continue;
+            next = ny * width + nx;
+            if (route_prev[next] != -2) continue;
+            route_prev[next] = cell;
+            route_queue[tail++] = next;
+        }
+    }
+    return 0;
+}
+
+static int validate_lift_trigger_routes(int *out_routes, int *out_trigger_steps, int *out_lift_steps) {
+    int start_cell = start_global_cell();
+    int start_x = start_cell % global_grid_w();
+    int start_y = start_cell / global_grid_w();
+    *out_routes = 0;
+    *out_trigger_steps = 0;
+    *out_lift_steps = 0;
+    if (DOOM_CHUNK_LIFT_TRIGGER_COUNT <= 0) return 1;
+    if (DOOM_CHUNK_LIFT_COUNT > 31) return 0;
+
+    for (unsigned short i = 0; i < DOOM_CHUNK_LIFT_TRIGGER_COUNT; i++) {
+        const NgChunkLiftTrigger *trigger = &g_chunk_lift_triggers[i];
+        unsigned int opened_lift_mask;
+        int trigger_steps = 0;
+        int lift_steps = 0;
+        if (trigger->lift >= DOOM_CHUNK_LIFT_COUNT) return 0;
+        if (!route_exists_with_lift_state(start_x, start_y, trigger->x, trigger->y, -1, 0, &trigger_steps)) continue;
+        opened_lift_mask = 1u << trigger->lift;
+        if (!route_exists_with_lift_state(trigger->x, trigger->y, 0, 0, trigger->lift, opened_lift_mask, &lift_steps)) {
+            return 0;
+        }
+        (*out_routes)++;
+        *out_trigger_steps += trigger_steps;
+        *out_lift_steps += lift_steps;
+    }
+    return 1;
+}
+
 static void open_route_cell(int global_x, int global_y, int *opened_doors, int *opened_lifts) {
     unsigned short chunk;
     unsigned short cell;
@@ -327,6 +436,9 @@ int main(void) {
     int route_transitions = 0;
     int route_opened_doors = 0;
     int route_opened_lifts = 0;
+    int lift_trigger_routes = 0;
+    int lift_trigger_steps = 0;
+    int lift_platform_steps = 0;
 
     for (unsigned short i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) g_chunk_door_open[i] = 0;
     for (unsigned short i = 0; i < DOOM_CHUNK_LIFT_COUNT; i++) g_chunk_lift_open[i] = 0;
@@ -411,8 +523,21 @@ int main(void) {
             );
             return 1;
         }
+        if (!validate_lift_trigger_routes(&lift_trigger_routes, &lift_trigger_steps, &lift_platform_steps)) {
+            fprintf(
+                stderr,
+                "%s movement failed: generated lift trigger route failed routes=%d trigger_steps=%d lift_steps=%d lifts=%d triggers=%d\n",
+                DOOM_CHUNK_MAP_NAME,
+                lift_trigger_routes,
+                lift_trigger_steps,
+                lift_platform_steps,
+                DOOM_CHUNK_LIFT_COUNT,
+                DOOM_CHUNK_LIFT_TRIGGER_COUNT
+            );
+            return 1;
+        }
         printf(
-            "%s chunk movement OK: start_chunk=%u final_chunk=%u progress_q8=%d moved_ticks=%d transitions=%d dynamic_blockers=%d route_steps=%d route_transitions=%d route_opened_doors=%d route_opened_lifts=%d start_global=(%d,%d) final_global=(%d,%d) final_local=(%d,%d)\n",
+            "%s chunk movement OK: start_chunk=%u final_chunk=%u progress_q8=%d moved_ticks=%d transitions=%d dynamic_blockers=%d route_steps=%d route_transitions=%d route_opened_doors=%d route_opened_lifts=%d lift_trigger_routes=%d lift_trigger_steps=%d lift_platform_steps=%d start_global=(%d,%d) final_global=(%d,%d) final_local=(%d,%d)\n",
             DOOM_CHUNK_MAP_NAME,
             DOOM_CHUNK_START_CHUNK,
             active_chunk,
@@ -424,6 +549,9 @@ int main(void) {
             route_transitions,
             route_opened_doors,
             route_opened_lifts,
+            lift_trigger_routes,
+            lift_trigger_steps,
+            lift_platform_steps,
             start_global_x_q8,
             start_global_y_q8,
             final_global_x_q8,

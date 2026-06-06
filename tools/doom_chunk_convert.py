@@ -658,6 +658,50 @@ def repair_start_exit_route(
     return repaired
 
 
+def repair_lift_trigger_routes(
+    grid: list[list[int]],
+    tex_grid: list[list[int]],
+    tex_phase_grid: list[list[int]],
+    floor_grid: list[list[int]],
+    damage_grid: list[list[int]],
+    light_grid: list[list[int]],
+    floor_height_grid: list[list[int]],
+    ceiling_height_grid: list[list[int]],
+    doors: list[ChunkDoor],
+    lifts: list[tuple[int, list[tuple[int, int]]]],
+    lift_triggers: list[tuple[int, int, int, int, int]],
+) -> int:
+    if not lifts or not lift_triggers:
+        return 0
+    passable = {(door.x, door.y) for door in doors}
+    for _tag, cells in lifts:
+        passable.update(cells)
+
+    repaired = 0
+    for trigger_x, trigger_y, lift_index, _special, _walk in lift_triggers:
+        if lift_index < 0 or lift_index >= len(lifts):
+            continue
+        targets = set(lifts[lift_index][1])
+        if not targets:
+            continue
+        path = minimum_wall_route(grid, (trigger_x, trigger_y), targets, passable)
+        if path is None:
+            continue
+        for x, y in path:
+            if not grid[y][x] or (x, y) in passable:
+                continue
+            grid[y][x] = 0
+            tex_grid[y][x] = 0
+            tex_phase_grid[y][x] = 0
+            floor_grid[y][x] = 0
+            damage_grid[y][x] = 0
+            light_grid[y][x] = 2
+            floor_height_grid[y][x] = 0
+            ceiling_height_grid[y][x] = 128
+            repaired += 1
+    return repaired
+
+
 def chunk_cells(grid: list[list[int]], chunk: int, chunk_size: int, chunk_cols: int) -> list[int]:
     chunk_x = chunk % chunk_cols
     chunk_y = chunk // chunk_cols
@@ -1036,6 +1080,19 @@ def convert(args: argparse.Namespace) -> None:
         converted_doors,
         converted_lifts,
     )
+    lift_route_repair_cells = repair_lift_trigger_routes(
+        grid,
+        tex_grid,
+        tex_phase_grid,
+        floor_grid,
+        damage_grid,
+        light_grid,
+        floor_height_grid,
+        ceiling_height_grid,
+        converted_doors,
+        converted_lifts,
+        converted_lift_triggers,
+    )
     start_chunk = (start_cell_y // args.chunk_size) * chunk_cols + (start_cell_x // args.chunk_size)
     start_x -= (start_chunk % chunk_cols) * args.chunk_size
     start_y -= (start_chunk // chunk_cols) * args.chunk_size
@@ -1078,7 +1135,7 @@ def convert(args: argparse.Namespace) -> None:
         f"{solid_cells} solid cells, {len(converted_things)} things, "
         f"{len(converted_exits)} exits, {len(converted_doors)} doors, "
         f"{len(converted_lifts)} lifts/{len(converted_lift_triggers)} triggers, "
-        f"{route_repair_cells} route cells -> {args.out}"
+        f"{route_repair_cells} route cells, {lift_route_repair_cells} lift-route cells -> {args.out}"
     )
 
 

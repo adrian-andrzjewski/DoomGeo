@@ -174,6 +174,12 @@ ROM the armor counter mirrors the script tick. This keeps movement proof out of
 fragile Xvfb timing while still leaving a visible ROM capture for stale-ROM and
 HUD/register checks.
 
+`chunk-movement-check` also validates reachable generated lift triggers: a
+trigger must be reachable while its lift is closed, and after opening that lift
+the target lift cells must become reachable. This catches coarse-grid conversion
+breaks where a Doom lift exists in metadata but cannot function in the chunked
+runtime.
+
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
 death/corpse feedback frame. Override `COMBAT_DEATH_WAIT_SECS` if an emulator
