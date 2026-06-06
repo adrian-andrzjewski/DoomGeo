@@ -99,6 +99,8 @@ static u8  wall_first_upload = 1;
 static u8  wall_frame_overrun = 0;
 static u8  render_motion_active = 0;
 #if DOOM_RIPDOOM_RENDER
+static long ripdoom_start_global_x_q8 = 0;
+static long ripdoom_start_global_y_q8 = 0;
 static short ripdoom_view_start_x = 0;
 static short ripdoom_view_start_y = 0;
 static u8 ripdoom_view_ready = 0;
@@ -130,22 +132,71 @@ static inline u8 depth_palette(u8 kind, int side, int h) {
 }
 
 #if DOOM_RIPDOOM_RENDER
+static long ripdoom_global_start_x_q8(void) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long chunk_x = DOOM_CHUNK_START_CHUNK % DOOM_CHUNK_COLS;
+    return (chunk_x * DOOM_CHUNK_SIZE * 256L) + DOOM_CHUNK_START_X_Q8;
+#else
+    return (long)(FIX(DOOM_START_X) >> (FBITS - 8));
+#endif
+}
+
+static long ripdoom_global_start_y_q8(void) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long chunk_y = DOOM_CHUNK_START_CHUNK / DOOM_CHUNK_COLS;
+    return (chunk_y * DOOM_CHUNK_SIZE * 256L) + DOOM_CHUNK_START_Y_Q8;
+#else
+    return (long)(FIX(DOOM_START_Y) >> (FBITS - 8));
+#endif
+}
+
+static void ripdoom_start_coord_from_chunk(short *x, short *y) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long global_x_q8 = ripdoom_global_start_x_q8();
+    long global_y_q8 = ripdoom_global_start_y_q8();
+    *x = (short)(DOOM_CHUNK_ORIGIN_X + ((global_x_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
+    *y = (short)(DOOM_CHUNK_ORIGIN_Y - ((global_y_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
+#else
+    *x = (short)0;
+    *y = (short)0;
+#endif
+}
+
 static void ripdoom_init_view_anchor(void) {
-    int i;
     ripdoom_view_ready = 0;
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    ripdoom_start_global_x_q8 = ripdoom_global_start_x_q8();
+    ripdoom_start_global_y_q8 = ripdoom_global_start_y_q8();
+    ripdoom_start_coord_from_chunk(&ripdoom_view_start_x, &ripdoom_view_start_y);
+    ripdoom_view_ready = 1;
+    return;
+#else
+    int i;
     for (i = 0; i < NG_RIP_THING_COUNT; i++) {
         if (g_rip_things[i].type == 1) {
+            ripdoom_start_global_x_q8 = ripdoom_global_start_x_q8();
+            ripdoom_start_global_y_q8 = ripdoom_global_start_y_q8();
             ripdoom_view_start_x = g_rip_things[i].x;
             ripdoom_view_start_y = g_rip_things[i].y;
             ripdoom_view_ready = 1;
             return;
         }
     }
+#endif
 }
 
 static void ripdoom_visual_pose(short *x, short *y) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long active_chunk_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
+    long active_chunk_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
+    long pos_x_q8 = (posX >> (FBITS - 8)) + active_chunk_x * DOOM_CHUNK_SIZE * 256L;
+    long pos_y_q8 = (posY >> (FBITS - 8)) + active_chunk_y * DOOM_CHUNK_SIZE * 256L;
+    long dx = ((pos_x_q8 - ripdoom_start_global_x_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+    long dy = ((pos_y_q8 - ripdoom_start_global_y_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+#else
     long dx = ((long)(posX - FIX(DOOM_START_X)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
     long dy = ((long)(posY - FIX(DOOM_START_Y)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
+#endif
     *x = (short)(ripdoom_view_start_x - dy);
     *y = (short)(ripdoom_view_start_y + dx);
 }
