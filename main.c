@@ -4277,6 +4277,20 @@ static void update_frame_stats_overlay(u8 frame_overrun) {
 }
 #endif
 
+#ifdef DOOM_INPUT_DEBUG
+static void update_input_debug_overlay(u8 pressed) {
+    int px;
+    int py;
+    rc_player_q8(&px, &py);
+    draw_stat3(0, 0, FIX_SOLID, pressed);
+    draw_stat3(0, 1, FIX_AMMO_M, (u16)(px >> 8));
+    draw_stat3(0, 2, FIX_KEY_MSG_Y, (u16)(py >> 8));
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    draw_stat3(0, 3, FIX_DEAD_D, SIMPLE_ACTIVE_CHUNK);
+#endif
+}
+#endif
+
 static void draw_fix_map_code(u16 col, u16 row, u8 episode, u8 mission) {
     fix_poke(col, row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
     fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + episode));
@@ -6858,6 +6872,9 @@ int main(void) {
             input_catchup_pending = frame_overrun;
 #ifdef DOOM_FRAME_STATS
             update_frame_stats_overlay(frame_overrun);
+#endif
+#ifdef DOOM_INPUT_DEBUG
+            update_input_debug_overlay(pressed);
 #endif
             watchdog_kick();
             update_sector_flat_palette();
