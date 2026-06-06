@@ -37,8 +37,11 @@ readable.
   the current stepping stone toward WAD-to-`16x16` chunk generation.
 - `make chunk-map` runs `tools/doom_chunk_convert.py`, which converts the WAD
   map at a fixed cell scale and emits generated `16x16` chunk pages plus
-  `doom_chunks_preview.txt`. The current runtime still uses the authored simple
-  map; the chunk tables are the next data contract for streamed map pages.
+  `doom_chunks_preview.txt`. In `DOOM_SIMPLE_MAP=1`, the runtime streams these
+  generated chunk pages while preserving the original NGRayEx-style 80-column
+  renderer. `make chunk-route-check` verifies the generated chunk start-to-exit
+  route, treating generated doors and lift cells as interactive pass-through
+  cells.
 - In simple-map play, pickups are given a foreground/readability bias and a
   larger minimum projected size so ammo, armor, health, and weapons remain
   visible among monsters and barrels.
@@ -399,6 +402,12 @@ readable.
 - `make route-check` statically verifies the generated E1M1 start-to-exit
   route against `build/doom_map_generated.h`, including whether completion
   depends on generated door cells.
+- `make chunk-route-check` statically verifies the generated `16x16` chunk map
+  route against `build/doom_chunks_generated.h` and
+  `build/doom_chunks_generated.c`. If the exact WAD player start falls on a
+  coarse-grid wall, chunk conversion moves it to the nearest open cell and
+  opens the minimum number of coarse wall cells needed to preserve a playable
+  start-to-exit route.
 - `make episode-route-report` converts shareware `E1M1` through `E1M9` into
   isolated generated headers and reports whether each map has a coarse-grid
   start-to-exit route. `make episode-route-check` runs the same pass in strict

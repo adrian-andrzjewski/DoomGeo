@@ -142,6 +142,7 @@ make cart DOOM_DETAIL=quality     # 40 wall columns, seven world things
 make cart DOOM_DETAIL=balanced    # 32 wall columns, nine world things
 make cart DOOM_DETAIL=speed       # 20 wall columns, eleven world things
 make route-check
+make DOOM_MAP=E1M1 BUILDDIR=build/chunk-e1m1 chunk-map chunk-route-check
 make bsp-asset-check
 tools/smoke_gameplay.sh
 make key-test-rom
@@ -175,7 +176,6 @@ make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
 make DOOM_MAP=E1M1 DOOM_SKILL_MASK=2
-make DOOM_MAP=E1M1 BUILDDIR=build/chunk-e1m1 chunk-map
 python3 tools/doomgeo_build.py build --target asm-rom
 python3 tools/doomgeo_build.py pages --out dist/pages
 make smoke-screenshot

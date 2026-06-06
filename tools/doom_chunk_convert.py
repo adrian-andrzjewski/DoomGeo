@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import heapq
 import math
 import os
 import sys
@@ -295,6 +296,82 @@ def build_door_grid(width: int, height: int, doors: list[ChunkDoor]) -> list[lis
             raise ValueError("chunk door id table supports at most 254 doors")
         grid[door.y][door.x] = index + 2
     return grid
+
+
+def route_neighbors(x: int, y: int) -> tuple[tuple[int, int], ...]:
+    return ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
+
+
+def minimum_wall_route(
+    grid: list[list[int]],
+    start: tuple[int, int],
+    targets: set[tuple[int, int]],
+    passable: set[tuple[int, int]],
+) -> list[tuple[int, int]] | None:
+    width = len(grid[0])
+    height = len(grid)
+    queue: list[tuple[int, int, int, int]] = [(0, 0, start[0], start[1])]
+    best: dict[tuple[int, int], tuple[int, int]] = {start: (0, 0)}
+    prev: dict[tuple[int, int], tuple[int, int] | None] = {start: None}
+    while queue:
+        cost, steps, x, y = heapq.heappop(queue)
+        if best.get((x, y)) != (cost, steps):
+            continue
+        if (x, y) in targets:
+            path: list[tuple[int, int]] = []
+            cur: tuple[int, int] | None = (x, y)
+            while cur is not None:
+                path.append(cur)
+                cur = prev[cur]
+            return list(reversed(path))
+        for nx, ny in route_neighbors(x, y):
+            if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                continue
+            extra = 1 if grid[ny][nx] and (nx, ny) not in passable else 0
+            next_score = (cost + extra, steps + 1)
+            old_score = best.get((nx, ny))
+            if old_score is not None and old_score <= next_score:
+                continue
+            best[(nx, ny)] = next_score
+            prev[(nx, ny)] = (x, y)
+            heapq.heappush(queue, (next_score[0], next_score[1], nx, ny))
+    return None
+
+
+def repair_start_exit_route(
+    grid: list[list[int]],
+    tex_grid: list[list[int]],
+    floor_grid: list[list[int]],
+    damage_grid: list[list[int]],
+    light_grid: list[list[int]],
+    floor_height_grid: list[list[int]],
+    ceiling_height_grid: list[list[int]],
+    start: tuple[int, int],
+    exits: list[ChunkExit],
+    doors: list[ChunkDoor],
+    lifts: list[tuple[int, list[tuple[int, int]]]],
+) -> int:
+    targets = {(exit.x_q8 >> 8, exit.y_q8 >> 8) for exit in exits}
+    if not targets:
+        return 0
+    passable = {(door.x, door.y) for door in doors}
+    passable.update((x, y) for _tag, cells in lifts for x, y in cells)
+    path = minimum_wall_route(grid, start, targets, passable)
+    if path is None:
+        return 0
+    repaired = 0
+    for x, y in path:
+        if not grid[y][x] or (x, y) in passable:
+            continue
+        grid[y][x] = 0
+        tex_grid[y][x] = 0
+        floor_grid[y][x] = 0
+        damage_grid[y][x] = 0
+        light_grid[y][x] = 2
+        floor_height_grid[y][x] = 0
+        ceiling_height_grid[y][x] = 128
+        repaired += 1
+    return repaired
 
 
 def chunk_cells(grid: list[list[int]], chunk: int, chunk_size: int, chunk_cols: int) -> list[int]:
@@ -605,6 +682,24 @@ def convert(args: argparse.Namespace) -> None:
     start_x, start_y = grid_coord(player.x, player.y, origin_x, origin_y, args.cell_units)
     start_cell_x = int(math.floor(start_x))
     start_cell_y = int(math.floor(start_y))
+    if grid[start_cell_y][start_cell_x]:
+        start_cell_x, start_cell_y = dc.nearest_open(grid, start_cell_x, start_cell_y)
+        start_x = start_cell_x + 0.5
+        start_y = start_cell_y + 0.5
+    route_start = (start_cell_x, start_cell_y)
+    route_repair_cells = repair_start_exit_route(
+        grid,
+        tex_grid,
+        floor_grid,
+        damage_grid,
+        light_grid,
+        floor_height_grid,
+        ceiling_height_grid,
+        route_start,
+        converted_exits,
+        converted_doors,
+        converted_lifts,
+    )
     start_chunk = (start_cell_y // args.chunk_size) * chunk_cols + (start_cell_x // args.chunk_size)
     start_x -= (start_chunk % chunk_cols) * args.chunk_size
     start_y -= (start_chunk // chunk_cols) * args.chunk_size
@@ -645,7 +740,8 @@ def convert(args: argparse.Namespace) -> None:
         f"{chunk_cols}x{chunk_rows} chunks of {args.chunk_size}x{args.chunk_size}, "
         f"{solid_cells} solid cells, {len(converted_things)} things, "
         f"{len(converted_exits)} exits, {len(converted_doors)} doors, "
-        f"{len(converted_lifts)} lifts/{len(converted_lift_triggers)} triggers -> {args.out}"
+        f"{len(converted_lifts)} lifts/{len(converted_lift_triggers)} triggers, "
+        f"{route_repair_cells} route cells -> {args.out}"
     )
 
 
