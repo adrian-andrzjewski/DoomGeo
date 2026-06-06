@@ -57,9 +57,12 @@ and emits generated C headers/sources under `build/`:
   because Doom's minor linedef details read as false full-height columns in the
   Neo Geo sprite-strip renderer. The pass protects map borders, doors, exits,
   things, and player-start clearance, and the 6.0 default is the strongest
-  tested value that preserved strict Episode 1 route coverage. `DOOM_MAP_DETAIL_CULL` and
-  `DOOM_MAP_READABILITY_CLEANUP` can be overridden for exact-conversion
-  experiments.
+  tested value that preserved strict Episode 1 route coverage. Visual WAD-line
+  metadata is generated with the separate `DOOM_RENDER_DETAIL_CULL=2.0`
+  default, so the runtime can still draw larger Doom room edges and pillars
+  that no longer need to be blocking collision cells. `DOOM_MAP_DETAIL_CULL`,
+  `DOOM_RENDER_DETAIL_CULL`, and `DOOM_MAP_READABILITY_CLEANUP` can be
+  overridden for exact-conversion experiments.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

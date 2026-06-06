@@ -14,17 +14,20 @@ readable.
 - Keeps richer generated map arrays for future work, but the runtime path uses
   Neo Geo-friendly fixed-size structures instead of a generic WAD directory.
 - Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
-  `DOOM_MAP_HEIGHT`, `DOOM_MAP_DETAIL_CULL`,
+  `DOOM_MAP_HEIGHT`, `DOOM_MAP_DETAIL_CULL`, `DOOM_RENDER_DETAIL_CULL`,
   `DOOM_MAP_READABILITY_CLEANUP`, and `DOOM_SKILL_MASK` at build time. The
   default skill mask is `4`, matching hard/Ultra-Violence THING placement; use
   `1` for easy or `2` for medium placement. The default grid remains centered
   at `96x72`, which gives the converter room to preserve original WAD
   placement, but the default map pass now uses `DOOM_MAP_DETAIL_CULL=6.0` to
   remove solid-line noise, isolated wall specks, and short dead-end wall tails
-  that become false full-height obstacles in the sprite-strip raycaster. The
-  default was chosen from E1M1 visual captures plus strict Episode 1 route
-  checks; lower values leave more false pillars, while higher values start
-  dropping required map structure.
+  that become false full-height obstacles in the sprite-strip raycaster.
+  Generated visual lines use the separate `DOOM_RENDER_DETAIL_CULL=2.0`
+  default, preserving larger room-edge and pillar cues without requiring those
+  lines to stay as blocking collision cells. The defaults were chosen from E1M1
+  visual captures plus strict Episode 1 route checks; lower collision culls
+  leave more false pillars, while higher collision culls start dropping required
+  map structure.
 - Generated map tables are split into `doom_map_generated.h` and
   `doom_map_generated.c` for Makefile builds so large arrays are compiled once
   instead of duplicated by every file that includes the generated header.
@@ -665,6 +668,10 @@ readable.
   but refines nearby solid hits against the converted WAD line metadata. The
   quality default goes further and enables solid-line refinement across the wall
   pass because navigation readability is the current bottleneck.
+- Quality and clarity tiers also allow generated solid WAD lines to act as
+  visual-only occluders while rays cross open coarse cells. This lets the
+  default simplified collision grid stay playable while still drawing larger
+  Doom pillars and room edges from the offline render-line table.
 - Balanced mode tightens that near-line refinement radius while the player is
   actively moving and skips portal-span refinement on those moving frames.
   Standing frames restore the portal-span pass, and after a late frame the same

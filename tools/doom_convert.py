@@ -2184,6 +2184,7 @@ def convert(args: argparse.Namespace) -> None:
         scale,
         margin,
     )
+    render_detail_cull = args.render_detail_cull if args.render_detail_cull is not None else args.detail_cull
     converted_render_lines, render_cell_starts, render_cell_counts, render_cell_refs = render_lines(
         linedefs,
         sidedefs,
@@ -2195,7 +2196,7 @@ def convert(args: argparse.Namespace) -> None:
         max_y,
         scale,
         margin,
-        args.detail_cull,
+        render_detail_cull,
     )
     damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
     floor_visual_grid, light_grid, floor_height_grid, ceiling_height_grid = sector_visual_grids(
@@ -2274,6 +2275,7 @@ def convert(args: argparse.Namespace) -> None:
         f"({culled_count} detail culled), "
         f"{thing_clearance_cells} thing clearance cells, "
         f"{readability_cells} readability cells ({readability_tail_cells} tail-pruned), "
+        f"{len(converted_render_lines)} render lines at visual cull {render_detail_cull:g}, "
         f"{len(converted_lifts)} lifts/{len(converted_lift_triggers)} triggers, "
         f"{len(things)} things -> {args.width}x{args.height} grid at {args.out}"
     )
@@ -2296,6 +2298,11 @@ def main() -> int:
         type=float,
         default=0.20,
         help="Cull solid linedefs shorter than this fraction of one output cell",
+    )
+    parser.add_argument(
+        "--render-detail-cull",
+        type=float,
+        help="Cull visual render lines shorter than this fraction of one output cell; defaults to --detail-cull",
     )
     parser.add_argument(
         "--readability-cleanup",

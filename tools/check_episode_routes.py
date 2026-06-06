@@ -144,6 +144,8 @@ def convert_map(args: argparse.Namespace, map_name: str, header: Path, source: P
             str(args.height),
             "--detail-cull",
             str(args.detail_cull),
+            "--render-detail-cull",
+            str(args.render_detail_cull),
             "--out",
             str(header),
             "--map-source",
@@ -168,6 +170,7 @@ def main() -> int:
     parser.add_argument("--width", type=int, default=96)
     parser.add_argument("--height", type=int, default=72)
     parser.add_argument("--detail-cull", type=float, default=6.0)
+    parser.add_argument("--render-detail-cull", type=float, default=2.0)
     parser.add_argument("--readability-cleanup", action="store_true")
     parser.add_argument("--skill-mask", type=int, default=4)
     parser.add_argument("--build-dir", default="build/episode-route")

@@ -313,7 +313,7 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     return 1;
 }
 
-static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, u8 accept_spans, fix *dist, u8 *kind, u8 *tex, int *side, u8 *span, u8 *span_height) {
+static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, u8 accept_mode, fix *dist, u8 *kind, u8 *tex, int *side, u8 *span, u8 *span_height) {
 #if DOOM_RENDER_LINES
     unsigned char cell_count = g_render_cell_count[cell_y][cell_x];
     unsigned short cell_start;
@@ -331,9 +331,9 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     for (unsigned char n = 0; n < cell_count; n++) {
         int i = g_render_cell_lines[cell_start + n];
         u8 line_span = g_render_lines[i].span;
-        if (accept_spans) {
+        if (accept_mode == 1) {
             if (!line_span) continue;
-        } else if (line_span) {
+        } else if (accept_mode == 0 && line_span) {
             continue;
         }
         int x1 = g_render_lines[i].x1_q8 >> 4;
@@ -389,7 +389,7 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     (void)rayY;
     (void)cell_x;
     (void)cell_y;
-    (void)accept_spans;
+    (void)accept_mode;
 #endif
     (void)dist;
     (void)kind;
@@ -437,6 +437,7 @@ void rc_render(void) {
         u8 span_kind = 0;
         u8 span_tex = 0;
         int span_side = 0;
+        u8 visual_line = 0;
         if (stepX < 0) sideX = fmul(posX - (mapX << FBITS), ddX);
         else           sideX = fmul(((mapX + 1) << FBITS) - posX, ddX);
         if (stepY < 0) sideY = fmul(posY - (mapY << FBITS), ddY);
@@ -458,8 +459,13 @@ void rc_render(void) {
                 u8 line_span = 0;
                 u8 line_height = 0;
                 if (allow_span_refinement && g_render_cell_count[mapY][mapX] &&
-                    rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 1, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
-                    line_span && projected_span_height(line_perp, line_height) >= PORTAL_SPAN_OCCLUDE_MIN_H) {
+                    rc_refine_render_line_hit(
+                        rayX, rayY, mapX, mapY,
+                        DOOM_VISUAL_SOLID_LINE_OCCLUSION ? 2 : 1,
+                        &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height)) {
+                    int occlude_h = line_span ? projected_span_height(line_perp, line_height) : projected_height(line_perp);
+                    int min_h = line_span ? PORTAL_SPAN_OCCLUDE_MIN_H : PORTAL_SPAN_REPLACE_MIN_H;
+                    if (occlude_h < min_h) continue;
                     if (line_perp < span_perp) {
                         span_kind = line_kind;
                         span_tex = line_tex;
@@ -467,6 +473,7 @@ void rc_render(void) {
                         span_perp = line_perp;
                         span = line_span;
                         span_height = line_height;
+                        visual_line = 1;
                     }
                 }
                 continue;
@@ -508,8 +515,8 @@ void rc_render(void) {
             h = (full_h * solid_height + 63) / 128;
             if (h < 2) h = 2;
         }
-        if (span && span_height && span_perp < perp) {
-            int candidate_h = projected_span_height(span_perp, span_height);
+        if (visual_line && span_perp < perp) {
+            int candidate_h = span ? projected_span_height(span_perp, span_height) : projected_height(span_perp);
             int far_floor = full_h / PORTAL_SPAN_REPLACE_FAR_DIV;
             if (candidate_h >= PORTAL_SPAN_REPLACE_MIN_H && candidate_h >= far_floor) {
                 kindbuf[x] = span_kind;
@@ -518,7 +525,9 @@ void rc_render(void) {
                 perp = span_perp;
                 inv_perp = recip(perp);
                 full_h = projected_height_from_inv(inv_perp);
+                if (!span) h = full_h;
             } else {
+                visual_line = 0;
                 span = 0;
                 span_height = 0;
             }
