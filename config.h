@@ -102,6 +102,13 @@
 #define DOOM_OVERRUN_LINE_REFINEMENT_CELLS 2
 #endif
 
+/* Floor/ceiling tiles are whole-row Neo Geo backdrop sprites, not Doom's
+ * per-pixel visplanes. Keep sector preview local so a distant hazard sector
+ * cannot recolor the entire current room through coarse-map openings. */
+#ifndef DOOM_SECTOR_PREVIEW_MAX_Q8
+#define DOOM_SECTOR_PREVIEW_MAX_Q8 896
+#endif
+
 #ifndef WALL_TILE_UPLOAD_COLUMNS_PER_FRAME
 #if defined(DOOM_DETAIL_CLARITY)
 #define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 16

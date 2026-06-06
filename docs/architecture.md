@@ -70,6 +70,11 @@ and emits generated C headers/sources under `build/`:
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.
+- Runtime thing placement has a narrow coarse-grid repair pass. When a
+  supported thing cell has no cardinal open neighbor, the converter can open a
+  single adjacent blocked cell that already touches open floor. This prevents
+  isolated thing pockets caused by low-resolution line rasterization while
+  preserving the surrounding map shape.
 
 The ROM does not load a WAD at runtime.
 
@@ -105,9 +110,11 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   than raw map X/Y, which keeps the cached floor/ceiling bank inside the
   hardware-safe tile range while avoiding runtime floor casting. The player cell
   and a few wall-stopped forward view samples choose a representative visible
-  sector class, so hazards/liquids can read before contact. Liquid classes add a
-  slow palette pulse over the same floor gradients instead of animating flat
-  pixels.
+  sector class, so nearby hazards/liquids can read before contact. The preview
+  distance is capped because the Neo Geo floor is a whole-row palette cue; a
+  distant sector should not recolor the entire current room through a coarse
+  opening. Liquid classes add a slow palette pulse over the same floor gradients
+  instead of animating flat pixels.
 - The floor/ceiling path intentionally follows the same performance trade seen
   in the Super FX Doom source: spend active runtime budget on wall visibility and
   control response, while floors remain a cheap solid/palette/pre-baked cue

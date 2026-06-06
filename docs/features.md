@@ -46,6 +46,10 @@ readable.
 - Supported runtime things can also reopen their own coarse cell when the cell
   was only closed by rasterization overlap. This preserves original player and
   thing placement without punching general-purpose holes through high ledges.
+- If a supported runtime thing lands in a sealed coarse-grid pocket, the
+  converter opens one adjacent escape cell that already borders open floor.
+  This keeps monsters/pickups from being stranded by the lower-resolution map
+  without broadly erasing nearby walls.
 - Two-sided lines are passable only when their vertical opening fits Doom's
   player height and their floor delta is within the configured step height.
   Small stairs remain walkable; tall platforms and ledges stay blocking.
@@ -117,6 +121,9 @@ readable.
   columns incrementally so strafing moves the planes while keeping the tile bank
   inside the hardware-safe range. `DOOM_FLAT_PLANES=1` switches back to static
   solid planes for debugging.
+- Sector floor/liquid preview is deliberately local. The current floor is a
+  whole-row Neo Geo backdrop palette, so distant hazards no longer recolor the
+  whole room through coarse-grid openings before the player reaches them.
 - Wall projection is intentionally a little taller than the original NGRayEx
   baseline. `DOOM_WALL_PROJECTION_NUM` / `DOOM_WALL_PROJECTION_DEN` tune the
   projection constant at compile time, keeping more of the view occupied by

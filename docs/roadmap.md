@@ -63,6 +63,9 @@ after the current documentation pass.
   converter now tags lower/upper spans with sidedef ownership, so the next major
   renderer gap is drawing more than one visible sector/span in a column instead
   of replacing the far wall with one selected partial span.
+- Re-run native-vs-NeoGeo side-by-side captures after manual emulator testing is
+  done. The current scripts kill existing `ngdevkit-gngeo` processes, so they
+  should not be run while someone is interactively testing a ROM.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
 - Profile wall, plane, thing, and HUD update costs before increasing sprite or

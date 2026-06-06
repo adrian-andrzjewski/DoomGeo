@@ -478,7 +478,7 @@ static void consider_sector_palette_cell(int cell_x, int cell_y, u8 *best_kind, 
 
 static void sample_sector_palette_ray(int px_q8, int py_q8, int ray_x_q8, int ray_y_q8,
                                       u8 *best_kind, u8 *best_light, u8 *best_priority) {
-    static const short distances_q8[] = {192, 448, 768, 1152, 1536, 1920};
+    static const short distances_q8[] = {192, 384, 640, DOOM_SECTOR_PREVIEW_MAX_Q8};
     u8 peek_blocks = 0;
     for (u8 i = 0; i < (u8)(sizeof(distances_q8) / sizeof(distances_q8[0])); i++) {
         int sample_x_q8 = px_q8 + (int)(((long)ray_x_q8 * distances_q8[i]) >> 8);
@@ -538,7 +538,7 @@ static void sample_sector_palette_cone(int px_q8, int py_q8, int dir_x_q8, int d
             rel_x_q8 = ((x << 8) + 128) - px_q8;
             rel_y_q8 = ((y << 8) + 128) - py_q8;
             front = ((long)rel_x_q8 * dir_x_q8 + (long)rel_y_q8 * dir_y_q8) >> 8;
-            if (front < 512 || front > 4096) continue;
+            if (front < 384 || front > DOOM_SECTOR_PREVIEW_MAX_Q8) continue;
             side = ((long)rel_x_q8 * plane_x_q8 + (long)rel_y_q8 * plane_y_q8) >> 8;
             if (side < 0) side = -side;
             if (side > front + 384) continue;
@@ -5499,6 +5499,25 @@ static u8 runtime_thing_is_shootable(int thing_index) {
     thing_class = thing_static_class[thing_index];
     return thing_class == THING_CLASS_MONSTER || thing_class == THING_CLASS_THREAT;
 #endif
+}
+
+u8 rc_dynamic_blocked_q8(short x_q8, short y_q8) {
+    enum { BLOCK_RANGE_Q8 = WORLD_Q8(104), BLOCK_RANGE_CELLS = (BLOCK_RANGE_Q8 + 255) >> 8 };
+    int cx = x_q8 >> 8;
+    int cy = y_q8 >> 8;
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        int i = thing_shootable_indices[si];
+        short thing_x;
+        short thing_y;
+        if (enemy_dead[i]) continue;
+        if (!runtime_thing_is_shootable(i)) continue;
+        thing_x = thing_x_q8[i];
+        thing_y = thing_y_q8[i];
+        if (iabs16((thing_x >> 8) - cx) > BLOCK_RANGE_CELLS) continue;
+        if (iabs16((thing_y >> 8) - cy) > BLOCK_RANGE_CELLS) continue;
+        if (iabs16(x_q8 - thing_x) <= BLOCK_RANGE_Q8 && iabs16(y_q8 - thing_y) <= BLOCK_RANGE_Q8) return 1;
+    }
+    return 0;
 }
 
 static u8 runtime_thing_render_bucket(int thing_index, u16 *thing_type) {

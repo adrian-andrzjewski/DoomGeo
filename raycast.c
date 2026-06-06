@@ -212,6 +212,7 @@ static u8 player_can_occupy(fix x, fix y) {
     if (map_at((x + PLAYER_RADIUS) >> FBITS, cy)) return 0;
     if (map_at(cx, (y - PLAYER_RADIUS) >> FBITS)) return 0;
     if (map_at(cx, (y + PLAYER_RADIUS) >> FBITS)) return 0;
+    if (rc_dynamic_blocked_q8((short)(x >> (FBITS - 8)), (short)(y >> (FBITS - 8)))) return 0;
     return 1;
 }
 

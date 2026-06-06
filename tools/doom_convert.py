@@ -870,7 +870,52 @@ def carve_runtime_thing_cells(
         if grid[cell_y][cell_x]:
             grid[cell_y][cell_x] = 0
             carved += 1
+        carved += carve_runtime_thing_escape(grid, cell_x, cell_y)
     return carved
+
+
+def open_cardinal_neighbor_count(grid: list[list[int]], cell_x: int, cell_y: int) -> int:
+    width = len(grid[0])
+    height = len(grid)
+    count = 0
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nx = cell_x + dx
+        ny = cell_y + dy
+        if 0 <= nx < width and 0 <= ny < height and grid[ny][nx] == 0:
+            count += 1
+    return count
+
+
+def carve_runtime_thing_escape(grid: list[list[int]], cell_x: int, cell_y: int) -> int:
+    width = len(grid[0])
+    height = len(grid)
+    if open_cardinal_neighbor_count(grid, cell_x, cell_y) != 0:
+        return 0
+
+    candidates: list[tuple[int, int, int]] = []
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nx = cell_x + dx
+        ny = cell_y + dy
+        if nx <= 0 or ny <= 0 or nx >= width - 1 or ny >= height - 1:
+            continue
+        if grid[ny][nx] == 0:
+            continue
+        adjacent_open = 0
+        for odx, ody in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ox = nx + odx
+            oy = ny + ody
+            if ox == cell_x and oy == cell_y:
+                continue
+            if 0 <= ox < width and 0 <= oy < height and grid[oy][ox] == 0:
+                adjacent_open += 1
+        if adjacent_open:
+            candidates.append((-adjacent_open, nx, ny))
+
+    if not candidates:
+        return 0
+    _score, nx, ny = min(candidates)
+    grid[ny][nx] = 0
+    return 1
 
 
 def forward_clearance(grid: list[list[int]], sx: float, sy: float, angle: int) -> float:
