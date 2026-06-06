@@ -57,8 +57,8 @@ after the current documentation pass.
   even though the same map and player start are loaded.
 - Keep checking native-vs-NeoGeo waypoints after converter changes. The centered
   `96x72` map plus scale-aware simplification improves coordinate fidelity and
-  removes some false full-height map noise, but current E1M1/E1M2 start
-  comparisons still show large visual differences from native Doom.
+  removes isolated specks plus short dead-end wall tails, but current E1M1/E1M2
+  start comparisons still show large visual differences from native Doom.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
 - Profile wall, plane, thing, and HUD update costs before increasing sprite or

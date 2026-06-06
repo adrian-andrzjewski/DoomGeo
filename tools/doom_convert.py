@@ -509,6 +509,76 @@ def cleanup_wall_specks(
     return len(remove)
 
 
+def wall_cardinal_neighbors(grid: list[list[int]], x: int, y: int) -> list[tuple[int, int]]:
+    neighbors: list[tuple[int, int]] = []
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nx = x + dx
+        ny = y + dy
+        if 0 <= ny < len(grid) and 0 <= nx < len(grid[0]) and grid[ny][nx] != 0:
+            neighbors.append((nx, ny))
+    return neighbors
+
+
+def cleanup_wall_tails(
+    grid: list[list[int]],
+    texture_grid: list[list[int]],
+    texture_phase_grid: list[list[int]],
+    texture_priority_grid: list[list[int]],
+    protected: set[tuple[int, int]],
+    max_tail_len: int = 3,
+) -> int:
+    # Short rasterized WAD details can attach to a real coarse wall as a tiny
+    # branch. The raycaster promotes that branch into a major visual blocker, so
+    # trim only small dead-end chains that reach a junction quickly. Long room
+    # boundaries, doors, exits, starts, and thing cells are protected.
+    removed = 0
+    changed = True
+    width = len(grid[0])
+    height = len(grid)
+    while changed:
+        changed = False
+        remove: set[tuple[int, int]] = set()
+        for y in range(1, height - 1):
+            for x in range(1, width - 1):
+                if grid[y][x] == 0 or (x, y) in protected or (x, y) in remove:
+                    continue
+                neighbors = wall_cardinal_neighbors(grid, x, y)
+                if len(neighbors) > 1:
+                    continue
+
+                chain = [(x, y)]
+                prev = (x, y)
+                current = neighbors[0] if neighbors else None
+                reaches_junction = False
+                while current is not None and len(chain) <= max_tail_len:
+                    cx, cy = current
+                    if current in protected:
+                        break
+                    chain.append(current)
+                    next_neighbors = [cell for cell in wall_cardinal_neighbors(grid, cx, cy) if cell != prev]
+                    if len(next_neighbors) == 0:
+                        break
+                    if len(next_neighbors) > 1:
+                        reaches_junction = True
+                        break
+                    prev = current
+                    current = next_neighbors[0]
+
+                if reaches_junction and len(chain) <= max_tail_len:
+                    remove.update(chain)
+
+        for x, y in remove:
+            if (x, y) in protected:
+                continue
+            grid[y][x] = 0
+            texture_grid[y][x] = 0
+            texture_phase_grid[y][x] = 0
+            texture_priority_grid[y][x] = 0
+            removed += 1
+            changed = True
+    return removed
+
+
 def line_cells(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
     width = len(grid[0])
     height = len(grid)
@@ -1721,6 +1791,7 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_FLAT_BRIDGE_CELLS {stats['flat_bridge_cells']}\n")
         f.write(f"#define DOOM_CONVERTED_THING_CLEARANCE_CELLS {stats['thing_clearance_cells']}\n")
         f.write(f"#define DOOM_CONVERTED_READABILITY_CELLS {stats['readability_cells']}\n")
+        f.write(f"#define DOOM_CONVERTED_READABILITY_TAIL_CELLS {stats['readability_tail_cells']}\n")
         f.write(f"#define DOOM_CONVERTED_SIDEDEFS {stats['sidedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SECTORS {stats['sectors']}\n")
         f.write(f"#define DOOM_CONVERTED_SEGS {stats['segs']}\n")
@@ -2076,6 +2147,7 @@ def convert(args: argparse.Namespace) -> None:
 
     flat_bridge_cells = carve_flat_bridges(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
     readability_cells = 0
+    readability_tail_cells = 0
     if args.readability_cleanup:
         protected_cells = cleanup_protected_cells(grid, linedefs, vertices, things, player, min_x, max_y, scale, margin)
         readability_cells = cleanup_wall_specks(
@@ -2085,6 +2157,14 @@ def convert(args: argparse.Namespace) -> None:
             texture_priority_grid,
             protected_cells,
         )
+        readability_tail_cells = cleanup_wall_tails(
+            grid,
+            texture_grid,
+            texture_phase_grid,
+            texture_priority_grid,
+            protected_cells,
+        )
+        readability_cells += readability_tail_cells
 
     sx, sy = grid_coord(player.x, player.y, min_x, max_y, scale, margin)
     sx, sy = carve_start_clearance(grid, sx, sy, player.angle)
@@ -2148,6 +2228,7 @@ def convert(args: argparse.Namespace) -> None:
             "flat_bridge_cells": flat_bridge_cells,
             "thing_clearance_cells": thing_clearance_cells,
             "readability_cells": readability_cells,
+            "readability_tail_cells": readability_tail_cells,
             "sidedefs": len(sidedefs),
             "sectors": len(sectors),
             "segs": len(segs),
@@ -2192,7 +2273,7 @@ def convert(args: argparse.Namespace) -> None:
         f"{args.map.upper()}: {len(vertices)} vertices, {solid_count}/{len(linedefs)} solid lines "
         f"({culled_count} detail culled), "
         f"{thing_clearance_cells} thing clearance cells, "
-        f"{readability_cells} readability cells, "
+        f"{readability_cells} readability cells ({readability_tail_cells} tail-pruned), "
         f"{len(converted_lifts)} lifts/{len(converted_lift_triggers)} triggers, "
         f"{len(things)} things -> {args.width}x{args.height} grid at {args.out}"
     )
