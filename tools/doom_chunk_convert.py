@@ -499,6 +499,47 @@ def build_things(
     return rows
 
 
+def thin_lite_things(
+    things: list[ChunkThing],
+    start_chunk: int,
+    start_x_q8: int,
+    start_y_q8: int,
+    max_per_chunk: int,
+    clear_start_radius_q8: int,
+) -> list[ChunkThing]:
+    if max_per_chunk <= 0 and clear_start_radius_q8 <= 0:
+        return things
+    rows: list[ChunkThing] = []
+    chunk_counts: dict[int, int] = {}
+
+    def priority(thing: ChunkThing) -> tuple[int, int, int, int]:
+        if thing.thing_class == dc.THING_CLASS_PICKUP:
+            klass = 0
+        elif thing.thing_class == dc.THING_CLASS_MONSTER:
+            klass = 1
+        elif thing.thing_class == dc.THING_CLASS_THREAT:
+            klass = 2
+        else:
+            klass = 3
+        dx = thing.x_q8 - start_x_q8 if thing.chunk == start_chunk else 0
+        dy = thing.y_q8 - start_y_q8 if thing.chunk == start_chunk else 0
+        return (thing.chunk, klass, -(abs(dx) + abs(dy)), thing.type)
+
+    for thing in sorted(things, key=priority):
+        if clear_start_radius_q8 > 0 and thing.chunk == start_chunk:
+            if thing.thing_class in (dc.THING_CLASS_MONSTER, dc.THING_CLASS_THREAT):
+                if abs(thing.x_q8 - start_x_q8) <= clear_start_radius_q8 and abs(thing.y_q8 - start_y_q8) <= clear_start_radius_q8:
+                    continue
+        if max_per_chunk > 0:
+            count = chunk_counts.get(thing.chunk, 0)
+            if count >= max_per_chunk:
+                continue
+            chunk_counts[thing.chunk] = count + 1
+        rows.append(thing)
+    rows.sort(key=lambda thing: (thing.chunk, thing.y_q8, thing.x_q8, thing.type))
+    return rows
+
+
 def build_exits(
     linedefs: list[dc.LineDef],
     vertices: list[dc.Vertex],
@@ -1066,6 +1107,17 @@ def convert(args: argparse.Namespace) -> None:
         start_x = start_cell_x + 0.5
         start_y = start_cell_y + 0.5
     route_start = (start_cell_x, start_cell_y)
+    start_chunk = (start_cell_y // args.chunk_size) * chunk_cols + (start_cell_x // args.chunk_size)
+    local_start_x = start_x - (start_chunk % chunk_cols) * args.chunk_size
+    local_start_y = start_y - (start_chunk // chunk_cols) * args.chunk_size
+    converted_things = thin_lite_things(
+        converted_things,
+        start_chunk,
+        int(round(local_start_x * 256)),
+        int(round(local_start_y * 256)),
+        args.max_things_per_chunk,
+        int(round(args.clear_start_thing_radius * 256)),
+    )
     route_repair_cells = repair_start_exit_route(
         grid,
         tex_grid,
@@ -1093,9 +1145,8 @@ def convert(args: argparse.Namespace) -> None:
         converted_lifts,
         converted_lift_triggers,
     )
-    start_chunk = (start_cell_y // args.chunk_size) * chunk_cols + (start_cell_x // args.chunk_size)
-    start_x -= (start_chunk % chunk_cols) * args.chunk_size
-    start_y -= (start_chunk // chunk_cols) * args.chunk_size
+    start_x = local_start_x
+    start_y = local_start_y
     write_outputs(
         args.out,
         args.chunk_source,
@@ -1167,11 +1218,27 @@ def main() -> int:
         action="store_true",
         help="Keep the exact WAD-derived fractional player start instead of centering in the open start area",
     )
+    parser.add_argument(
+        "--max-things-per-chunk",
+        type=int,
+        default=0,
+        help="Optional lite-map cap for runtime things emitted per 16x16 chunk; 0 keeps all things",
+    )
+    parser.add_argument(
+        "--clear-start-thing-radius",
+        type=float,
+        default=0.0,
+        help="Drop monster/threat things within this many cells of the centered player start",
+    )
     args = parser.parse_args()
     if args.chunk_size <= 0:
         parser.error("--chunk-size must be positive")
     if args.cell_units <= 0:
         parser.error("--cell-units must be positive")
+    if args.max_things_per_chunk < 0:
+        parser.error("--max-things-per-chunk must be non-negative")
+    if args.clear_start_thing_radius < 0:
+        parser.error("--clear-start-thing-radius must be non-negative")
     convert(args)
     return 0
 

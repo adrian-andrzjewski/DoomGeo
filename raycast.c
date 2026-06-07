@@ -95,6 +95,7 @@ static u16 door_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 static u8  wall_upload_scan = 0;
+static u8  wall_render_scan = 0;
 static u8  wall_first_upload = 1;
 static u8  wall_frame_overrun = 0;
 static u8  render_motion_active = 0;
@@ -525,34 +526,6 @@ u8 rc_sprite_strip_visible(int left, int right, int dist_q8) {
     return 0;
 }
 
-void rc_reserve_sprite_budget_for_screen_range(int left, int right) {
-#if DOOM_SIMPLE_MAP
-    int first_col;
-    int last_col;
-    u16 hidden_scb3;
-    if (right < 0 || left >= SCRW) return;
-    if (left < 0) left = 0;
-    if (right >= SCRW) right = SCRW - 1;
-    if (right < left) return;
-    first_col = left / COLW;
-    last_col = right / COLW;
-    if (first_col < 0) first_col = 0;
-    if (last_col >= NUM_COLS) last_col = NUM_COLS - 1;
-    hidden_scb3 = scb3_word(SCRH + 32, 0, 1);
-    for (int c = first_col; c <= last_col; c++) {
-        u16 spr = WALL_BASE + c;
-        u16 hidden_scb2 = (u16)((HSHRINK << 8) | 0x00);
-        vram_poke((u16)(VRAM_SCB2 + spr), hidden_scb2);
-        vram_poke((u16)(VRAM_SCB3 + spr), hidden_scb3);
-        curscb2[c] = hidden_scb2;
-        curscb3[c] = hidden_scb3;
-    }
-#else
-    (void)left;
-    (void)right;
-#endif
-}
-
 u8 rc_background_column_hidden(u8 col) {
     int left;
     int right;
@@ -674,8 +647,17 @@ void rc_render(void) {
     update_ray_cache();
     int baseMapX = posX >> FBITS;
     int baseMapY = posY >> FBITS;
+    int render_start = 0;
+    int render_count = NUM_COLS;
     u8 allow_span_refinement = 1;
     u8 near_refinement_cells = DOOM_NEAR_LINE_REFINEMENT_CELLS;
+#if DOOM_MOVING_RENDER_COLUMNS < NUM_COLS
+    if (!wall_first_upload && (render_motion_active || wall_render_scan != 0)) {
+        render_start = wall_render_scan;
+        render_count = DOOM_MOVING_RENDER_COLUMNS;
+        if (render_count < 1) render_count = 1;
+    }
+#endif
 #if DOOM_ADAPTIVE_LINE_REFINEMENT
     if (wall_frame_overrun) {
         allow_span_refinement = 0;
@@ -687,7 +669,9 @@ void rc_render(void) {
         near_refinement_cells = DOOM_MOVING_LINE_REFINEMENT_CELLS;
     }
 #endif
-    for (int x = 0; x < NUM_COLS; x++) {
+    for (int render_i = 0; render_i < render_count; render_i++) {
+        int x = render_start + render_i;
+        while (x >= NUM_COLS) x -= NUM_COLS;
         fix rayX = rayXbuf[x];
         fix rayY = rayYbuf[x];
 #if DOOM_RIPDOOM_RENDER
@@ -850,7 +834,19 @@ void rc_render(void) {
         /* distance shading */
         palbuf[x] = depth_palette(kindbuf[x], side, h);
     }
+#if DOOM_MOVING_RENDER_COLUMNS < NUM_COLS
+    if (render_count < NUM_COLS) {
+        wall_render_scan = (u8)(render_start + render_count);
+        while (wall_render_scan >= NUM_COLS) wall_render_scan -= NUM_COLS;
+        view_dirty = (u8)(wall_render_scan != 0);
+    } else {
+        wall_render_scan = 0;
+        view_dirty = 0;
+    }
+#else
+    wall_render_scan = 0;
     view_dirty = 0;
+#endif
     wall_upload_dirty = 1;
 }
 

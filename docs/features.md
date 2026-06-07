@@ -13,7 +13,11 @@ readable.
   sector, secret sector, floor/ceiling height, door, exit, and thing data.
 - Keeps richer generated map arrays for future work, but the runtime path uses
   Neo Geo-friendly fixed-size structures instead of a generic WAD directory.
-- Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
+- The normal cart build now defaults to `DOOM_SIMPLE_MAP=1`, a compact handmade
+  `16x16` showcase map that keeps the NGRayEx-style proportions and exercises
+  enemies, pickups, a key door, and an exit from the real menu flow. The WAD
+  converter remains available by building with `DOOM_SIMPLE_MAP=0`.
+- The converted-WAD path defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
   `DOOM_MAP_HEIGHT`, `DOOM_MAP_DETAIL_CULL`, `DOOM_RENDER_DETAIL_CULL`,
   `DOOM_MAP_READABILITY_CLEANUP`, and `DOOM_SKILL_MASK` at build time. The
   default skill mask is `4`, matching hard/Ultra-Violence THING placement; use
@@ -37,7 +41,7 @@ readable.
   offline conversion path.
 - `make chunk-map` runs `tools/doom_chunk_convert.py`, which converts the WAD
   map at a fixed cell scale and emits generated `16x16` chunk pages plus
-  `doom_chunks_preview.txt`. The default chunk scale is 64 Doom units per cell:
+  `doom_chunks_preview.txt`. The default chunk scale is 256 Doom units per cell:
   E1M1 becomes a 5x3 set of pages, but the Neo Geo runtime still loads only one
   `16x16` page into the original NGRayEx-style 80-column renderer. `make
   chunk-route-check` verifies the generated chunk start-to-exit route, treating
@@ -95,9 +99,9 @@ readable.
   center of its active `16x16` room page, which gives more visual clearance from
   the start wall without changing the sprite-strip/RIPDOOM-lite renderer.
 - `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
-  ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
+  ROM with `16x16` chunks, 256 Doom units per cell, skipped intro, and normal
   player input. Simple mode keeps the original NGRayEx wall projection height
-  even when chunk cells represent smaller WAD units, so the 32-unit chunk build
+  even when chunk cells represent smaller WAD units, so the chunk build
   does not collapse distant E1M1 walls into unreadable horizon slivers.
   `make chunk-movement-test-rom` uses the same scale but replaces input with a
   scripted forward walk, so it is only for regression testing.
@@ -150,7 +154,7 @@ readable.
 
 ## Rendering
 
-- The default `DOOM_DETAIL=quality` renderer uses 40 wall-column sprites over
+- The converted-WAD `DOOM_DETAIL=quality` renderer uses 40 wall-column sprites over
   the 320-pixel playfield, giving 8-pixel logical columns backed by 16-pixel
   Neo Geo strips. This is the normal readable-navigation mode; `balanced` and
   `speed` remain lower-cost stress tiers, while the heavier 64-column
@@ -192,7 +196,7 @@ readable.
   direction changes. Movement-only frames reuse those values before running
   DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
   column.
-- The default renderer spends more active playfield sprites on walls: 20
+- The converted-WAD renderer spends more active playfield sprites on walls: 20
   backdrop strips, 40 wall columns, seven 4-strip world things, and seven weapon
   strips fit inside the first 95 active sprites. Alternate build tiers are
   available for different tradeoffs: `DOOM_DETAIL=clarity` uses 64 wall columns
@@ -513,14 +517,13 @@ readable.
   EPISODE_MAP=E1M3` build or launch a standalone ROM for a specific Episode 1
   map under `build/episode-roms/`. `make episode-roms` loops through E1M1-E1M9
   and builds one standalone ROM output per map.
-- The default ROM starts on shareware `E1M1`; `make key-test-rom` and
-  `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
-  the real red keycard and red locked-door path can be verified without
-  changing the default map.
-- `make key-door-test-rom` and `make key-door-test-gngeo` build a focused E1M2
-  key/door verification ROM. It starts beside the real red locked-door group,
-  faces the door, hides unrelated things, and places a real WAD red keycard in
-  front of the player so pickup and locked-door behavior can be tested quickly.
+- The default ROM starts on the hand-authored `DOOM_SIMPLE_MAP=1` sample map.
+  `make key-test-rom` and `make key-test-gngeo` now use that same sample-map
+  geometry by default while keeping the normal Doom asset conversion path.
+- `make key-door-test-rom` and `make key-door-test-gngeo` build a focused
+  key/door verification ROM. In the default sample-map build it stages the
+  authored blue-key door; building with `DOOM_SIMPLE_MAP=0` still exercises the
+  converted E1M2 red-key path.
 - `tools/smoke_key_door.sh` automates that focused ROM through missing-key,
   key pickup, and successful door-open stages, producing comparison screenshots
   under `.tools/screens/latest`. It now runs a focused PNG checker that verifies
@@ -579,11 +582,10 @@ readable.
   computer, light, and brown variants into those existing classes so E1M2 walls
   retain more Doom identity without adding runtime WAD parsing or more wall
   sprites.
-- `make exit-test-rom` and `make exit-test-gngeo` build a focused E1M1 exit
-  completion ROM. It starts two converted cells left of the real generated
-  E1M1 exit trigger, and `tools/smoke_e1m1_exit.sh` walks into that trigger,
-  captures the completed frame, and checks the `EXIT` plus kill/item/secret
-  percentage overlay.
+- `make exit-test-rom` and `make exit-test-gngeo` build a focused exit
+  completion ROM. In the default sample-map build it walks into the authored
+  exit trigger; building with `DOOM_SIMPLE_MAP=0` keeps the converted E1M1 exit
+  trigger path available for converter checks.
 - `make e1m8-boss-test-rom` and `make e1m8-boss-test-gngeo` build a focused
   E1M8 boss-exit verification ROM. It stages the two real E1M8 Baron things in
   front of the player with low HP, and `tools/smoke_e1m8_boss_exit.sh` fires

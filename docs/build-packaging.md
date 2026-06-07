@@ -52,13 +52,10 @@ launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
 `.tools/screens/latest/smoke.png`. Override `SMOKE_BUILD_TARGET`,
 `SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, `SMOKE_WAIT_SECS`, or
 `SMOKE_START_GAME=1` when capturing variants or when a normal ROM should press
-B through the intro/menu before capture,
-such as the E1M2 key-test ROM, the focused red key/door ROM, the combat
-verification ROM, the focused real E1M1 encounter ROM, the E1M1 scout-route
-ROM, the close-combat
-verification ROM, the living-monster gallery ROM, the weapons/keycard arsenal
-verification ROM, the death/drop verification ROM, or the powerup verification
-ROM:
+B through the intro/menu before capture, such as the sample-map key/door ROM,
+combat verification ROM, sample encounter ROM, scout-route ROM, close-combat
+verification ROM, living-monster gallery ROM, weapons/keycard arsenal
+verification ROM, death/drop verification ROM, or powerup verification ROM:
 
 ```sh
 SMOKE_BUILD_TARGET=combat-test-rom \
@@ -196,20 +193,21 @@ pump animation. The helper also steps the player slightly backward before the
 final capture so the weapon sprite does not cover the corpse/drop feedback;
 override `COMBAT_DEATH_REVEAL_STEP_SECS` if that framing needs tuning.
 
-For a real converted E1M1 monster visibility pass, run
+For a sample-map monster visibility pass, run
 `tools/smoke_e1m1_encounter.sh`. It builds `make encounter-test-rom`, launches
 `make encounter-test-gngeo`, and captures both the initial focused encounter and
-one pistol-fire frame against an existing WAD-derived shotgun guy.
+one pistol-fire frame against an authored sample-map monster.
 
 For a first-contact route visibility pass, run `tools/smoke_e1m1_scout.sh`. It
 builds `make scout-test-rom`, launches `make scout-test-gngeo`, and captures a
-normal-route waypoint looking toward the first reachable WAD-position shotgun
-guys plus a pistol-fire frame.
+sample-map route waypoint looking toward visible pickups and monsters plus a
+pistol-fire frame.
 
 For a focused first-level completion check, run `tools/smoke_e1m1_exit.sh`. It
-builds `make exit-test-rom`, starts two converted cells left of the real
-generated E1M1 exit trigger, walks into that trigger, captures the completed
-frame, and checks the `EXIT` plus kill/item/secret percentage overlay.
+builds `make exit-test-rom`, stages the player near the authored sample exit,
+walks into that trigger, captures the completed frame, and checks the `EXIT`
+plus kill/item/secret percentage overlay. Build with `DOOM_SIMPLE_MAP=0` when
+checking the older converted E1M1 exit staging.
 
 For the E1M8 special boss-death exit, run `tools/smoke_e1m8_boss_exit.sh`. It
 builds `make e1m8-boss-test-rom` from the real E1M8 generated map, stages the
@@ -254,7 +252,7 @@ make smoke-screenshot
 ```
 
 For the full key-door interaction path, use `tools/smoke_key_door.sh`. It
-captures the initial focused E1M2 scene, the missing-red-key message, the
+captures the initial sample-map key-door scene, the missing-key message, the
 post-pickup HUD state, the opened-door frame, and one extra frame after walking
 through the opened doorway. The helper finishes with
 `tools/check_key_door_screens.py`, which rejects missing captures, missing
