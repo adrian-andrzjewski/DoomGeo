@@ -783,7 +783,15 @@ static void update_hurt_flash(void) {
             palette_effect = 1;
         }
         hurt_flash--;
-    } else if (bonus_flash) {
+        return;
+    }
+
+    if (palette_effect == 1) {
+        restore_hurt_palettes();
+        palette_effect = 0;
+    }
+
+    if (bonus_flash) {
         if (palette_effect != 3) {
             set_bonus_palettes();
             palette_effect = 3;
@@ -6230,6 +6238,13 @@ static int projected_floor_screen_offset(short world_x_q8, short world_y_q8, int
     return offset;
 }
 
+static int pickup_floor_distance_bias(int dist_q8) {
+    if (dist_q8 > WORLD_Q8(2304)) return 10;
+    if (dist_q8 > WORLD_Q8(1536)) return 7;
+    if (dist_q8 > WORLD_Q8(1024)) return 4;
+    return 0;
+}
+
 static int thing_min_screen_height(u16 thing_type) {
 #if DOOM_SIMPLE_MAP
     switch (thing_type) {
@@ -6362,6 +6377,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
             top = world_sprite_origin_y(thing_type, h)
                 - projected_floor_screen_offset(world_x_q8, world_y_q8, h, view_px, view_py)
                 - meta->origin_y + ENEMY_GROUND_LIFT;
+            if (is_pickup) top += pickup_floor_distance_bias(dist_q8);
         }
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
