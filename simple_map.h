@@ -139,7 +139,7 @@ static inline int map_at(int x, int y) {
     }
     {
         unsigned char lift_id = g_chunk_lift_cell[chunk][cell];
-        if (lift_id && !g_chunk_lift_open[lift_id - 1]) return 1;
+        if (lift_id) return g_chunk_lift_open[lift_id - 1] ? 0 : 1;
     }
     return g_chunk_solid[chunk][cell] ? 1 : 0;
 }

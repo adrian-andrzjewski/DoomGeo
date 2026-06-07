@@ -55,6 +55,10 @@ readable.
   triggers and their target lift sectors. Lifts still remain blocking until
   triggered, but once opened their coarse `16x16` platform cells have a playable
   route instead of being stranded by rasterization.
+- Chunked runtime collision now treats generated lift-cell metadata as the
+  authority after activation, even when the lift cell is in a neighboring
+  streamed page. This keeps opened platforms passable after a chunk transition
+  instead of falling back to the coarse solid wall bit.
 - Chunk start placement still prefers an open centered cell in the player's
   source sector, but now also scores exact forward visual clearance against WAD
   linedefs. This keeps the E1M1 playable start from being pushed into a coarse
