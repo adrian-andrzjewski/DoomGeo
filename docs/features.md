@@ -75,6 +75,11 @@ readable.
   then compares per-column wall distance/seg samples so the harness catches
   regressions where the weapon bobs but the rendered wall state appears fixed
   in place.
+- RIPDOOM wall hits now carry a one-span lower/upper wall approximation from
+  front/back sector floor and ceiling deltas. The renderer still uses one Neo
+  Geo sprite strip per column, but platform/stair/window edges can be drawn as
+  top- or bottom-anchored partial walls instead of every two-sided hit becoming
+  a full-height slab.
 - RIPDOOM ray casting keeps the fast local blockmap search first, then falls
   back to sampling blockmap cells along a missed ray. This fills long corridor
   or chunk-edge columns without raising the local line/seg caps for every

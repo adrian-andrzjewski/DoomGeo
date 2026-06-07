@@ -215,6 +215,7 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     short rip_dir_x;
     short rip_dir_y;
     fix perp;
+    int full_h;
     int h;
     int top;
     int vsh;
@@ -228,7 +229,9 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
 
     perp = (fix)((((long)hit.distance_q8) << FBITS) / DOOM_RIPDOOM_RENDER_UNITS_PER_CELL);
     if (perp < FMIN) perp = FMIN;
-    h = projected_height(perp);
+    full_h = projected_height(perp);
+    h = full_h;
+    if (hit.span && hit.span_height) h = projected_span_height(perp, hit.span_height);
     if (h < 1) h = 1;
     if (h > MAX_H) h = MAX_H;
     kindbuf[column] = ripdoom_kind_for_hit(&hit);
@@ -243,6 +246,13 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     view_h = GAME_H;
 #endif
     top = (view_h - h) / 2;
+    if (hit.span == 1) {
+        int bottom = (view_h + full_h) / 2;
+        if (bottom > view_h) bottom = view_h;
+        top = bottom - h;
+    } else if (hit.span == 2) {
+        top = (view_h - full_h) / 2;
+    }
     if (top < 0) top = 0;
     if (top > view_h - 1) top = view_h - 1;
     vsh = h - 1;
@@ -251,7 +261,7 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
 
     scb2buf[column] = (u16)((HSHRINK << 8) | (vsh & 0xFF));
     scb3buf[column] = scb3_word(top, 0, WALL_WIN);
-    wall_full_cover[column] = (u8)(top <= 0 && h >= view_h);
+    wall_full_cover[column] = (u8)(!hit.span && top <= 0 && h >= view_h);
     palbuf[column] = depth_palette(kindbuf[column], hit.side, h);
     return 1;
 }

@@ -14,6 +14,8 @@ typedef struct NgRipRayHit {
     unsigned char texture_kind;
     unsigned char tex_u;
     unsigned char side;
+    unsigned char span;
+    unsigned char span_height;
 } NgRipRayHit;
 
 int ripdoom_point_side(short x, short y, const NgRipNode *node);

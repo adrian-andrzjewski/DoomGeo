@@ -100,6 +100,44 @@ static int ripdoom_div_q8(long numerator, long denominator) {
     return (int)((numerator << 8) / denominator);
 }
 
+static unsigned char ripdoom_span_height_from_delta(int delta) {
+    int height;
+    if (delta < 0) delta = -delta;
+    if (delta <= 0) return 0;
+    height = (delta * 128 + 63) / 128;
+    if (height < 1) height = 1;
+    if (height > 128) height = 128;
+    return (unsigned char)height;
+}
+
+static void ripdoom_seg_span(const NgRipSeg *seg, unsigned char *span, unsigned char *span_height) {
+    enum { MIN_OCCLUDING_SPAN_HEIGHT = 48 };
+    *span = 0;
+    *span_height = 0;
+    if (!seg) return;
+    if (seg->flags & NG_RIP_SEG_DOOR) return;
+    if (!(seg->flags & NG_RIP_SEG_TWO_SIDED)) return;
+    if (seg->front_sector < 0 || seg->back_sector < 0) return;
+    if (seg->front_sector >= NG_RIP_SECTOR_COUNT || seg->back_sector >= NG_RIP_SECTOR_COUNT) return;
+    if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) {
+        int delta = (int)g_rip_sectors[seg->back_sector].floor_height - (int)g_rip_sectors[seg->front_sector].floor_height;
+        unsigned char height = ripdoom_span_height_from_delta(delta);
+        if (height >= MIN_OCCLUDING_SPAN_HEIGHT) {
+            *span = 1;
+            *span_height = height;
+            return;
+        }
+    }
+    if ((seg->flags & NG_RIP_SEG_UPPER) && seg->upper_texture) {
+        int delta = (int)g_rip_sectors[seg->front_sector].ceiling_height - (int)g_rip_sectors[seg->back_sector].ceiling_height;
+        unsigned char height = ripdoom_span_height_from_delta(delta);
+        if (height >= MIN_OCCLUDING_SPAN_HEIGHT) {
+            *span = 2;
+            *span_height = height;
+        }
+    }
+}
+
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 static int ripdoom_floor_div(long value, int divisor) {
     if (value >= 0) return (int)(value / divisor);
@@ -397,12 +435,15 @@ int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int
         const NgRipSeg *seg = &g_rip_segs[best_seg];
         unsigned short texture = seg->mid_texture;
         unsigned char texture_kind = seg->mid_kind;
+        unsigned char span = 0;
+        unsigned char span_height = 0;
         if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture = seg->lower_texture;
         if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture_kind = seg->lower_kind;
         else if ((seg->flags & NG_RIP_SEG_UPPER) && seg->upper_texture) {
             texture = seg->upper_texture;
             texture_kind = seg->upper_kind;
         }
+        ripdoom_seg_span(seg, &span, &span_height);
         out_hit->seg = (unsigned short)best_seg;
         out_hit->linedef = (unsigned short)seg->linedef;
         out_hit->sector = seg->front_sector;
@@ -412,6 +453,8 @@ int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int
         out_hit->texture_kind = texture_kind;
         out_hit->tex_u = (unsigned char)(best_u_q8 > 255 ? 255 : best_u_q8);
         out_hit->side = (unsigned char)best_side;
+        out_hit->span = span;
+        out_hit->span_height = span_height;
     }
     return 1;
 }
