@@ -1,4 +1,4 @@
-# DoomGeo-AES Build and Release Plan
+# DoomGeo Build and Release Plan
 
 This file is the committed plan tracked by `doomgeo-plan`. It is intentionally
 separate from the build helper so one standalone binary can build/package while
@@ -21,17 +21,17 @@ the other only accompanies and tracks the plan.
 ## Evidence
 
 - Linux ROM builds are expected to produce `build/rom/magdrop2.zip` internally,
-  then package it as `dist/rom/doomgeo-aes.zip`.
+  then package it as `dist/rom/doomgeo.zip`.
 - ASM ROM builds are expected to produce `build/asm-rom/magdrop2.zip` from
-  `asm/doomgeo_asm.S`, then package it as `dist/asm-rom/doomgeo-aes-asm.zip`.
+  `asm/doomgeo_asm.S`, then package it as `dist/asm-rom/doomgeo-asm.zip`.
 - Windows/MSYS2 ROM builds are expected to produce the same packaged
-  `doomgeo-aes.zip` through the UCRT64 ngdevkit packages.
+  `doomgeo.zip` through the UCRT64 ngdevkit packages.
 - Standalone helper builds are expected to produce `doomgeo-build` and
   `doomgeo-plan` artifacts for Linux, plus `.exe` variants for Windows.
 - The Pages bundle is expected to publish `index.html`, `asm.html`,
-  `rom/web-<hash>/magdrop2.zip`, `rom/web-<hash>/doomgeo-aes.zip`,
+  `rom/web-<hash>/magdrop2.zip`, `rom/web-<hash>/doomgeo.zip`,
   `rom/web-<hash>/neogeo.zip`, `rom/asm/web-<hash>/magdrop2.zip`, and
-  `rom/asm/web-<hash>/doomgeo-aes-asm.zip`.
+  `rom/asm/web-<hash>/doomgeo-asm.zip`.
 - The Pages ROM zips are expected to be FBNeo-compatible launch packages with
   `magdrop2` driver chip filenames, sizes, and CRCs internally while preserving
   the generated homebrew data outside the final padding correction bytes.

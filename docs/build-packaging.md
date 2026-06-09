@@ -23,7 +23,7 @@ bank without cutting assets back to a smaller romset shape. The browser
 player launches `magdrop2.zip` and sets `EJS_gameName = "magdrop2"` because
 FBNeo identifies arcade games by driver/romset name. The bundle also writes
 project-named copies
-(`doomgeo-aes.zip` and `doomgeo-aes-asm.zip`) for download links, but those are
+(`doomgeo.zip` and `doomgeo-asm.zip`) for download links, but those are
 not the files passed to the emulator. The raw build artifacts under
 `build/rom/` are not rewritten this way; this compatibility package is only for
 the browser player.
@@ -401,10 +401,10 @@ The Pages job consumes the Freedoom web ROM artifact and writes:
 dist/pages/index.html
 dist/pages/asm.html
 dist/pages/rom/web-<hash>/magdrop2.zip
-dist/pages/rom/web-<hash>/doomgeo-aes.zip
+dist/pages/rom/web-<hash>/doomgeo.zip
 dist/pages/rom/web-<hash>/neogeo.zip
 dist/pages/rom/asm/web-<hash>/magdrop2.zip
-dist/pages/rom/asm/web-<hash>/doomgeo-aes-asm.zip
+dist/pages/rom/asm/web-<hash>/doomgeo-asm.zip
 ```
 
 The web players use the hosted EmulatorJS loader, set `EJS_core = "fbneo"`, and

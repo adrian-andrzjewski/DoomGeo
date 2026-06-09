@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DoomGeo-AES build helper.
+"""DoomGeo build helper.
 
 This script is intentionally dependency-light so GitHub Actions can package it
 as a single standalone binary with PyInstaller for Linux and Windows.
@@ -21,9 +21,9 @@ from typing import TypeAlias
 
 REPO_MARKERS = ("Makefile", "config.mk", "rom.mk")
 DEFAULT_LOCAL_PREFIX = Path(".tools") / "ngdevkit-local" / "usr"
-PROJECT_NAME = "DoomGeo-AES"
-PACKAGE_ROM_ZIP = "doomgeo-aes.zip"
-PACKAGE_ASM_ROM_ZIP = "doomgeo-aes-asm.zip"
+PROJECT_NAME = "DoomGeo"
+PACKAGE_ROM_ZIP = "doomgeo.zip"
+PACKAGE_ASM_ROM_ZIP = "doomgeo-asm.zip"
 FBNEO_COMPAT_ROM_ZIP = "magdrop2.zip"
 FBNEO_DRIVER_NAME = "magdrop2"
 ROM_ZIP = Path("build") / "rom" / FBNEO_COMPAT_ROM_ZIP

@@ -55,7 +55,7 @@ jobs:
       - name: Upload ROM
         uses: actions/upload-artifact@v4
         with:
-          name: doomgeo-aes-rom
+          name: doomgeo-rom
           path: dist/rom/*
           if-no-files-found: error
 
@@ -83,7 +83,7 @@ jobs:
       - name: Upload ASM ROM
         uses: actions/upload-artifact@v4
         with:
-          name: doomgeo-aes-asm-rom
+          name: doomgeo-asm-rom
           path: dist/asm-rom/*
           if-no-files-found: error
 
@@ -119,7 +119,7 @@ jobs:
       - name: Upload Pages ROM
         uses: actions/upload-artifact@v4
         with:
-          name: doomgeo-aes-pages-rom
+          name: doomgeo-pages-rom
           path: dist/pages-rom/*
           if-no-files-found: error
 
@@ -130,11 +130,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            artifact: doomgeo-aes-linux-helpers
+            artifact: doomgeo-linux-helpers
             build_name: doomgeo-build
             plan_name: doomgeo-plan
           - os: windows-2022
-            artifact: doomgeo-aes-windows-helpers
+            artifact: doomgeo-windows-helpers
             build_name: doomgeo-build.exe
             plan_name: doomgeo-plan.exe
     runs-on: ${{ matrix.os }}
@@ -216,7 +216,7 @@ jobs:
       - name: Upload Windows-built ROM
         uses: actions/upload-artifact@v4
         with:
-          name: doomgeo-aes-windows-rom
+          name: doomgeo-windows-rom
           path: dist/windows-rom/*
           if-no-files-found: error
 
@@ -238,17 +238,17 @@ jobs:
       - name: Download Pages ROM artifact
         uses: actions/download-artifact@v4
         with:
-          name: doomgeo-aes-pages-rom
+          name: doomgeo-pages-rom
           path: dist/pages-rom
 
       - name: Download ASM ROM artifact
         uses: actions/download-artifact@v4
         with:
-          name: doomgeo-aes-asm-rom
+          name: doomgeo-asm-rom
           path: dist/asm-rom
 
       - name: Build Pages bundle
-        run: python3 tools/doomgeo_build.py pages --rom dist/pages-rom/doomgeo-aes.zip --bios dist/pages-rom/neogeo.zip --asm-rom dist/asm-rom/doomgeo-aes-asm.zip --out dist/pages
+        run: python3 tools/doomgeo_build.py pages --rom dist/pages-rom/doomgeo.zip --bios dist/pages-rom/neogeo.zip --asm-rom dist/asm-rom/doomgeo-asm.zip --out dist/pages
 
       - name: Verify FBNeo web package CRCs
         run: |
@@ -280,10 +280,10 @@ jobs:
                       if actual != crc:
                           raise SystemExit(f"{path}:{name} CRC {actual:08x} != {crc:08x}")
 
-          main_rom = glob.glob("dist/pages/rom/web-*/doomgeo-aes.zip")
+          main_rom = glob.glob("dist/pages/rom/web-*/doomgeo.zip")
           main_launch_rom = glob.glob("dist/pages/rom/web-*/magdrop2.zip")
           main_bios = glob.glob("dist/pages/rom/web-*/neogeo.zip")
-          asm_rom = glob.glob("dist/pages/rom/asm/web-*/doomgeo-aes-asm.zip")
+          asm_rom = glob.glob("dist/pages/rom/asm/web-*/doomgeo-asm.zip")
           asm_launch_rom = glob.glob("dist/pages/rom/asm/web-*/magdrop2.zip")
           if len(main_rom) != 1 or len(main_launch_rom) != 1 or len(main_bios) != 1 or len(asm_rom) != 1 or len(asm_launch_rom) != 1:
               raise SystemExit(

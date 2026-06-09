@@ -269,7 +269,7 @@ GNGEO_BASE_DATAFILE:=$(GNGEO_DATAFILE)
 GNGEO_RUN_DATAFILE=$(ROM)/gngeo_data.zip
 
 %/gngeo_data.zip: %/202-p1.p1 %/202-m1.m1 %/202-v1.v1 %/202-s1.s1 %/202-c1.c1 %/202-c2.c2
-	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-AES --year 2026 --publisher Unpublished --prom $(@D)/202-p1.p1 --mrom $(@D)/202-m1.m1 --vrom $(@D)/202-v1.v1 --srom $(@D)/202-s1.s1 --crom $(@D)/202-c1.c1 $(@D)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
+	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo --year 2026 --publisher Unpublished --prom $(@D)/202-p1.p1 --mrom $(@D)/202-m1.m1 --vrom $(@D)/202-v1.v1 --srom $(@D)/202-s1.s1 --crom $(@D)/202-c1.c1 $(@D)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
 
 gngeo gngeo-fullscreen: GNGEO_DATAFILE=$(GNGEO_RUN_DATAFILE)
 gngeo gngeo-fullscreen: $(GNGEO_RUN_DATAFILE)
@@ -397,7 +397,7 @@ $(SPRITE_BANK_TEST_CART): $(SPRITE_BANK_TEST_PROM) $(SPRITE_BANK_TEST_ROM)/202-c
 	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
 
 $(SPRITE_BANK_TEST_GNGEO_DATAFILE): $(SPRITE_BANK_TEST_PROM) $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 $(SPRITE_BANK_TEST_ROM)/202-s1.s1 $(SPRITE_BANK_TEST_ROM)/202-m1.m1 $(SPRITE_BANK_TEST_ROM)/202-v1.v1 | $(SPRITE_BANK_TEST_ROM)
-	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-AES-Sprite-Bank-Test --year 2026 --publisher Unpublished --prom $(SPRITE_BANK_TEST_PROM) --mrom $(SPRITE_BANK_TEST_ROM)/202-m1.m1 --vrom $(SPRITE_BANK_TEST_ROM)/202-v1.v1 --srom $(SPRITE_BANK_TEST_ROM)/202-s1.s1 --crom $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
+	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-Sprite-Bank-Test --year 2026 --publisher Unpublished --prom $(SPRITE_BANK_TEST_PROM) --mrom $(SPRITE_BANK_TEST_ROM)/202-m1.m1 --vrom $(SPRITE_BANK_TEST_ROM)/202-v1.v1 --srom $(SPRITE_BANK_TEST_ROM)/202-s1.s1 --crom $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
 
 sprite-bank-test-rom: $(SPRITE_BANK_TEST_CART)
 
