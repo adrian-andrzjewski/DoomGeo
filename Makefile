@@ -654,7 +654,20 @@ ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) $(filter -D%,$(CFLAGS)) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_RENDER_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
-.PHONY: face-test-rom face-test-gngeo sprite-bank-test-rom sprite-bank-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo smoke-screenshot simple-enemy-visibility-check route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
+# Generic WAD import pipeline
+import-validate: $(DOOM_IWAD) tools/doom_import.py
+	$(PYTHON) tools/doom_import.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --validate --stats --cache-dir .tools/cache
+
+import-stats: $(DOOM_IWAD) tools/doom_import.py
+	$(PYTHON) tools/doom_import.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --stats --cache-dir .tools/cache
+
+import-json: $(DOOM_IWAD) tools/doom_import.py
+	$(PYTHON) tools/doom_import.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --validate --stats --json --cache-dir .tools/cache
+
+import-all-maps: $(DOOM_IWAD) tools/doom_import.py
+	$(PYTHON) tools/doom_import.py --iwad $(DOOM_IWAD) --all-maps --validate --stats --cache-dir .tools/cache
+
+.PHONY: face-test-rom face-test-gngeo sprite-bank-test-rom sprite-bank-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo smoke-screenshot simple-enemy-visibility-check route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check import-validate import-stats import-json import-all-maps
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
