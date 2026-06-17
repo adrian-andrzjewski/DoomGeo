@@ -489,3 +489,118 @@ The web players use the hosted EmulatorJS loader, set `EJS_core = "fbneo"`, and
 point `EJS_gameUrl`/`EJS_biosUrl` at those generated files. The `<hash>` path
 component is generated from the source artifacts so browser/CDN caches cannot
 reuse a stale ROM zip with older CRCs.
+
+## Contributing to the Original Repository
+
+To contribute changes back to the original `sabino/DoomGeo` repository, you
+need to fork the repo, make changes, and create a pull request.
+
+### One-Time Setup
+
+1. **Fork the repository** on GitHub:
+   - Visit https://github.com/sabino/DoomGeo
+   - Click "Fork" in the top-right corner
+   - Or use the GitHub CLI:
+     ```sh
+     gh repo fork sabino/DoomGeo --clone=false
+     ```
+
+2. **Add your fork as a remote**:
+   ```sh
+   git remote add myfork https://github.com/YOUR_USERNAME/DoomGeo.git
+   ```
+
+3. **Authenticate with GitHub** (if not already):
+   ```sh
+   gh auth login
+   gh auth setup-git
+   ```
+
+### Making Changes
+
+1. **Create a feature branch** (optional but recommended):
+   ```sh
+   git checkout -b feature/my-feature
+   ```
+
+2. **Make your changes** and stage them:
+   ```sh
+   git add <changed-files>
+   ```
+
+3. **Commit with a descriptive message**:
+   ```sh
+   git commit -m "Brief description of changes"
+   ```
+   
+   Commit message conventions:
+   - `docs:` for documentation changes
+   - `feat:` for new features
+   - `fix:` for bug fixes
+   - `refactor:` for code refactoring
+   - `chore:` for build/tooling changes
+
+4. **Push to your fork**:
+   ```sh
+   git push myfork feature/my-feature
+   # or for main branch:
+   git push myfork main
+   ```
+
+### Creating a Pull Request
+
+1. **Using GitHub CLI** (recommended):
+   ```sh
+   gh pr create --repo sabino/DoomGeo \
+     --title "Brief PR title" \
+     --body "Description of changes"
+   ```
+
+2. **Using GitHub web interface**:
+   - Go to https://github.com/sabino/DoomGeo/pulls
+   - Click "New pull request"
+   - Click "compare across forks"
+   - Select your fork and branch
+   - Fill in the PR title and description
+   - Click "Create pull request"
+
+### Keeping Your Fork in Sync
+
+To keep your fork updated with the original repo:
+
+```sh
+# Fetch upstream changes
+git fetch origin
+
+# Update your local main branch
+git checkout main
+git merge origin/main
+
+# Push updates to your fork
+git push myfork main
+```
+
+### Example Workflow
+
+```sh
+# 1. Fork on GitHub (one-time)
+gh repo fork sabino/DoomGeo --clone=false
+
+# 2. Add remote (one-time)
+git remote add myfork https://github.com/YOUR_USERNAME/DoomGeo.git
+
+# 3. Make changes
+# ... edit files ...
+
+# 4. Stage and commit
+git add README.md docs/build-packaging.md
+git commit -m "docs: add Windows build instructions"
+
+# 5. Push to fork
+git push myfork main
+
+# 6. Create pull request
+gh pr create --repo sabino/DoomGeo \
+  --title "docs: add Windows build instructions" \
+  --body "Added comprehensive Windows build guide with MSYS2 UCRT64."
+```
