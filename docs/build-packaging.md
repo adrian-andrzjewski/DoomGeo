@@ -339,15 +339,100 @@ one scale level for the requested frames.
 
 ## Local Windows Build
 
-ngdevkit's current Windows path is native MSYS2 UCRT64. Run the helper from an
-MSYS2 UCRT64 shell and let the standalone installer command configure the
-upstream package repository and install the needed packages:
+ngdevkit's current Windows path is native MSYS2 UCRT64. The following steps
+provide a complete guide to building and running DoomGeo on Windows.
+
+### Prerequisites
+
+- Windows 10 or later
+- [MSYS2](https://www.msys2.org) (can be installed via winget: `winget install MSYS2.MSYS2`)
+
+### Step-by-Step Instructions
+
+1. **Install MSYS2** (if not already installed):
+   ```powershell
+   winget install MSYS2.MSYS2
+   ```
+
+2. **Open MSYS2 UCRT64 shell** from the Start menu or run:
+   ```
+   C:\msys64\ucrt64.exe
+   ```
+
+3. **Install dependencies** using the build helper:
+   ```sh
+   python3 tools/doomgeo_build.py install --method msys2
+   ```
+   This installs:
+   - ngdevkit toolchain (m68k-neogeo-elf-gcc, etc.)
+   - ngdevkit-gngeo emulator
+   - Required packages (imagemagick, sox, python-pillow, etc.)
+
+4. **Verify the environment**:
+   ```sh
+   python3 tools/doomgeo_build.py doctor --tools-prefix /ucrt64
+   ```
+   Both `m68k-neogeo-elf-gcc` and `m68k-neogeo-elf-objcopy` should show as found.
+
+5. **Build the ROM**:
+   ```sh
+   python3 tools/doomgeo_build.py build --tools-prefix /ucrt64
+   ```
+   Or directly with make:
+   ```sh
+   make cart TOOLS_PREFIX=/ucrt64
+   ```
+
+6. **Run the emulator**:
+   ```sh
+   make gngeo TOOLS_PREFIX=/ucrt64
+   ```
+
+### Controls
+
+| Key | Neo Geo Button | Action |
+|-----|----------------|--------|
+| Arrow Up/Down | D-pad | Move forward/back |
+| Arrow Left/Right | D-pad | Turn |
+| Z | A | Strafe modifier (hold + Left/Right) |
+| X | B | Fire weapon |
+| A | C | Cycle weapon / Hold+D-pad for shortcuts |
+| S | D | Use facing door |
+| Z+A | A+C | Toggle minimap |
+| 1 | Start | Start game |
+| 3 | Coin | Insert coin |
+
+### Build Variants
 
 ```sh
-doomgeo-build.exe install --method msys2
-doomgeo-build.exe doctor --tools-prefix /ucrt64
-doomgeo-build.exe build --tools-prefix /ucrt64
+make cart TOOLS_PREFIX=/ucrt64                         # default 16x16 showcase
+make cart TOOLS_PREFIX=/ucrt64 DOOM_DETAIL=clarity     # clarity-tier assets
+make cart TOOLS_PREFIX=/ucrt64 DOOM_DETAIL=quality     # quality-tier assets (default)
+make cart TOOLS_PREFIX=/ucrt64 DOOM_DETAIL=balanced    # balanced-tier assets
+make cart TOOLS_PREFIX=/ucrt64 DOOM_DETAIL=speed       # speed-tier assets
+make cart TOOLS_PREFIX=/ucrt64 DOOM_SIMPLE_MAP=0       # experimental converted-WAD grid
 ```
+
+### Alternative: Using Python Script Directly
+
+If you prefer using the Python build helper:
+
+```sh
+# From MSYS2 UCRT64 shell:
+python3 tools/doomgeo_build.py install --method msys2
+python3 tools/doomgeo_build.py doctor --tools-prefix /ucrt64
+python3 tools/doomgeo_build.py build --tools-prefix /ucrt64
+make gngeo TOOLS_PREFIX=/ucrt64
+```
+
+### Troubleshooting
+
+- **"MSYS2 install requires the UCRT64 environment"**: Make sure you're running
+  from the MSYS2 UCRT64 shell, not MSYS2 MSYS or MinGW.
+- **"missing executable: m68k-neogeo-elf-gcc"**: Run the install step again or
+  verify MSYS2 packages are installed with `pacman -Q | grep ngdevkit`.
+- **Emulator not starting**: Ensure the ROM was built successfully and
+  `build/rom/gngeo_data.zip` exists.
 
 If the helper is run from normal Windows with WSL available, ROM builds delegate
 to WSL as a fallback. Native Windows builds are intentionally standardized on

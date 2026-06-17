@@ -124,11 +124,109 @@ The default build uses the Doom 1 shareware WAD zip. To compare against an owned
 Doom 1 IWAD, pass `DOOM_IWAD=/path/to/DOOM.WAD`; to test the full
 redistributable weapon-art path explicitly, pass `DOOM_IWAD=$(FREEDOOM_ZIP)`.
 
+### Linux (Ubuntu/Debian)
+
 ```sh
 python3 tools/doomgeo_build.py install
 python3 tools/doomgeo_build.py doctor
 python3 tools/doomgeo_build.py build
 SDL_VIDEODRIVER=x11 make gngeo
+```
+
+### Windows (MSYS2 UCRT64)
+
+1. **Install MSYS2** from https://www.msys2.org or via winget:
+   ```powershell
+   winget install MSYS2.MSYS2
+   ```
+
+2. **Open MSYS2 UCRT64 shell** and install dependencies:
+   ```sh
+   python3 tools/doomgeo_build.py install --method msys2
+   ```
+
+3. **Verify the environment**:
+   ```sh
+   python3 tools/doomgeo_build.py doctor --tools-prefix /ucrt64
+   ```
+
+4. **Build the ROM**:
+   ```sh
+   python3 tools/doomgeo_build.py build --tools-prefix /ucrt64
+   ```
+
+5. **Run the emulator**:
+   ```sh
+   make gngeo TOOLS_PREFIX=/ucrt64
+   ```
+
+### Controls
+
+| Key | Action |
+|-----|--------|
+| Arrow Up/Down | Move forward/back |
+| Arrow Left/Right | Turn |
+| Z (A) | Strafe modifier |
+| X (B) | Fire weapon |
+| A (C) | Cycle weapon / Hold+D-pad for shortcuts |
+| S (D) | Use door |
+| Z+A | Toggle minimap |
+| 1 | Start |
+| 3 | Coin |
+
+### Build Variants
+
+```sh
+make cart                         # default simple 16x16 showcase, DOOM_DETAIL=quality
+make cart DOOM_DETAIL=clarity     # simple showcase with clarity-tier assets
+make cart DOOM_DETAIL=quality     # simple showcase with quality-tier assets
+make cart DOOM_DETAIL=balanced    # simple showcase with balanced-tier assets
+make cart DOOM_DETAIL=speed       # simple showcase with speed-tier assets
+make cart DOOM_SIMPLE_MAP=0       # experimental converted-WAD grid renderer
+make route-check
+make DOOM_MAP=E1M1 BUILDDIR=build/chunk-e1m1 chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check
+make DOOM_MAP=E1M1 BUILDDIR=build/ripdoom-e1m1 ripdoom-map ripdoom-check
+make DOOM_MAP=E1M1 BUILDDIR=build/ripdoom-e1m1 ripdoom-runtime-check
+make DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_RIPDOOM_RENDER=1 BUILDDIR=build/ripdoom-render-e1m1 ROM=build/ripdoom-render-e1m1-cart GFX_ROM_DIR=build/ripdoom-render-e1m1-assets cart
+make bsp-asset-check
+tools/smoke_gameplay.sh
+make key-test-rom
+make key-test-gngeo
+make key-door-test-rom
+make key-door-test-gngeo
+tools/smoke_key_door.sh
+make combat-test-rom
+make combat-test-gngeo
+tools/smoke_combat_interaction.sh
+make encounter-test-rom
+make encounter-test-gngeo
+tools/smoke_e1m1_encounter.sh
+make exit-test-rom
+make exit-test-gngeo
+tools/smoke_e1m1_exit.sh
+tools/smoke_enemy_visibility.sh
+make monster-gallery-rom
+make monster-gallery-gngeo
+make arsenal-test-rom
+make arsenal-test-gngeo
+make death-test-rom
+make death-test-gngeo
+tools/smoke_death_drop.sh
+make powerup-test-rom
+make powerup-test-gngeo
+tools/smoke_powerup.sh
+tools/stress_movement.sh
+tools/bench_movement.sh
+make DOOM_MAP=E1M2
+make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
+make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
+make DOOM_MAP=E1M1 DOOM_SKILL_MASK=2
+python3 tools/doomgeo_build.py pages --out dist/pages
+make smoke-screenshot
+DOOM_MAP=E1M1 tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m1-scout tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m2-start tools/capture_compare.sh
+python3 tools/inspect_map_specials.py --map E1M2
 ```
 
 Useful variants:
